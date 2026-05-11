@@ -140,7 +140,7 @@ function closeModal() {
 async function initApp() {
   document.getElementById("main").innerHTML =
     `<div class="empty"><div class="spinner"></div> Laddar...</div>`;
-  await Promise.all([loadNotes(), loadMats(), loadReturns(), loadTasks(), loadInfoArticles()]);
+  await Promise.all([loadNotes(), loadMats(), loadReturns(), loadTasks(), loadInfoArticles(), loadActionComments()]);
   updMeta();
   render();
 }
@@ -165,9 +165,11 @@ function showTab(t) {
 }
 
 // ---- SUB-TABS för Material ----
-function setMatSubTab(t) {
+async function setMatSubTab(t) {
   matSubTab = t;
   openMatId = null;
+  openItemId = null;
+  if (t === "åtgärder") await loadActionComments();
   render();
 }
 

@@ -203,13 +203,91 @@ async function openMat(id) {
   const loads = [];
   if (!materialHistory[id]) loads.push(loadMatHistory(id));
   if (!materialComments[id]) loads.push(loadMatComments(id));
+  if (!materialImages[id]) loads.push(loadMatImages(id));
   await Promise.all(loads);
   render();
 }
 
 function closeMat() {
   openMatId = null;
+  openItemId = null;
   render();
+}
+
+// ---- ÖPPNA/STÄNG ARTIKELDETALJVY ----
+async function openItem(itemId) {
+  openItemId = itemId;
+  const loads = [];
+  if (!materialItemImages[itemId]) loads.push(loadMatItemImages(itemId));
+  if (openMatId && !materialComments[openMatId]) loads.push(loadMatComments(openMatId));
+  if (openMatId && !materialHistory[openMatId]) loads.push(loadMatHistory(openMatId));
+  await Promise.all(loads);
+  render();
+}
+
+function closeItem() {
+  openItemId = null;
+  _itemCommentImgUrl = null;
+  render();
+}
+
+// ---- MATERIAL-BILDER (lagerräknande och artikelbaserade) ----
+async function handleMatImg(matId, inputEl) {
+  const file = inputEl.files?.[0];
+  if (!file) return;
+  try {
+    toast("Laddar upp bild...");
+    const url = await uploadImg(file);
+    await addMatImage(matId, url);
+    await loadMatImages(matId);
+    toast("✓ Bild tillagd");
+    render();
+  } catch (e) {
+    toast("Kunde inte ladda upp bild", 1);
+  }
+}
+
+async function doDelMatImg(imgId, matId) {
+  if (!isAdmin) return;
+  if (!confirm("Ta bort bilden?")) return;
+  try {
+    await delMatImage(imgId);
+    await loadMatImages(matId);
+    toast("🗑 Bild borttagen");
+    render();
+  } catch (e) {
+    toast("Kunde inte ta bort", 1);
+  }
+}
+
+// ---- KOMMENTARSSTATUS ----
+async function toggleCommentStatus(commentId, matId, itemId, currentStatus) {
+  const newStatus = currentStatus === "åtgärd_krävs" ? "klart" : "åtgärd_krävs";
+  try {
+    await setMatCommentStatus(commentId, newStatus);
+    await loadMatComments(matId);
+    await loadActionComments();
+    toast(newStatus === "åtgärd_krävs" ? "⚠ Åtgärd markerad" : "✓ Markerad som klar");
+    render();
+  } catch (e) {
+    toast("Kunde inte uppdatera", 1);
+  }
+}
+
+// ---- BILD PÅ MATERIAL-KOMMENTAR (material-nivå) ----
+let _matCommentImgUrl = null;
+
+async function handleMatCommentImg(inputEl) {
+  const file = inputEl.files?.[0];
+  if (!file) return;
+  try {
+    toast("Laddar upp bild...");
+    _matCommentImgUrl = await uploadImg(file);
+    toast("✓ Bild redo att skickas");
+    render();
+  } catch (e) {
+    toast("Kunde inte ladda upp bild", 1);
+  }
 }
 
 async function reloadMatHistory(id) {
@@ -753,19 +831,66 @@ async function submitTaskComment(taskId) {
   }
 }
 
-function toggleItem(itemId) {
-  openItemId = openItemId === itemId ? null : itemId;
-  render();
+let _itemCommentImgUrl = null;
+
+async function handleItemImg(itemId, matId, inputEl) {
+  const file = inputEl.files?.[0];
+  if (!file) return;
+  try {
+    toast("Laddar upp bild...");
+    const url = await uploadImg(file);
+    await addMatItemImage(itemId, matId, url);
+    await loadMatItemImages(itemId);
+    toast("✓ Bild tillagd");
+    render();
+  } catch (e) {
+    toast("Kunde inte ladda upp bild", 1);
+  }
+}
+
+async function doDelItemImg(imgId, itemId) {
+  if (!isAdmin) return;
+  if (!confirm("Ta bort bilden?")) return;
+  try {
+    await delMatItemImage(imgId);
+    await loadMatItemImages(itemId);
+    toast("🗑 Bild borttagen");
+    render();
+  } catch (e) {
+    toast("Kunde inte ta bort", 1);
+  }
+}
+
+async function handleItemCommentImg(inputEl) {
+  const file = inputEl.files?.[0];
+  if (!file) return;
+  try {
+    toast("Laddar upp bild...");
+    _itemCommentImgUrl = await uploadImg(file);
+    toast("✓ Bild redo att skickas");
+    render();
+  } catch (e) {
+    toast("Kunde inte ladda upp bild", 1);
+  }
 }
 
 async function submitMatComment(matId, itemId) {
-  const key = itemId != null ? "item-comment-input-" + itemId : "mat-comment-input-" + matId;
+  const isItem = itemId != null;
+  const key = isItem ? "item-comment-input-" + itemId : "mat-comment-input-" + matId;
   const inp = document.getElementById(key);
   const text = inp?.value?.trim();
-  if (!text) return;
+  const imgUrl = isItem ? _itemCommentImgUrl : _matCommentImgUrl;
+  if (!text && !imgUrl) return;
+
+  const statusEl = document.getElementById(isItem ? "item-comment-status-" + itemId : "mat-comment-status-" + matId);
+  const commentStatus = statusEl?.value || "klart";
+
   try {
-    await addMatComment(matId, itemId, text);
+    await addMatComment(matId, itemId, text || "", imgUrl, commentStatus);
+    if (isItem) _itemCommentImgUrl = null;
+    else _matCommentImgUrl = null;
     await loadMatComments(matId);
+    if (commentStatus === "åtgärd_krävs") await loadActionComments();
     render();
     toast("✓ Kommentar sparad");
   } catch (e) {

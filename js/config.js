@@ -89,7 +89,10 @@ let archivedTasks = [];       // Arkiverade uppgifter (admin)
 let taskStatusLogs = {};      // { taskId: [{...}] }
 let taskComments = {};        // { taskId: [{...}] }
 let materialComments = {};    // { matId: [{...}] } — item_id null = materialkommentar, annars artikelkommentar
-let openItemId = null;        // ID på den artikel vars kommentarer är öppna
+let materialItemImages = {};  // { itemId: [{id, item_id, image_url, uploaded_by, created_at}] }
+let materialImages = {};      // { materialId: [{id, material_id, image_url, uploaded_by, created_at}] }
+let actionComments = [];      // Alla material_comments med status 'åtgärd_krävs'
+let openItemId = null;        // ID på den artikel vars detaljvy är öppen
 let infoArticles = [];        // Alla info-artiklar (pinnade + förslag)
 let infoImages = {};          // { articleId: [{...bilder}] }
 let infoComments = {};        // { articleId: [{...kommentarer}] }
