@@ -355,6 +355,24 @@ ${m.info_text ? `<div class="card">
   <div style="font-size:12px;line-height:1.7;white-space:pre-wrap">${esc(m.info_text)}</div>
 </div>` : ""}
 
+<!-- KOMMENTARER PÅ MATERIAL -->
+<div class="card">
+  ${(() => {
+    const matLevelComments = (materialComments[m.id] || []).filter(c => !c.item_id);
+    return `<div class="comment-lbl">KOMMENTARER (${matLevelComments.length})</div>
+    ${matLevelComments.map(c =>
+      `<div class="comment-item">
+        <div class="comment-text" style="white-space:pre-wrap">${esc(c.text)}</div>
+        <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}</div>
+      </div>`
+    ).join("")}
+    <div class="comment-input-row">
+      <input type="text" id="mat-comment-input-${m.id}" placeholder="Skriv en kommentar om ${escAttr(m.name)}..." onkeydown="if(event.key==='Enter')submitMatComment(${m.id},null)">
+      <button class="btn-ghost" onclick="submitMatComment(${m.id},null)">Skicka</button>
+    </div>`;
+  })()}
+</div>
+
 <!-- HISTORIK -->
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -393,16 +411,35 @@ function rMatItemsView(m) {
     ? `<div style="font-size:12px;color:var(--muted)">Inga artiklar tillagda</div>`
     : sortedItems.map(it => {
         const stat = MAT_STATS[it.status] || MAT_STATS.tillgänglig;
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
-          <div>
-            <div style="font-family:var(--display);font-weight:700;font-size:14px">${esc(it.article_id)}</div>
-            ${it.last_washed ? `<div style="font-size:10px;color:var(--muted)">Senast tvättat: ${fmtDateOnly(it.last_washed)}</div>` : ""}
+        const isOpen = openItemId === it.id;
+        const itComments = (materialComments[m.id] || []).filter(c => c.item_id === it.id);
+        return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;cursor:pointer" onclick="toggleItem(${it.id})">
+            <div>
+              <div style="font-family:var(--display);font-weight:700;font-size:14px">${esc(it.article_id)}</div>
+              ${it.last_washed ? `<div style="font-size:10px;color:var(--muted)">Senast tvättat: ${fmtDateOnly(it.last_washed)}</div>` : ""}
+              ${itComments.length ? `<div style="font-size:10px;color:var(--muted)">💬 ${itComments.length} kommentar${itComments.length > 1 ? "er" : ""}</div>` : ""}
+            </div>
+            <div style="display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+              <span class="tag" style="background:${stat.color}22;color:${stat.color}">${stat.emoji} ${stat.label.toUpperCase()}</span>
+              <button class="btn-ghost" onclick="openChangeItemStatus(${it.id},${m.id})">Ändra</button>
+              ${isAdmin ? `<button class="btn-ghost" onclick="doDelItem(${it.id},${m.id})" style="color:var(--accent)">🗑</button>` : ""}
+            </div>
           </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span class="tag" style="background:${stat.color}22;color:${stat.color}">${stat.emoji} ${stat.label.toUpperCase()}</span>
-            <button class="btn-ghost" onclick="openChangeItemStatus(${it.id},${m.id})">Ändra</button>
-            ${isAdmin ? `<button class="btn-ghost" onclick="doDelItem(${it.id},${m.id})" style="color:var(--accent)">🗑</button>` : ""}
-          </div>
+          ${isOpen ? `
+          <div style="border-top:1px solid var(--border);padding:10px" onclick="event.stopPropagation()">
+            <div class="comment-lbl">KOMMENTARER (${itComments.length})</div>
+            ${itComments.map(c =>
+              `<div class="comment-item">
+                <div class="comment-text" style="white-space:pre-wrap">${esc(c.text)}</div>
+                <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}</div>
+              </div>`
+            ).join("")}
+            <div class="comment-input-row">
+              <input type="text" id="item-comment-input-${it.id}" placeholder="Skriv en kommentar om ${escAttr(it.article_id)}..." onkeydown="if(event.key==='Enter')submitMatComment(${m.id},${it.id})">
+              <button class="btn-ghost" onclick="submitMatComment(${m.id},${it.id})">Skicka</button>
+            </div>
+          </div>` : ""}
         </div>`;
       }).join("")
   }
@@ -539,7 +576,7 @@ function rTaskCard(t, isArchived = false) {
     ${dlStatus ? `<span class="${deadlineBadgeClass(dlStatus)}">${esc(dlLabel)}</span>` : ""}
   </div>
   <div class="note-text ${isDone ? "done" : ""}" style="font-family:var(--display);font-weight:700;font-size:15px">${esc(t.title)}</div>
-  ${t.description ? `<div class="note-text ${isDone ? "done" : ""}" style="font-size:12px;color:var(--muted);margin-top:4px">${esc(t.description)}</div>` : ""}
+  ${t.description ? `<div class="note-text ${isDone ? "done" : ""}" style="font-size:12px;color:var(--muted);margin-top:4px;white-space:pre-wrap">${esc(t.description)}</div>` : ""}
   <div class="note-meta">
     ${t.start_date ? `<span>Start: ${fmtDateOnly(t.start_date)}</span>` : ""}
     <span>· skapad ${fmtD(t.created_at)} av ${esc(t.created_by || "")}</span>
@@ -553,6 +590,19 @@ function rTaskCard(t, isArchived = false) {
     ${isAdmin && !isArchived && t.status === "klar" ? `<button class="btn-ghost" onclick="archiveTask(${t.id},true)">📁 Arkivera</button>` : ""}
     ${isAdmin && isArchived ? `<button class="btn-ghost" onclick="archiveTask(${t.id},false)">↩ Aktivera</button>` : ""}
     ${isAdmin ? `<button class="btn-ghost" onclick="doDelTask(${t.id})" style="margin-left:auto;color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
+  </div>
+  <div class="comments-section" onclick="event.stopPropagation()">
+    <div class="comment-lbl">DAGLIGA UPPDATERINGAR (${(taskComments[t.id] || []).length})</div>
+    ${(taskComments[t.id] || []).map(c =>
+      `<div class="comment-item">
+        <div class="comment-text" style="white-space:pre-wrap">${esc(c.text)}</div>
+        <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}</div>
+      </div>`
+    ).join("")}
+    <div class="comment-input-row">
+      <input type="text" id="task-comment-input-${t.id}" placeholder="Lägg till daglig uppdatering..." onkeydown="if(event.key==='Enter')submitTaskComment(${t.id})">
+      <button class="btn-ghost" onclick="submitTaskComment(${t.id})">Skicka</button>
+    </div>
   </div>
   ${log.length > 0 ? `
   <div class="comments-section" onclick="event.stopPropagation()">

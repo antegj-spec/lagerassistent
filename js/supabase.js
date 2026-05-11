@@ -373,6 +373,48 @@ async function addComment(noteId, text) {
 }
 
 // ============================================================
+// KOMMENTARER PÅ UPPGIFTER (task_comments)
+// ============================================================
+async function loadTaskComments(task_id) {
+  try {
+    const data = await sb("/rest/v1/task_comments?task_id=eq." + task_id + "&order=created_at.asc") || [];
+    taskComments[task_id] = data;
+  } catch (e) {
+    taskComments[task_id] = [];
+  }
+}
+
+async function addTaskComment(task_id, text) {
+  await sb("/rest/v1/task_comments", {
+    method: "POST",
+    body: JSON.stringify({ task_id, text, created_by: user, created_at: new Date().toISOString() }),
+    prefer: "return=minimal"
+  });
+}
+
+// ============================================================
+// KOMMENTARER PÅ MATERIAL/ARTIKLAR (material_comments)
+// ============================================================
+async function loadMatComments(material_id) {
+  try {
+    const data = await sb("/rest/v1/material_comments?material_id=eq." + material_id + "&order=created_at.asc") || [];
+    materialComments[material_id] = data;
+  } catch (e) {
+    materialComments[material_id] = [];
+  }
+}
+
+async function addMatComment(material_id, item_id, text) {
+  const body = { material_id, text, created_by: user, created_at: new Date().toISOString() };
+  if (item_id != null) body.item_id = item_id;
+  await sb("/rest/v1/material_comments", {
+    method: "POST",
+    body: JSON.stringify(body),
+    prefer: "return=minimal"
+  });
+}
+
+// ============================================================
 // BILDHANTERING
 // ============================================================
 async function uploadImg(file) {

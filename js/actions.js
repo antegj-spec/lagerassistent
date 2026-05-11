@@ -199,7 +199,11 @@ async function saveEdit(id) {
 // ---- ÖPPNA/STÄNG DETALJVY ----
 async function openMat(id) {
   openMatId = id;
-  if (!materialHistory[id]) await loadMatHistory(id);
+  openItemId = null;
+  const loads = [];
+  if (!materialHistory[id]) loads.push(loadMatHistory(id));
+  if (!materialComments[id]) loads.push(loadMatComments(id));
+  await Promise.all(loads);
   render();
 }
 
@@ -724,10 +728,48 @@ async function doDelReturn(id) {
 // ============================================================
 function toggleTask(id) {
   openTaskId = openTaskId === id ? null : id;
-  if (openTaskId && !taskStatusLogs[id]) {
-    loadTaskStatusLog(id).then(() => render());
+  if (openTaskId) {
+    const loads = [];
+    if (!taskStatusLogs[id]) loads.push(loadTaskStatusLog(id));
+    if (!taskComments[id]) loads.push(loadTaskComments(id));
+    if (loads.length) Promise.all(loads).then(() => render());
+    else render();
   } else {
     render();
+  }
+}
+
+async function submitTaskComment(taskId) {
+  const inp = document.getElementById("task-comment-input-" + taskId);
+  const text = inp?.value?.trim();
+  if (!text) return;
+  try {
+    await addTaskComment(taskId, text);
+    await loadTaskComments(taskId);
+    render();
+    toast("✓ Uppdatering sparad");
+  } catch (e) {
+    toast("Kunde inte spara uppdatering", 1);
+  }
+}
+
+function toggleItem(itemId) {
+  openItemId = openItemId === itemId ? null : itemId;
+  render();
+}
+
+async function submitMatComment(matId, itemId) {
+  const key = itemId != null ? "item-comment-input-" + itemId : "mat-comment-input-" + matId;
+  const inp = document.getElementById(key);
+  const text = inp?.value?.trim();
+  if (!text) return;
+  try {
+    await addMatComment(matId, itemId, text);
+    await loadMatComments(matId);
+    render();
+    toast("✓ Kommentar sparad");
+  } catch (e) {
+    toast("Kunde inte spara kommentar", 1);
   }
 }
 
