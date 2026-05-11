@@ -5,16 +5,18 @@
 
 // ---- INITIERA ANVÄNDARVAL ----
 function initUsers() {
-  document.getElementById("user-select").innerHTML = USERS.map(u =>
-    `<button class="user-chip ${u === selUser ? "active" : ""}" onclick="pickUser('${esc(u)}')">${esc(u)}</button>`
-  ).join("");
+  const dl = document.getElementById("username-list");
+  if (dl) dl.innerHTML = USERS.map(u => `<option value="${escAttr(u)}">`).join("");
+  const input = document.getElementById("username-input");
+  if (input) { input.value = ""; input.focus(); }
+  pinBuf = "";
+  updDots();
 }
 
 function pickUser(u) {
   selUser = u;
   pinBuf = "";
   updDots();
-  initUsers();
 }
 
 // ---- PIN-KNAPPAR ----
@@ -37,6 +39,17 @@ function updDots() {
 
 // ---- KONTROLLERA PIN ----
 async function checkPin() {
+  const inputEl = document.getElementById("username-input");
+  const typedName = inputEl ? inputEl.value.trim() : "";
+  const matchedUser = USERS.find(u => u.toLowerCase() === typedName.toLowerCase());
+  if (!matchedUser) {
+    document.getElementById("pin-error").textContent = "Okänt användarnamn — försök igen";
+    pinBuf = "";
+    updDots();
+    setTimeout(() => document.getElementById("pin-error").textContent = "", 1800);
+    return;
+  }
+  selUser = matchedUser;
   if (Object.keys(userPins).length === 0) await loadPins();
   const correctPin = userPins[selUser] || DEFAULT_PINS[selUser];
   if (pinBuf === correctPin) {
@@ -49,10 +62,15 @@ async function checkPin() {
       completeLogin();
     }
   } else {
-    document.getElementById("pin-error").textContent = "Fel PIN — försök igen";
+    const errEl = document.getElementById("pin-error");
+    const dotsEl = document.getElementById("pin-dots");
+    errEl.textContent = "Fel PIN — försök igen";
+    dotsEl.style.animation = "none";
+    dotsEl.offsetHeight;
+    dotsEl.style.animation = "pinShake .35s ease";
     pinBuf = "";
     updDots();
-    setTimeout(() => document.getElementById("pin-error").textContent = "", 1800);
+    setTimeout(() => { errEl.textContent = ""; dotsEl.style.animation = ""; }, 1800);
   }
 }
 
@@ -166,6 +184,8 @@ function logout() {
   document.getElementById("pin-screen").style.display = "flex";
   selUser = USERS[0];
   initUsers();
+  const input = document.getElementById("username-input");
+  if (input) { input.value = ""; input.focus(); }
 }
 
 // ---- BYT PIN (inloggad) ----
