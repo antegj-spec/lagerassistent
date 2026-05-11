@@ -140,7 +140,7 @@ function closeModal() {
 async function initApp() {
   document.getElementById("main").innerHTML =
     `<div class="empty"><div class="spinner"></div> Laddar...</div>`;
-  await Promise.all([loadNotes(), loadMats(), loadReturns(), loadTasks()]);
+  await Promise.all([loadNotes(), loadMats(), loadReturns(), loadTasks(), loadInfoArticles()]);
   updMeta();
   render();
 }
@@ -159,7 +159,7 @@ function showTab(t) {
   imgFile = null;
   searchQuery = "";
   document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
-  const tabs = ["hem", "anteckningar", "material", "plan", "chat", "export", "trash"];
+  const tabs = ["hem", "anteckningar", "material", "plan", "info", "chat", "export", "trash"];
   document.querySelectorAll("nav button")[tabs.indexOf(t)]?.classList.add("active");
   render();
 }

@@ -30,7 +30,8 @@ async function sb(path, opts = {}) {
 async function loadNotes() {
   try {
     const all = await sb("/rest/v1/notes?order=created_at.desc") || [];
-    notes = all.filter(n => !n.deleted_at);
+    const canSeeIntern = INTERN_USERS.includes(user);
+    notes = all.filter(n => !n.deleted_at && (n.category !== "intern" || canSeeIntern));
     if (isAdmin) {
       const cutoff = new Date(Date.now() - TRASH_DAYS * 86400000).toISOString();
       trashedNotes = all.filter(n => n.deleted_at && n.deleted_at > cutoff);
@@ -412,6 +413,82 @@ async function addMatComment(material_id, item_id, text) {
     body: JSON.stringify(body),
     prefer: "return=minimal"
   });
+}
+
+// ============================================================
+// INFO-ARTIKLAR (FAQ/info-flik)
+// ============================================================
+async function loadInfoArticles() {
+  try {
+    const all = await sb("/rest/v1/info_articles?order=is_pinned.desc,created_at.desc") || [];
+    infoArticles = all.filter(a => !a.deleted_at);
+    // Ladda alla bilder och kommentarer i en svep
+    const imgs = await sb("/rest/v1/info_images?order=created_at.asc") || [];
+    infoImages = {};
+    imgs.forEach(img => {
+      if (!infoImages[img.article_id]) infoImages[img.article_id] = [];
+      infoImages[img.article_id].push(img);
+    });
+    const cmts = await sb("/rest/v1/info_comments?order=created_at.asc") || [];
+    infoComments = {};
+    cmts.forEach(c => {
+      if (!infoComments[c.article_id]) infoComments[c.article_id] = [];
+      infoComments[c.article_id].push(c);
+    });
+  } catch (e) {
+    console.error("loadInfoArticles failed:", e);
+  }
+}
+
+async function saveInfoArticle(a) {
+  const { id, created_at, ...b } = a;
+  if (id) {
+    await sb("/rest/v1/info_articles?id=eq." + id, {
+      method: "PATCH",
+      body: JSON.stringify({ ...b, updated_at: new Date().toISOString() }),
+      prefer: "return=minimal"
+    });
+    return id;
+  } else {
+    const r = await sb("/rest/v1/info_articles", {
+      method: "POST",
+      body: JSON.stringify(b),
+      headers: { "Prefer": "return=representation" }
+    });
+    return r?.[0]?.id;
+  }
+}
+
+async function delInfoArticle(id) {
+  await sb("/rest/v1/info_articles?id=eq." + id, {
+    method: "PATCH",
+    body: JSON.stringify({ deleted_at: new Date().toISOString() }),
+    prefer: "return=minimal"
+  });
+}
+
+async function addInfoImage(article_id, image_url) {
+  await sb("/rest/v1/info_images", {
+    method: "POST",
+    body: JSON.stringify({ article_id, image_url, uploaded_by: user }),
+    prefer: "return=minimal"
+  });
+}
+
+async function delInfoImage(id) {
+  await sb("/rest/v1/info_images?id=eq." + id, { method: "DELETE" });
+}
+
+async function addInfoComment(article_id, body, image_url) {
+  await sb("/rest/v1/info_comments", {
+    method: "POST",
+    body: JSON.stringify({ article_id, body, image_url: image_url || null, created_by: user }),
+    prefer: "return=minimal"
+  });
+}
+
+async function delInfoComment(id) {
+  await sb("/rest/v1/info_comments?id=eq." + id, { method: "DELETE" });
 }
 
 // ============================================================

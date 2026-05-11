@@ -10,6 +10,7 @@ function render() {
   else if (tab === "anteckningar") m.innerHTML = rNotes();
   else if (tab === "material")     m.innerHTML = rMat();
   else if (tab === "plan")         m.innerHTML = rPlan();
+  else if (tab === "info")         m.innerHTML = rInfo();
   else if (tab === "chat")         m.innerHTML = rChat();
   else if (tab === "export")       m.innerHTML = rExport();
   else if (tab === "trash")        m.innerHTML = rTrash();
@@ -51,7 +52,7 @@ function rHem() {
     <div class="lbl">NY ANTECKNING</div>
     <textarea id="note-input" rows="3" placeholder="Beskriv vad du observerat... (t.ex. 'Kravallstaket rad 3 trasig fot, brådskande')"></textarea>
     <label class="field-label">KATEGORI (auto)</label>
-    <select id="note-cat">${Object.entries(CATS).map(([k, v]) => `<option value="${k}">${v.emoji} ${v.label}</option>`).join("")}</select>
+    <select id="note-cat">${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(user)).map(([k, v]) => `<option value="${k}">${v.emoji} ${v.label}</option>`).join("")}</select>
     <label class="field-label">PRIORITET (auto)</label>
     <select id="note-prio">${Object.entries(PRIOS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("")}</select>
     <label class="field-label">TILLDELA TILL (valfritt)</label>
@@ -128,7 +129,7 @@ function rNotes() {
 <div class="lbl">KATEGORI</div>
 <div class="filter-row">
   <button class="filter-btn ${fCat === "alla" ? "active" : ""}" onclick="setFC('alla')">Alla</button>
-  ${Object.entries(CATS).map(([k, v]) =>
+  ${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(user)).map(([k, v]) =>
     `<button class="filter-btn ${fCat === k ? "active" : ""}" onclick="setFC('${k}')">${v.emoji} ${v.label}</button>`
   ).join("")}
 </div>
@@ -751,4 +752,175 @@ function rExport() {
   <button class="btn btn-blue" onclick="sendWeeklyNow()">📧 SKICKA</button>
 </div>
 <div id="ai-box"></div>`;
+}
+
+// ============================================================
+// INFO/FAQ-FLIKEN
+// ============================================================
+function rInfo() {
+  return `
+<div class="info-split">
+  <div class="info-sidebar">${rInfoList()}</div>
+  <div class="info-content">${rInfoContent()}</div>
+</div>`;
+}
+
+function rInfoList() {
+  let html = `<button class="btn mb" onclick="startNewInfo()" style="width:100%">+ NYTT FÖRSLAG</button>`;
+  Object.entries(INFO_CATS).forEach(([catName, catCfg]) => {
+    const articles = infoArticles.filter(a => a.category === catName);
+    if (articles.length === 0) {
+      html += `<div class="info-cat-section">
+        <div class="info-cat-header" style="color:${catCfg.color}">${catCfg.emoji} ${esc(catName.toUpperCase())}</div>
+        <div class="info-empty">Inga artiklar</div>
+      </div>`;
+      return;
+    }
+    const pinned = articles.filter(a => a.is_pinned);
+    const suggestions = articles.filter(a => !a.is_pinned);
+    html += `<div class="info-cat-section">
+      <div class="info-cat-header" style="color:${catCfg.color}">${catCfg.emoji} ${esc(catName.toUpperCase())}</div>
+      ${pinned.map(a => rInfoListItem(a, catCfg)).join("")}
+      ${suggestions.map(a => rInfoListItem(a, catCfg)).join("")}
+    </div>`;
+  });
+  return html;
+}
+
+function rInfoListItem(a, catCfg) {
+  const active = openInfoId === a.id ? " active" : "";
+  const imgCount = (infoImages[a.id] || []).length;
+  const cmtCount = (infoComments[a.id] || []).length;
+  return `<div class="info-list-item${active}" onclick="openInfo(${a.id})" style="border-left-color:${catCfg.color}">
+    <div class="info-list-title">
+      ${a.is_pinned ? `<span class="info-pin">📌</span>` : `<span class="info-suggest">💡 Förslag</span>`}
+      ${esc(a.title)}
+    </div>
+    <div class="info-list-meta">
+      ${esc(a.created_by || "")}${imgCount ? ` · 📷 ${imgCount}` : ""}${cmtCount ? ` · 💬 ${cmtCount}` : ""}
+    </div>
+  </div>`;
+}
+
+function rInfoContent() {
+  if (infoEditMode === "new" || infoEditMode === "edit") return rInfoEditor();
+  if (openInfoId == null) {
+    return `<div class="info-empty-state">
+      <div style="font-size:48px;margin-bottom:10px">📖</div>
+      <div style="font-family:var(--display);font-size:18px;margin-bottom:6px">VÄLJ EN ARTIKEL</div>
+      <div style="font-size:12px;color:var(--muted);max-width:300px;text-align:center;line-height:1.6">
+        Klicka på en artikel i listan, eller lägg till ett nytt förslag. Alla kan föreslå artiklar och bilder — Admin fäster det som ska bli officiellt.
+      </div>
+    </div>`;
+  }
+  const a = infoArticles.find(x => x.id === openInfoId);
+  if (!a) return `<div class="info-empty-state">Artikeln hittades inte</div>`;
+  return rInfoArticle(a);
+}
+
+function rInfoArticle(a) {
+  const catCfg = INFO_CATS[a.category] || INFO_CATS.Utrustning;
+  const images = infoImages[a.id] || [];
+  const comments = infoComments[a.id] || [];
+  const canEdit = isAdmin || (a.created_by === user && !a.is_pinned);
+
+  return `
+<div class="info-article-head">
+  <div style="flex:1">
+    <div class="info-art-cat" style="color:${catCfg.color}">${catCfg.emoji} ${esc(a.category.toUpperCase())} ${a.is_pinned ? `· 📌 FÄST` : `· 💡 FÖRSLAG`}</div>
+    <div class="info-art-title">${esc(a.title)}</div>
+    <div class="info-art-meta">av ${esc(a.created_by || "okänd")} · ${fmtD(a.created_at)}${a.updated_at && a.updated_at !== a.created_at ? ` · uppdaterad ${fmtD(a.updated_at)}` : ""}</div>
+  </div>
+  <div class="info-art-actions">
+    ${isAdmin && !a.is_pinned ? `<button class="btn" onclick="pinInfoArticle(${a.id})">📌 FÄST</button>` : ""}
+    ${isAdmin && a.is_pinned ? `<button class="btn-ghost" onclick="unpinInfoArticle(${a.id})">Avfäst</button>` : ""}
+    ${canEdit ? `<button class="btn-ghost" onclick="startEditInfo(${a.id})">✎ Redigera</button>` : ""}
+    ${isAdmin ? `<button class="btn-ghost" onclick="doDelInfoArticle(${a.id})" style="color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
+  </div>
+</div>
+
+${a.body ? `<div class="info-art-body">${esc(a.body)}</div>` : ""}
+
+<div class="info-images">
+  ${images.map(img =>
+    `<div class="info-img-wrap">
+      <img src="${escAttr(img.image_url)}" loading="lazy" onclick="window.open('${escAttr(img.image_url)}','_blank')">
+      ${isAdmin ? `<button class="info-img-del" onclick="doDelInfoImage(${img.id})">×</button>` : ""}
+    </div>`
+  ).join("")}
+  <label class="info-img-add">
+    📷 Lägg till bild
+    <input type="file" accept="image/*" style="display:none" onchange="handleInfoAddImg(${a.id}, this)">
+  </label>
+</div>
+
+<div class="info-comments">
+  <div class="comment-lbl">KOMMENTARER & FRÅGOR (${comments.length})</div>
+  ${comments.map(c =>
+    `<div class="info-comment">
+      <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}${isAdmin ? ` <button class="info-cmt-del" onclick="doDelInfoComment(${c.id})">×</button>` : ""}</div>
+      ${c.body ? `<div class="comment-text" style="white-space:pre-wrap">${esc(c.body)}</div>` : ""}
+      ${c.image_url ? `<img class="info-cmt-img" src="${escAttr(c.image_url)}" loading="lazy" onclick="window.open('${escAttr(c.image_url)}','_blank')">` : ""}
+    </div>`
+  ).join("")}
+  <div class="info-comment-form">
+    <textarea id="info-comment-input-${a.id}" rows="2" placeholder="Skriv en kommentar eller fråga..."></textarea>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+      <label class="btn-ghost" style="cursor:pointer">
+        📷 Bifoga bild
+        <input type="file" accept="image/*" style="display:none" onchange="handleInfoCommentImg(${a.id}, this)">
+      </label>
+      ${_infoCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
+      <button class="btn" style="margin-left:auto" onclick="submitInfoComment(${a.id})">Skicka</button>
+    </div>
+  </div>
+</div>`;
+}
+
+function rInfoEditor() {
+  const isNew = infoEditMode === "new";
+  const a = !isNew && openInfoId ? infoArticles.find(x => x.id === openInfoId) : null;
+  const presetCat = isNew ? (window._infoEditPreset || "Utrustning") : (a?.category || "Utrustning");
+  const existingImgs = !isNew && a ? (infoImages[a.id] || []) : [];
+
+  return `
+<div class="info-editor">
+  <div class="info-art-cat">${isNew ? "💡 NYTT FÖRSLAG" : "✎ REDIGERA ARTIKEL"}</div>
+  <label class="field-label">RUBRIK</label>
+  <input type="text" id="info-title" placeholder="T.ex. Truckladdning — så gör du" value="${a ? escAttr(a.title) : ""}">
+  <label class="field-label">KATEGORI</label>
+  <select id="info-cat">
+    ${Object.entries(INFO_CATS).map(([k, v]) =>
+      `<option value="${esc(k)}" ${presetCat === k ? "selected" : ""}>${v.emoji} ${esc(k)}</option>`
+    ).join("")}
+  </select>
+  <label class="field-label">BESKRIVNING</label>
+  <textarea id="info-body" rows="10" placeholder="Steg-för-steg, viktiga detaljer, varningar...">${a ? esc(a.body || "") : ""}</textarea>
+
+  ${existingImgs.length ? `<label class="field-label">BEFINTLIGA BILDER</label>
+  <div class="info-images">
+    ${existingImgs.map(img =>
+      `<div class="info-img-wrap">
+        <img src="${escAttr(img.image_url)}" loading="lazy">
+        ${isAdmin ? `<button class="info-img-del" onclick="doDelInfoImage(${img.id})">×</button>` : ""}
+      </div>`
+    ).join("")}
+  </div>` : ""}
+
+  <label class="field-label">LÄGG TILL BILDER (${infoEditImages.length} redo)</label>
+  <div class="info-images">
+    ${infoEditImages.map(url =>
+      `<div class="info-img-wrap"><img src="${escAttr(url)}" loading="lazy"></div>`
+    ).join("")}
+    <label class="info-img-add">
+      📷 Välj bild
+      <input type="file" accept="image/*" style="display:none" onchange="handleInfoEditImg(this)">
+    </label>
+  </div>
+
+  <div class="modal-actions" style="margin-top:14px">
+    <button class="btn-ghost" onclick="cancelInfoEdit()" style="flex:1">Avbryt</button>
+    <button class="btn" onclick="saveInfoArticleForm()" style="flex:1">${isNew ? "SKAPA FÖRSLAG" : "SPARA"}</button>
+  </div>
+</div>`;
 }
