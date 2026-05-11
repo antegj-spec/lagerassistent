@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Lagerassistent</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>(function(){var t=localStorage.getItem('lager-theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -74,9 +75,12 @@
       </div>
       <div class="hdr-user">
         Inloggad som<br><b id="user-display">—</b>
-        <span class="hdr-link" onclick="openChangePin()">Byt PIN</span>
-        <span class="hdr-link" onclick="logout()">Logga ut</span>
+        <div class="hdr-links">
+          <span class="hdr-link" onclick="openChangePin()">Byt PIN</span>
+          <span class="hdr-link" onclick="logout()">Logga ut</span>
+        </div>
       </div>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Växla tema" aria-label="Växla tema"></button>
     </div>
     <div class="hdr-meta" id="header-meta">Laddar...</div>
     <div id="header-deadline-warn"></div>
@@ -108,5 +112,12 @@
 <script src="js/ui.js"></script>
 <script src="js/render.js"></script>
 <script src="js/actions.js"></script>
+<script>
+function toggleTheme() {
+  var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('lager-theme', next);
+}
+</script>
 </body>
 </html>
