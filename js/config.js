@@ -76,6 +76,9 @@ let archivedReturns = [];     // Arkiverade returer (admin)
 let tasks      = [];          // Aktiva uppgifter
 let archivedTasks = [];       // Arkiverade uppgifter (admin)
 let taskStatusLogs = {};      // { taskId: [{...}] }
+let taskComments = {};        // { taskId: [{...}] }
+let materialComments = {};    // { matId: [{...}] } — item_id null = materialkommentar, annars artikelkommentar
+let openItemId = null;        // ID på den artikel vars kommentarer är öppna
 let trashedNotes = [];
 let chat       = [];
 let openId     = null;
