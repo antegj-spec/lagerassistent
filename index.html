@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Lagerassistent</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- PIN SCREEN -->
+  <div id="pin-screen">
+    <div class="pin-logo">LAGER</div>
+    <div class="pin-sub">EVENTLAGER // ASSISTENT</div>
+    <div class="lbl" style="text-align:center;margin-bottom:10px">VEM ÄR DU?</div>
+    <div class="pin-user-select" id="user-select"></div>
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot"></div><div class="pin-dot"></div>
+      <div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-btn" onclick="pinPress('1')">1</button>
+      <button class="pin-btn" onclick="pinPress('2')">2</button>
+      <button class="pin-btn" onclick="pinPress('3')">3</button>
+      <button class="pin-btn" onclick="pinPress('4')">4</button>
+      <button class="pin-btn" onclick="pinPress('5')">5</button>
+      <button class="pin-btn" onclick="pinPress('6')">6</button>
+      <button class="pin-btn" onclick="pinPress('7')">7</button>
+      <button class="pin-btn" onclick="pinPress('8')">8</button>
+      <button class="pin-btn" onclick="pinPress('9')">9</button>
+      <button class="pin-btn"></button>
+      <button class="pin-btn" onclick="pinPress('0')">0</button>
+      <button class="pin-btn del" onclick="pinDel()">⌫</button>
+    </div>
+    <div class="pin-error" id="pin-error"></div>
+  </div>
+
+  <!-- FIRST LOGIN: SET OWN PIN -->
+  <div id="first-pin-screen" style="display:none">
+    <div class="pin-logo">LAGER</div>
+    <div class="pin-sub">VÄLJ DIN PIN-KOD</div>
+    <div class="first-pin-title" id="first-pin-name"></div>
+    <div class="first-pin-sub">Det är första gången du loggar in.<br>Välj en egen PIN-kod (4 siffror).</div>
+    <div class="lbl" style="text-align:center;margin-bottom:6px" id="first-pin-step-lbl">NY PIN</div>
+    <div class="pin-dots" id="first-pin-dots">
+      <div class="pin-dot"></div><div class="pin-dot"></div>
+      <div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+    <div class="pin-grid" style="margin-bottom:10px">
+      <button class="pin-btn" onclick="firstPinPress('1')">1</button>
+      <button class="pin-btn" onclick="firstPinPress('2')">2</button>
+      <button class="pin-btn" onclick="firstPinPress('3')">3</button>
+      <button class="pin-btn" onclick="firstPinPress('4')">4</button>
+      <button class="pin-btn" onclick="firstPinPress('5')">5</button>
+      <button class="pin-btn" onclick="firstPinPress('6')">6</button>
+      <button class="pin-btn" onclick="firstPinPress('7')">7</button>
+      <button class="pin-btn" onclick="firstPinPress('8')">8</button>
+      <button class="pin-btn" onclick="firstPinPress('9')">9</button>
+      <button class="pin-btn"></button>
+      <button class="pin-btn" onclick="firstPinPress('0')">0</button>
+      <button class="pin-btn del" onclick="firstPinDel()">⌫</button>
+    </div>
+    <div class="pin-error" id="first-pin-error"></div>
+  </div>
+
+  <!-- HEADER -->
+  <header id="main-header" style="display:none">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-label">EVENTLAGER // AI-ASSISTENT</div>
+        <div class="hdr-title">Lagerassistent</div>
+      </div>
+      <div class="hdr-user">
+        Inloggad som<br><b id="user-display">—</b>
+        <span class="hdr-link" onclick="openChangePin()">Byt PIN</span>
+        <span class="hdr-link" onclick="logout()">Logga ut</span>
+      </div>
+    </div>
+    <div class="hdr-meta" id="header-meta">Laddar...</div>
+    <div id="header-deadline-warn"></div>
+  </header>
+
+  <!-- NAV -->
+  <nav id="main-nav" style="display:none">
+    <button class="active" onclick="showTab('hem')">🏠 HEM</button>
+    <button onclick="showTab('anteckningar')">📝 NOTER</button>
+    <button onclick="showTab('material')">📦 MATERIAL</button>
+    <button onclick="showTab('plan')">📋 PLAN</button>
+    <button id="ai-btn" style="display:none" onclick="showTab('chat')">💬 AI</button>
+    <button id="export-btn" style="display:none" onclick="showTab('export')">📤 EXPORT</button>
+    <button id="trash-btn" style="display:none" onclick="showTab('trash')">🗑 PAPPER</button>
+  </nav>
+
+  <main id="main" style="display:none"></main>
+
+</div>
+
+<div id="toast"></div>
+<div id="modal-container"></div>
+
+<!-- JavaScript — laddas i rätt ordning -->
+<script src="js/config.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/render.js"></script>
+<script src="js/actions.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+[build]
+  functions = "netlify/functions"
+
+[[scheduled-functions]]
+  name = "send-weekly"
+  cron = "0 7 * * 1"
