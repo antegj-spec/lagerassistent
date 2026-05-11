@@ -27,8 +27,12 @@ const CATS = {
   logistik:   { label: "Logistik",   emoji: "🚛", color: "#4CAF7D" },
   idé:        { label: "Idé",        emoji: "💡", color: "#E8A81A" },
   material:   { label: "Material",   emoji: "📦", color: "#9B59B6" },
-  övrigt:     { label: "Övrigt",     emoji: "📋", color: "#6B7280" }
+  övrigt:     { label: "Övrigt",     emoji: "📋", color: "#6B7280" },
+  intern:     { label: "Intern",     emoji: "🔒", color: "#C0392B" }
 };
+
+// Användare som får se kategorin "intern"
+const INTERN_USERS = ["Admin", "Andreas"];
 
 // PRIORITETER
 const PRIOS = {
@@ -50,6 +54,13 @@ const MAT_STATS = {
   uthyrd:      { label: "Uthyrd",       emoji: "📤", color: "#2E7DC4" },
   tvätt:       { label: "Tvätt behövs", emoji: "🧼", color: "#E8A81A" },
   reparation:  { label: "Reparation",   emoji: "🔧", color: "#E8521A" }
+};
+
+// INFO-KATEGORIER (FAQ/info-flik)
+const INFO_CATS = {
+  "Utrustning": { emoji: "🛠", color: "#2E7DC4" },
+  "Maskiner":   { emoji: "⚙️", color: "#9B59B6" },
+  "Rutiner":    { emoji: "📋", color: "#4CAF7D" }
 };
 
 // TASK-STATUSAR
@@ -79,6 +90,12 @@ let taskStatusLogs = {};      // { taskId: [{...}] }
 let taskComments = {};        // { taskId: [{...}] }
 let materialComments = {};    // { matId: [{...}] } — item_id null = materialkommentar, annars artikelkommentar
 let openItemId = null;        // ID på den artikel vars kommentarer är öppna
+let infoArticles = [];        // Alla info-artiklar (pinnade + förslag)
+let infoImages = {};          // { articleId: [{...bilder}] }
+let infoComments = {};        // { articleId: [{...kommentarer}] }
+let openInfoId = null;        // ID på vald artikel
+let infoEditMode = null;      // null | "new" | "edit" — för redigeringsläge
+let infoEditImages = [];      // Bilder som ska kopplas vid skapande (urls)
 let trashedNotes = [];
 let chat       = [];
 let openId     = null;

@@ -151,7 +151,7 @@ function openEdit(id) {
     <label class="field-label">TEXT</label>
     <textarea id="edit-text" rows="4">${esc(note.text)}</textarea>
     <label class="field-label">KATEGORI</label>
-    <select id="edit-cat">${Object.entries(CATS).map(([k, v]) =>
+    <select id="edit-cat">${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(user)).map(([k, v]) =>
       `<option value="${k}" ${note.category === k ? "selected" : ""}>${v.emoji} ${v.label}</option>`
     ).join("")}</select>
     <label class="field-label">PRIORITET</label>
@@ -974,5 +974,205 @@ async function doDelTask(id) {
     render();
   } catch (e) {
     toast("Kunde inte radera", 1);
+  }
+}
+
+// ============================================================
+// INFO/FAQ
+// ============================================================
+function openInfo(id) {
+  openInfoId = id;
+  infoEditMode = null;
+  render();
+}
+
+function closeInfo() {
+  openInfoId = null;
+  infoEditMode = null;
+  infoEditImages = [];
+  render();
+}
+
+function startNewInfo(presetCat) {
+  openInfoId = null;
+  infoEditMode = "new";
+  infoEditImages = [];
+  window._infoEditPreset = presetCat || "Utrustning";
+  render();
+}
+
+function startEditInfo(id) {
+  openInfoId = id;
+  infoEditMode = "edit";
+  infoEditImages = [];
+  render();
+}
+
+function cancelInfoEdit() {
+  infoEditMode = null;
+  infoEditImages = [];
+  render();
+}
+
+async function saveInfoArticleForm() {
+  const title = document.getElementById("info-title")?.value?.trim();
+  if (!title) { toast("Ange en rubrik", 1); return; }
+  const body = document.getElementById("info-body")?.value?.trim() || null;
+  const category = document.getElementById("info-cat")?.value || "Utrustning";
+
+  try {
+    if (infoEditMode === "new") {
+      const newId = await saveInfoArticle({
+        title, body, category,
+        is_pinned: false,
+        created_by: user
+      });
+      // Koppla på uppladdade bilder
+      for (const url of infoEditImages) {
+        await addInfoImage(newId, url);
+      }
+      await loadInfoArticles();
+      infoEditMode = null;
+      infoEditImages = [];
+      openInfoId = newId;
+      toast("✓ Förslag skapat");
+    } else if (infoEditMode === "edit" && openInfoId) {
+      await saveInfoArticle({ id: openInfoId, title, body, category });
+      for (const url of infoEditImages) {
+        await addInfoImage(openInfoId, url);
+      }
+      await loadInfoArticles();
+      infoEditMode = null;
+      infoEditImages = [];
+      toast("✓ Sparat");
+    }
+    render();
+  } catch (e) {
+    toast("Kunde inte spara: " + e.message, 1);
+  }
+}
+
+async function pinInfoArticle(id) {
+  if (!isAdmin) return;
+  try {
+    await saveInfoArticle({ id, is_pinned: true });
+    await loadInfoArticles();
+    toast("📌 Artikeln är nu fäst");
+    render();
+  } catch (e) {
+    toast("Kunde inte fästa", 1);
+  }
+}
+
+async function unpinInfoArticle(id) {
+  if (!isAdmin) return;
+  try {
+    await saveInfoArticle({ id, is_pinned: false });
+    await loadInfoArticles();
+    toast("Avfäst — tillbaka som förslag");
+    render();
+  } catch (e) {
+    toast("Kunde inte avfästa", 1);
+  }
+}
+
+async function doDelInfoArticle(id) {
+  if (!isAdmin) return;
+  if (!confirm("Ta bort artikeln? Den arkiveras (soft-delete).")) return;
+  try {
+    await delInfoArticle(id);
+    await loadInfoArticles();
+    if (openInfoId === id) openInfoId = null;
+    toast("🗑 Borttagen");
+    render();
+  } catch (e) {
+    toast("Kunde inte ta bort", 1);
+  }
+}
+
+// Bilder vid skapande/redigering
+async function handleInfoEditImg(inputEl) {
+  const file = inputEl.files?.[0];
+  if (!file) return;
+  try {
+    toast("Laddar upp bild...");
+    const url = await uploadImg(file);
+    infoEditImages.push(url);
+    toast("✓ Bild tillagd");
+    render();
+  } catch (e) {
+    toast("Kunde inte ladda upp bild", 1);
+  }
+}
+
+// Bilder direkt på en befintlig artikel (alla användare)
+async function handleInfoAddImg(articleId, inputEl) {
+  const file = inputEl.files?.[0];
+  if (!file) return;
+  try {
+    toast("Laddar upp bild...");
+    const url = await uploadImg(file);
+    await addInfoImage(articleId, url);
+    await loadInfoArticles();
+    toast("✓ Bild tillagd");
+    render();
+  } catch (e) {
+    toast("Kunde inte ladda upp bild", 1);
+  }
+}
+
+async function doDelInfoImage(imgId) {
+  if (!isAdmin) return;
+  if (!confirm("Ta bort bilden?")) return;
+  try {
+    await delInfoImage(imgId);
+    await loadInfoArticles();
+    toast("🗑 Bild borttagen");
+    render();
+  } catch (e) {
+    toast("Kunde inte ta bort", 1);
+  }
+}
+
+// Kommentarer
+let _infoCommentImgUrl = null;
+async function handleInfoCommentImg(articleId, inputEl) {
+  const file = inputEl.files?.[0];
+  if (!file) return;
+  try {
+    toast("Laddar upp bild...");
+    _infoCommentImgUrl = await uploadImg(file);
+    toast("✓ Bild redo att skickas");
+    render();
+  } catch (e) {
+    toast("Kunde inte ladda upp bild", 1);
+  }
+}
+
+async function submitInfoComment(articleId) {
+  const inp = document.getElementById("info-comment-input-" + articleId);
+  const body = inp?.value?.trim();
+  if (!body && !_infoCommentImgUrl) { toast("Skriv en kommentar eller bifoga en bild", 1); return; }
+  try {
+    await addInfoComment(articleId, body || "", _infoCommentImgUrl);
+    _infoCommentImgUrl = null;
+    await loadInfoArticles();
+    render();
+    toast("✓ Kommentar sparad");
+  } catch (e) {
+    toast("Kunde inte spara kommentar", 1);
+  }
+}
+
+async function doDelInfoComment(commentId) {
+  if (!isAdmin) return;
+  if (!confirm("Ta bort kommentaren?")) return;
+  try {
+    await delInfoComment(commentId);
+    await loadInfoArticles();
+    toast("🗑 Borttagen");
+    render();
+  } catch (e) {
+    toast("Kunde inte ta bort", 1);
   }
 }
