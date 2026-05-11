@@ -405,14 +405,80 @@ async function loadMatComments(material_id) {
   }
 }
 
-async function addMatComment(material_id, item_id, text) {
-  const body = { material_id, text, created_by: user, created_at: new Date().toISOString() };
+async function addMatComment(material_id, item_id, text, image_url, status) {
+  const body = {
+    material_id, text, created_by: user,
+    created_at: new Date().toISOString(),
+    status: status || "klart"
+  };
   if (item_id != null) body.item_id = item_id;
+  if (image_url) body.image_url = image_url;
   await sb("/rest/v1/material_comments", {
     method: "POST",
     body: JSON.stringify(body),
     prefer: "return=minimal"
   });
+}
+
+async function setMatCommentStatus(commentId, status) {
+  await sb("/rest/v1/material_comments?id=eq." + commentId, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+    prefer: "return=minimal"
+  });
+}
+
+async function loadActionComments() {
+  try {
+    const data = await sb("/rest/v1/material_comments?status=eq.åtgärd_krävs&order=created_at.desc") || [];
+    actionComments = data;
+  } catch (e) {
+    actionComments = [];
+  }
+}
+
+// ---- ARTIKELBILDER (material_item_images) ----
+async function loadMatItemImages(item_id) {
+  try {
+    const data = await sb("/rest/v1/material_item_images?item_id=eq." + item_id + "&order=created_at.asc") || [];
+    materialItemImages[item_id] = data;
+  } catch (e) {
+    materialItemImages[item_id] = [];
+  }
+}
+
+async function addMatItemImage(item_id, material_id, image_url) {
+  await sb("/rest/v1/material_item_images", {
+    method: "POST",
+    body: JSON.stringify({ item_id, material_id, image_url, uploaded_by: user }),
+    prefer: "return=minimal"
+  });
+}
+
+async function delMatItemImage(id) {
+  await sb("/rest/v1/material_item_images?id=eq." + id, { method: "DELETE" });
+}
+
+// ---- MATERIALBILDER (material_images) ----
+async function loadMatImages(material_id) {
+  try {
+    const data = await sb("/rest/v1/material_images?material_id=eq." + material_id + "&order=created_at.asc") || [];
+    materialImages[material_id] = data;
+  } catch (e) {
+    materialImages[material_id] = [];
+  }
+}
+
+async function addMatImage(material_id, image_url) {
+  await sb("/rest/v1/material_images", {
+    method: "POST",
+    body: JSON.stringify({ material_id, image_url, uploaded_by: user }),
+    prefer: "return=minimal"
+  });
+}
+
+async function delMatImage(id) {
+  await sb("/rest/v1/material_images?id=eq." + id, { method: "DELETE" });
 }
 
 // ============================================================

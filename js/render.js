@@ -220,17 +220,152 @@ function rCard(n, inTrash = false) {
 }
 
 // ============================================================
-// MATERIAL-FLIKEN — med sub-tabs (Status / Returer)
+// MATERIAL-FLIKEN — med sub-tabs (Status / Åtgärder / Returer)
 // ============================================================
 function rMat() {
+  const actionCount = actionComments.length;
   const subTabs = `
 <div class="filter-row mb" style="border-bottom:1px solid var(--border);padding-bottom:8px">
   <button class="filter-btn ${matSubTab === "status" ? "active" : ""}" onclick="setMatSubTab('status')">📦 MATERIAL STATUS</button>
+  <button class="filter-btn ${matSubTab === "åtgärder" ? "active" : ""}" onclick="setMatSubTab('åtgärder')" style="${actionCount > 0 ? "border-color:#E8521A;color:#E8521A" : ""}">🚨 ÅTGÄRDER${actionCount > 0 ? ` (${actionCount})` : ""}</button>
   <button class="filter-btn ${matSubTab === "returer" ? "active" : ""}" onclick="setMatSubTab('returer')">↩ RETURER (${returnsList.length})</button>
 </div>`;
 
   if (matSubTab === "returer") return subTabs + rReturer();
+  if (matSubTab === "åtgärder") return subTabs + rMatActions();
   return subTabs + rMatStatus();
+}
+
+// ---- KOMMENTARSKORT MED STATUS ----
+function rMatCommentCard(c, matId) {
+  const isAction = c.status === "åtgärd_krävs";
+  const itemId = c.item_id ?? "null";
+  return `<div class="comment-item" style="${isAction ? "border-left:2px solid #E8521A;padding-left:10px;" : ""}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      ${c.text ? `<div class="comment-text" style="white-space:pre-wrap;flex:1">${esc(c.text)}</div>` : `<div style="flex:1"></div>`}
+      <button onclick="toggleCommentStatus(${c.id},${matId},${itemId},'${esc(c.status || "klart")}')"
+        style="flex-shrink:0;font-size:10px;padding:3px 8px;border-radius:12px;border:1px solid ${isAction ? "#E8521A" : "#4CAF7D"};color:${isAction ? "#E8521A" : "#4CAF7D"};background:transparent;cursor:pointer;white-space:nowrap">
+        ${isAction ? "⚠ Åtgärd krävs" : "✅ Klart"}
+      </button>
+    </div>
+    ${c.image_url ? `<img class="info-cmt-img" src="${escAttr(c.image_url)}" loading="lazy" onclick="window.open('${escAttr(c.image_url)}','_blank')">` : ""}
+    <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}</div>
+  </div>`;
+}
+
+// ---- ÅTGÄRDER-VYN ----
+function rMatActions() {
+  const grouped = {};
+  actionComments.forEach(c => {
+    const mat = materials.find(m => m.id === c.material_id);
+    if (!mat) return;
+    if (!grouped[c.material_id]) grouped[c.material_id] = { mat, items: [] };
+    grouped[c.material_id].items.push(c);
+  });
+  const groups = Object.values(grouped);
+
+  return `
+<div class="lbl">⚠ KRÄVER ÅTGÄRD (${actionComments.length})</div>
+${groups.length === 0
+  ? `<div class="empty">Inga öppna åtgärder 🎉</div>`
+  : groups.map(g => {
+    const matItems = materialItems[g.mat.id] || [];
+    return `<div class="card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <span style="font-size:18px">${esc(g.mat.emoji || "📦")}</span>
+          <span style="font-family:var(--display);font-weight:700;margin-left:6px">${esc(g.mat.name)}</span>
+        </div>
+        <button class="btn-ghost" onclick="openMat(${g.mat.id})">Öppna →</button>
+      </div>
+      ${g.items.map(c => {
+        const it = c.item_id ? matItems.find(i => i.id === c.item_id) : null;
+        return `<div style="margin-bottom:8px">
+          ${it ? `<div style="font-size:10px;color:var(--muted);margin-bottom:3px">📎 ${esc(it.article_id)}</div>` : ""}
+          ${rMatCommentCard(c, g.mat.id)}
+        </div>`;
+      }).join("")}
+    </div>`;
+  }).join("")}`;
+}
+
+// ---- ARTIKELDETALJVY (full sida) ----
+function rItemDetail(it, m) {
+  const stat = MAT_STATS[it.status] || MAT_STATS.tillgänglig;
+  const images = materialItemImages[it.id] || [];
+  const cmts = (materialComments[m.id] || []).filter(c => c.item_id === it.id);
+  const history = (materialHistory[m.id] || []).filter(h => h.article_id === it.article_id);
+
+  return `
+<button class="btn-ghost mb" onclick="closeItem()">← Tillbaka till ${esc(m.name)}</button>
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+    <div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${esc(m.emoji || "📦")} ${esc(m.name)}</div>
+      <div style="font-family:var(--display);font-size:26px;font-weight:900">${esc(it.article_id)}</div>
+      ${it.last_washed ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">🧼 Senast tvättat: ${fmtDateOnly(it.last_washed)}</div>` : ""}
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+      <span class="tag" style="background:${stat.color}22;color:${stat.color};font-size:12px;padding:4px 10px">${stat.emoji} ${stat.label.toUpperCase()}</span>
+      <button class="btn-ghost" onclick="openChangeItemStatus(${it.id},${m.id})">✎ Ändra status</button>
+      ${isAdmin ? `<button class="btn-ghost" onclick="doDelItem(${it.id},${m.id})" style="color:var(--accent);border-color:var(--accent)">🗑 Radera</button>` : ""}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="lbl">BILDER (${images.length})</div>
+  <div class="info-images">
+    ${images.map(img =>
+      `<div class="info-img-wrap">
+        <img src="${escAttr(img.image_url)}" loading="lazy" onclick="window.open('${escAttr(img.image_url)}','_blank')">
+        ${isAdmin ? `<button class="info-img-del" onclick="doDelItemImg(${img.id},${it.id})">×</button>` : ""}
+      </div>`
+    ).join("")}
+    <label class="info-img-add">
+      📷 Lägg till bild
+      <input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleItemImg(${it.id},${m.id},this)">
+    </label>
+  </div>
+</div>
+
+<div class="card">
+  <div class="lbl">STATUSUPPDATERINGAR (${cmts.length})</div>
+  ${cmts.map(c => rMatCommentCard(c, m.id)).join("")}
+  <div style="margin-top:10px">
+    <textarea id="item-comment-input-${it.id}" rows="2"
+      placeholder="Skriv en uppdatering om ${escAttr(it.article_id)}..."
+      style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--fg);font-size:12px;resize:vertical;font-family:inherit"
+      onkeydown="if(event.ctrlKey&&event.key==='Enter')submitMatComment(${m.id},${it.id})"></textarea>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">
+      <label class="field-label" style="margin:0;font-size:10px">STATUS:</label>
+      <select id="item-comment-status-${it.id}"
+        style="font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--fg)">
+        <option value="klart">✅ Klart</option>
+        <option value="åtgärd_krävs">⚠ Åtgärd krävs</option>
+      </select>
+      <label class="btn-ghost" style="cursor:pointer;font-size:11px">
+        📷 Bifoga bild
+        <input type="file" accept="image/*" style="display:none" onchange="handleItemCommentImg(this)">
+      </label>
+      ${_itemCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
+      <button class="btn-ghost" style="margin-left:auto" onclick="submitMatComment(${m.id},${it.id})">Skicka</button>
+    </div>
+  </div>
+</div>
+
+${history.length > 0 ? `<div class="card">
+  <div class="lbl">STATUSHISTORIK</div>
+  ${history.slice(0, 10).map(h => {
+    const oldS = h.old_status ? MAT_STATS[h.old_status]?.label || h.old_status : "";
+    const newS = h.new_status ? MAT_STATS[h.new_status]?.label || h.new_status : "";
+    return `<div style="background:var(--bg);border-left:2px solid var(--border);padding:8px 10px;margin-bottom:4px;border-radius:0 6px 6px 0">
+      <div style="font-size:12px">${oldS ? esc(oldS) + " → " : ""}<b>${esc(newS)}</b></div>
+      ${h.comment ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(h.comment)}</div>` : ""}
+      <div style="font-size:10px;color:var(--dim);margin-top:3px">${esc(h.changed_by)} · ${fmtD(h.created_at)}</div>
+    </div>`;
+  }).join("")}
+</div>` : ""}`;
 }
 
 // ---- MATERIAL STATUS-VYN ----
@@ -303,15 +438,19 @@ function rMatCardSummary(m) {
 
 // ---- DETALJVY FÖR ETT MATERIAL ----
 function rMatDetail(m) {
+  // Om en artikel är öppen — visa full artikelvy
+  if (openItemId && m.is_article_based) {
+    const items = materialItems[m.id] || [];
+    const it = items.find(i => i.id === openItemId);
+    if (it) return rItemDetail(it, m);
+  }
+
   const history = materialHistory[m.id] || [];
   const borrowed = borrowedMaterial[m.id] || [];
+  const matImages = materialImages[m.id] || [];
+  const matLevelComments = (materialComments[m.id] || []).filter(c => !c.item_id);
 
-  let body = "";
-  if (m.is_article_based) {
-    body = rMatItemsView(m);
-  } else {
-    body = rMatCountsView(m);
-  }
+  let body = m.is_article_based ? rMatItemsView(m) : rMatCountsView(m);
 
   return `
 <button class="btn-ghost mb" onclick="closeMat()">← Tillbaka till lista</button>
@@ -326,6 +465,23 @@ function rMatDetail(m) {
       <button class="btn-ghost" onclick="openEditMat(${m.id})">✎ Redigera</button>
       <button class="btn-ghost" onclick="doDelMat(${m.id})" style="color:var(--accent);border-color:var(--accent)">🗑</button>
     </div>` : ""}
+  </div>
+</div>
+
+<!-- BILDER PÅ MATERIAL -->
+<div class="card">
+  <div class="lbl">BILDER (${matImages.length})</div>
+  <div class="info-images">
+    ${matImages.map(img =>
+      `<div class="info-img-wrap">
+        <img src="${escAttr(img.image_url)}" loading="lazy" onclick="window.open('${escAttr(img.image_url)}','_blank')">
+        ${isAdmin ? `<button class="info-img-del" onclick="doDelMatImg(${img.id},${m.id})">×</button>` : ""}
+      </div>`
+    ).join("")}
+    <label class="info-img-add">
+      📷 Lägg till bild
+      <input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleMatImg(${m.id},this)">
+    </label>
   </div>
 </div>
 
@@ -358,20 +514,28 @@ ${m.info_text ? `<div class="card">
 
 <!-- KOMMENTARER PÅ MATERIAL -->
 <div class="card">
-  ${(() => {
-    const matLevelComments = (materialComments[m.id] || []).filter(c => !c.item_id);
-    return `<div class="comment-lbl">KOMMENTARER (${matLevelComments.length})</div>
-    ${matLevelComments.map(c =>
-      `<div class="comment-item">
-        <div class="comment-text" style="white-space:pre-wrap">${esc(c.text)}</div>
-        <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}</div>
-      </div>`
-    ).join("")}
-    <div class="comment-input-row">
-      <input type="text" id="mat-comment-input-${m.id}" placeholder="Skriv en kommentar om ${escAttr(m.name)}..." onkeydown="if(event.key==='Enter')submitMatComment(${m.id},null)">
-      <button class="btn-ghost" onclick="submitMatComment(${m.id},null)">Skicka</button>
-    </div>`;
-  })()}
+  <div class="lbl">KOMMENTARER (${matLevelComments.length})</div>
+  ${matLevelComments.map(c => rMatCommentCard(c, m.id)).join("")}
+  <div style="margin-top:10px">
+    <textarea id="mat-comment-input-${m.id}" rows="2"
+      placeholder="Skriv en kommentar om ${escAttr(m.name)}..."
+      style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--fg);font-size:12px;resize:vertical;font-family:inherit"
+      onkeydown="if(event.ctrlKey&&event.key==='Enter')submitMatComment(${m.id},null)"></textarea>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">
+      <label class="field-label" style="margin:0;font-size:10px">STATUS:</label>
+      <select id="mat-comment-status-${m.id}"
+        style="font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--fg)">
+        <option value="klart">✅ Klart</option>
+        <option value="åtgärd_krävs">⚠ Åtgärd krävs</option>
+      </select>
+      <label class="btn-ghost" style="cursor:pointer;font-size:11px">
+        📷 Bifoga bild
+        <input type="file" accept="image/*" style="display:none" onchange="handleMatCommentImg(this)">
+      </label>
+      ${_matCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
+      <button class="btn-ghost" style="margin-left:auto" onclick="submitMatComment(${m.id},null)">Skicka</button>
+    </div>
+  </div>
 </div>
 
 <!-- HISTORIK -->
@@ -412,14 +576,18 @@ function rMatItemsView(m) {
     ? `<div style="font-size:12px;color:var(--muted)">Inga artiklar tillagda</div>`
     : sortedItems.map(it => {
         const stat = MAT_STATS[it.status] || MAT_STATS.tillgänglig;
-        const isOpen = openItemId === it.id;
         const itComments = (materialComments[m.id] || []).filter(c => c.item_id === it.id);
-        return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;cursor:pointer" onclick="toggleItem(${it.id})">
+        const cmtCount = itComments.length;
+        const actionCount = itComments.filter(c => c.status === "åtgärd_krävs").length;
+        return `<div style="background:var(--bg);border:1px solid var(--border);border-left:3px solid ${stat.color};border-radius:8px;margin-bottom:8px;cursor:pointer" onclick="openItem(${it.id})">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:12px">
             <div>
-              <div style="font-family:var(--display);font-weight:700;font-size:14px">${esc(it.article_id)}</div>
-              ${it.last_washed ? `<div style="font-size:10px;color:var(--muted)">Senast tvättat: ${fmtDateOnly(it.last_washed)}</div>` : ""}
-              ${itComments.length ? `<div style="font-size:10px;color:var(--muted)">💬 ${itComments.length} kommentar${itComments.length > 1 ? "er" : ""}</div>` : ""}
+              <div style="font-family:var(--display);font-weight:700;font-size:15px">${esc(it.article_id)}</div>
+              <div style="display:flex;gap:10px;margin-top:3px;flex-wrap:wrap">
+                ${it.last_washed ? `<span style="font-size:10px;color:var(--muted)">🧼 ${fmtDateOnly(it.last_washed)}</span>` : ""}
+                ${cmtCount ? `<span style="font-size:10px;color:var(--muted)">💬 ${cmtCount}</span>` : ""}
+                ${actionCount ? `<span style="font-size:10px;color:#E8521A;font-weight:700">⚠ ${actionCount} åtgärd${actionCount > 1 ? "er" : ""}</span>` : ""}
+              </div>
             </div>
             <div style="display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
               <span class="tag" style="background:${stat.color}22;color:${stat.color}">${stat.emoji} ${stat.label.toUpperCase()}</span>
@@ -427,20 +595,6 @@ function rMatItemsView(m) {
               ${isAdmin ? `<button class="btn-ghost" onclick="doDelItem(${it.id},${m.id})" style="color:var(--accent)">🗑</button>` : ""}
             </div>
           </div>
-          ${isOpen ? `
-          <div style="border-top:1px solid var(--border);padding:10px" onclick="event.stopPropagation()">
-            <div class="comment-lbl">KOMMENTARER (${itComments.length})</div>
-            ${itComments.map(c =>
-              `<div class="comment-item">
-                <div class="comment-text" style="white-space:pre-wrap">${esc(c.text)}</div>
-                <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}</div>
-              </div>`
-            ).join("")}
-            <div class="comment-input-row">
-              <input type="text" id="item-comment-input-${it.id}" placeholder="Skriv en kommentar om ${escAttr(it.article_id)}..." onkeydown="if(event.key==='Enter')submitMatComment(${m.id},${it.id})">
-              <button class="btn-ghost" onclick="submitMatComment(${m.id},${it.id})">Skicka</button>
-            </div>
-          </div>` : ""}
         </div>`;
       }).join("")
   }
