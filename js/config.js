@@ -50,6 +50,7 @@ const STATS = {
 
 // MATERIAL-STATUSAR
 const MAT_STATS = {
+  okänd:       { label: "Okänd",        emoji: "❓", color: "#94A3B8" },
   tillgänglig: { label: "Tillgänglig",  emoji: "✅", color: "#4CAF7D" },
   uthyrd:      { label: "Uthyrd",       emoji: "📤", color: "#2E7DC4" },
   tvätt:       { label: "Tvätt behövs", emoji: "🧼", color: "#E8A81A" },
@@ -116,8 +117,10 @@ let matSubTab   = "status";   // "status" | "returer"
 let openMatId   = null;       // ID på det material vars detaljvy är öppen
 
 // PLAN-VY STATE
-let planSubTab  = "aktiva";   // "aktiva" | "arkiv"
-let openTaskId  = null;       // ID på den uppgift som är expanderad
+let planSubTab      = "aktiva";   // "aktiva" | "arkiv"
+let openTaskId      = null;       // ID på den uppgift vars detaljsida är öppen
+let planPersonFilter = "alla";    // "alla" | "ingen" | användarnamn
+let taskChecklists  = {};         // { taskId: [{id, text, done, created_by}] }
 
 // PIN-STATE
 let pinBuf     = "";

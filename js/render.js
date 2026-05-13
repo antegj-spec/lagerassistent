@@ -198,12 +198,19 @@ function rCard(n, inTrash = false) {
   </div>
   <div class="comments-section" onclick="event.stopPropagation()">
     <div class="comment-lbl">KOMMENTARER (${commentCount})</div>
-    ${noteComments.map(c =>
-      `<div class="comment-item">
-        <div class="comment-text">${esc(c.text)}</div>
+    ${noteComments.map(c => {
+      const canMod = isAdmin || c.created_by === user;
+      return `<div class="comment-item">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+          <div class="comment-text" style="flex:1">${esc(c.text)}</div>
+          ${canMod ? `<div style="display:flex;gap:4px;flex-shrink:0">
+            <button class="cmt-act-btn" onclick="editNoteCommentAction(${n.id},${c.id},'${escAttr(c.text)}')">✎</button>
+            <button class="cmt-act-btn cmt-act-del" onclick="delNoteCommentAction(${n.id},${c.id})">🗑</button>
+          </div>` : ""}
+        </div>
         <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}</div>
-      </div>`
-    ).join("")}
+      </div>`;
+    }).join("")}
     <div class="comment-input-row">
       <input type="text" id="comment-input-${n.id}" placeholder="Skriv en kommentar..." onkeydown="if(event.key==='Enter')submitComment(${n.id})">
       <button class="btn-ghost" onclick="submitComment(${n.id})">Skicka</button>
@@ -238,15 +245,27 @@ function rMat() {
 
 // ---- KOMMENTARSKORT MED STATUS ----
 function rMatCommentCard(c, matId) {
-  const isAction = c.status === "åtgärd_krävs";
+  const isUrgent = c.status === "åtgärd_krävs";
+  const isNeeded = c.status === "åtgärd_behövs";
+  const isAction = isUrgent || isNeeded;
   const itemId = c.item_id ?? "null";
-  return `<div class="comment-item" style="${isAction ? "border-left:2px solid #E8521A;padding-left:10px;" : ""}">
+  const accentColor = isUrgent ? "#E8521A" : isNeeded ? "#E8A81A" : "#4CAF7D";
+  const accentLabel = isUrgent ? "⚠ Åtgärd krävs" : isNeeded ? "⚠ Åtgärd behövs" : "✅ Klart";
+  const canMod = isAdmin || c.created_by === user;
+
+  return `<div class="comment-item" style="${isAction ? `border-left:2px solid ${accentColor};padding-left:10px;` : ""}">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
       ${c.text ? `<div class="comment-text" style="white-space:pre-wrap;flex:1">${esc(c.text)}</div>` : `<div style="flex:1"></div>`}
-      <button onclick="toggleCommentStatus(${c.id},${matId},${itemId},'${esc(c.status || "klart")}')"
-        style="flex-shrink:0;font-size:10px;padding:3px 8px;border-radius:12px;border:1px solid ${isAction ? "#E8521A" : "#4CAF7D"};color:${isAction ? "#E8521A" : "#4CAF7D"};background:transparent;cursor:pointer;white-space:nowrap">
-        ${isAction ? "⚠ Åtgärd krävs" : "✅ Klart"}
-      </button>
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
+        <button onclick="cycleCommentStatus(${c.id},${matId},${itemId},'${esc(c.status || "klart")}')"
+          style="font-size:10px;padding:3px 8px;border-radius:12px;border:1px solid ${accentColor};color:${accentColor};background:transparent;cursor:pointer;white-space:nowrap">
+          ${accentLabel}
+        </button>
+        ${canMod ? `<div style="display:flex;gap:4px">
+          <button class="cmt-act-btn" onclick="editMatCommentAction(${c.id},${matId},${itemId})">✎</button>
+          <button class="cmt-act-btn cmt-act-del" onclick="delMatCommentAction(${c.id},${matId})">🗑</button>
+        </div>` : ""}
+      </div>
     </div>
     ${c.image_url ? `<img class="info-cmt-img" src="${escAttr(c.image_url)}" loading="lazy" onclick="window.open('${escAttr(c.image_url)}','_blank')">` : ""}
     <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}</div>
@@ -342,7 +361,8 @@ function rItemDetail(it, m) {
       <select id="item-comment-status-${it.id}"
         style="font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--fg)">
         <option value="klart">✅ Klart</option>
-        <option value="åtgärd_krävs">⚠ Åtgärd krävs</option>
+        <option value="åtgärd_behövs">⚠ Åtgärd behövs</option>
+        <option value="åtgärd_krävs">🚨 Åtgärd krävs</option>
       </select>
       <label class="btn-ghost" style="cursor:pointer;font-size:11px">
         📷 Bifoga bild
@@ -526,7 +546,8 @@ ${m.info_text ? `<div class="card">
       <select id="mat-comment-status-${m.id}"
         style="font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--fg)">
         <option value="klart">✅ Klart</option>
-        <option value="åtgärd_krävs">⚠ Åtgärd krävs</option>
+        <option value="åtgärd_behövs">⚠ Åtgärd behövs</option>
+        <option value="åtgärd_krävs">🚨 Åtgärd krävs</option>
       </select>
       <label class="btn-ghost" style="cursor:pointer;font-size:11px">
         📷 Bifoga bild
@@ -678,6 +699,12 @@ function rReturCard(r, isArchived = false) {
 // PLAN-FLIKEN (Arbetsplanering)
 // ============================================================
 function rPlan() {
+  // Detaljvy
+  if (openTaskId) {
+    const t = [...tasks, ...archivedTasks].find(t => t.id === openTaskId);
+    if (t) return rTaskDetail(t);
+  }
+
   const subTabs = `
 <div class="filter-row mb" style="border-bottom:1px solid var(--border);padding-bottom:8px">
   <button class="filter-btn ${planSubTab === "aktiva" ? "active" : ""}" onclick="setPlanSubTab('aktiva')">📋 AKTIVA (${tasks.length})</button>
@@ -689,11 +716,25 @@ function rPlan() {
 }
 
 function rPlanActive() {
+  const allUsers = USERS.filter(u => u !== "Admin");
+  const filtered = tasks.filter(t => {
+    if (planPersonFilter === "alla") return true;
+    if (planPersonFilter === "ingen") return !t.responsible && !(t.assigned_to || []).length;
+    return t.responsible === planPersonFilter || (t.assigned_to || []).includes(planPersonFilter);
+  });
+
   return `
 ${isAdmin ? `<button class="btn mb" onclick="openAddTask()" style="width:100%">+ NY UPPGIFT</button>` : ""}
-${tasks.length === 0
-  ? `<div class="empty">Inga uppgifter</div>`
-  : tasks.map(t => rTaskCard(t)).join("")
+<div class="lbl">FILTRERA PÅ PERSON</div>
+<div class="filter-row mb">
+  <button class="filter-btn ${planPersonFilter === "alla" ? "active" : ""}" onclick="setPlanPersonFilter('alla')">Alla</button>
+  <button class="filter-btn ${planPersonFilter === "ingen" ? "active" : ""}" onclick="setPlanPersonFilter('ingen')">Ej tilldelat</button>
+  ${allUsers.map(u => `<button class="filter-btn ${planPersonFilter === u ? "active" : ""}" onclick="setPlanPersonFilter('${esc(u)}')">${esc(u)}</button>`).join("")}
+</div>
+<div class="lbl">${filtered.length} UPPGIFTER</div>
+${filtered.length === 0
+  ? `<div class="empty">Inga uppgifter matchar filtret</div>`
+  : filtered.map(t => rTaskListRow(t)).join("")
 }`;
 }
 
@@ -701,77 +742,168 @@ function rPlanArchive() {
   return `
 ${archivedTasks.length === 0
   ? `<div class="empty">Inget arkiverat</div>`
-  : archivedTasks.map(t => rTaskCard(t, true)).join("")
+  : archivedTasks.map(t => rTaskListRow(t, true)).join("")
 }`;
 }
 
-function rTaskCard(t, isArchived = false) {
+// ---- KOMPAKT UPPGIFTSRAD I LISTAN ----
+function rTaskListRow(t, isArchived = false) {
   const prio = PRIOS[t.priority] || PRIOS.medel;
   const stat = TASK_STATS[t.status] || TASK_STATS.ny;
-  const open = openTaskId === t.id;
+  const dlStatus = t.deadline ? deadlineStatus(t.deadline) : null;
+  const dlLabel  = t.deadline ? deadlineLabel(t.deadline) : "";
+  const isDone = t.status === "klar";
+  const cmtCount = (taskComments[t.id] || []).length;
+  const checkItems = taskChecklists[t.id] || [];
+  const doneItems = checkItems.filter(i => i.done).length;
+
+  const lastUpdate = cmtCount
+    ? fmtD((taskComments[t.id] || []).at(-1)?.created_at)
+    : fmtD(t.updated_at || t.created_at);
+
+  return `<div class="task-row" onclick="openTaskDetail(${t.id})" style="border-left:3px solid ${prio.color};${isDone ? "opacity:.55;" : ""}${
+    dlStatus === "overdue" ? "border-top:2px solid #ff6b6b;" :
+    dlStatus === "urgent"  ? "border-top:2px solid var(--accent);" : ""
+  }">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+    <div style="flex:1;min-width:0">
+      <div style="font-family:var(--display);font-weight:700;font-size:15px;${isDone ? "text-decoration:line-through;color:var(--muted);" : ""}">${esc(t.title)}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;align-items:center">
+        <span style="font-size:9px;color:${prio.color};font-family:var(--display);font-weight:700">● ${prio.label}</span>
+        <span style="font-size:9px;color:${stat.color};font-family:var(--display);font-weight:700">${stat.label.toUpperCase()}</span>
+        ${t.responsible ? `<span class="note-assign">⭐ ${esc(t.responsible)}</span>` : ""}
+        ${(t.assigned_to || []).filter(u => u !== t.responsible).map(u => `<span class="note-assign">@${esc(u)}</span>`).join("")}
+        ${dlStatus ? `<span class="${deadlineBadgeClass(dlStatus)}">${esc(dlLabel)}</span>` : ""}
+        ${checkItems.length ? `<span style="font-size:9px;color:var(--muted)">✓ ${doneItems}/${checkItems.length}</span>` : ""}
+        ${cmtCount ? `<span style="font-size:9px;color:var(--muted)">💬 ${cmtCount}</span>` : ""}
+      </div>
+    </div>
+    <div style="text-align:right;flex-shrink:0">
+      <div style="font-size:10px;color:var(--dim)">Uppdaterat</div>
+      <div style="font-size:10px;color:var(--muted)">${lastUpdate}</div>
+    </div>
+  </div>
+  <div class="note-meta" style="margin-top:4px">
+    <span>Skapad ${fmtD(t.created_at)} av ${esc(t.created_by || "")}</span>
+    ${t.start_date ? `<span>· start ${fmtDateOnly(t.start_date)}</span>` : ""}
+  </div>
+</div>`;
+}
+
+// ---- FULL DETALJSIDA FÖR UPPGIFT ----
+function rTaskDetail(t) {
+  const prio = PRIOS[t.priority] || PRIOS.medel;
+  const stat = TASK_STATS[t.status] || TASK_STATS.ny;
   const dlStatus = t.deadline ? deadlineStatus(t.deadline) : null;
   const dlLabel  = t.deadline ? deadlineLabel(t.deadline) : "";
   const isDone = t.status === "klar";
   const log = taskStatusLogs[t.id] || [];
+  const cmts = taskComments[t.id] || [];
+  const checkItems = taskChecklists[t.id] || [];
+  const isArchived = archivedTasks.some(a => a.id === t.id);
 
-  // Visa "huvudansvarig" markering
-  const respLabel = t.responsible ? `<span class="note-assign">⭐ ${esc(t.responsible)}</span>` : "";
-  const others = (t.assigned_to || []).filter(u => u !== t.responsible);
-  const othersLabel = others.length ? others.map(u => `<span class="note-assign">@${esc(u)}</span>`).join("") : "";
-  const extra = t.extra_staff > 0 ? `<span class="note-assign">+${t.extra_staff} extra</span>` : "";
+  return `
+<button class="btn-ghost mb" onclick="closeTaskDetail()">← Tillbaka till planering</button>
 
-  return `<div class="note-card" onclick="toggleTask(${t.id})" style="border-left:3px solid ${prio.color};${isDone ? "opacity:.55;" : ""}${
-    dlStatus === "overdue" ? "border-top:2px solid #ff6b6b;" :
-    dlStatus === "urgent"  ? "border-top:2px solid var(--accent);" : ""
-  }">
-  <div class="note-tags">
-    <span style="font-size:9px;color:${prio.color};font-family:var(--display);font-weight:700">● ${prio.label}</span>
-    <span style="font-size:9px;color:${stat.color};font-family:var(--display);font-weight:700">${stat.label.toUpperCase()}</span>
-    ${respLabel}${othersLabel}${extra}
-    ${dlStatus ? `<span class="${deadlineBadgeClass(dlStatus)}">${esc(dlLabel)}</span>` : ""}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+        <span style="font-size:9px;color:${prio.color};font-family:var(--display);font-weight:700">● ${prio.label}</span>
+        <span style="font-size:9px;color:${stat.color};font-family:var(--display);font-weight:700">${stat.label.toUpperCase()}</span>
+        ${dlStatus ? `<span class="${deadlineBadgeClass(dlStatus)}">${esc(dlLabel)}</span>` : ""}
+      </div>
+      <div style="font-family:var(--display);font-size:24px;font-weight:900;${isDone ? "text-decoration:line-through;color:var(--muted);" : ""}">${esc(t.title)}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">
+        Skapad ${fmtD(t.created_at)} av ${esc(t.created_by || "")}
+        ${t.start_date ? `· start ${fmtDateOnly(t.start_date)}` : ""}
+      </div>
+    </div>
+    ${isAdmin || t.responsible === user ? `<div style="display:flex;flex-direction:column;gap:6px">
+      <button class="btn-ghost" onclick="openEditTask(${t.id})">✎ Redigera</button>
+      ${isAdmin ? `<button class="btn-ghost" onclick="doDelTask(${t.id})" style="color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
+    </div>` : ""}
   </div>
-  <div class="note-text ${isDone ? "done" : ""}" style="font-family:var(--display);font-weight:700;font-size:15px">${esc(t.title)}</div>
-  ${t.description ? `<div class="note-text ${isDone ? "done" : ""}" style="font-size:12px;color:var(--muted);margin-top:4px;white-space:pre-wrap">${esc(t.description)}</div>` : ""}
-  <div class="note-meta">
-    ${t.start_date ? `<span>Start: ${fmtDateOnly(t.start_date)}</span>` : ""}
-    <span>· skapad ${fmtD(t.created_at)} av ${esc(t.created_by || "")}</span>
+
+  <div class="lbl">PERSONAL</div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px">
+    ${t.responsible ? `<span class="note-assign" style="font-size:12px;padding:4px 10px">⭐ ${esc(t.responsible)}</span>` : ""}
+    ${(t.assigned_to || []).filter(u => u !== t.responsible).map(u => `<span class="note-assign" style="font-size:12px;padding:4px 10px">@${esc(u)}</span>`).join("")}
+    ${t.extra_staff > 0 ? `<span class="note-assign" style="font-size:12px;padding:4px 10px">+${t.extra_staff} extra inhyrd</span>` : ""}
+    ${!t.responsible && !(t.assigned_to || []).length ? `<span style="font-size:12px;color:var(--muted)">Ingen tilldelad</span>` : ""}
   </div>
-  ${open ? `
-  <div class="note-actions" onclick="event.stopPropagation()">
+
+  <div class="lbl">STATUS</div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px">
     ${Object.entries(TASK_STATS).map(([k, v]) =>
       `<button class="status-btn ${t.status === k ? "active" : ""}" onclick="setTaskStatus(${t.id},'${k}')">${v.label}</button>`
     ).join("")}
-    ${(isAdmin || t.responsible === user) ? `<button class="btn-ghost" onclick="openEditTask(${t.id})">✎ Redigera</button>` : ""}
     ${isAdmin && !isArchived && t.status === "klar" ? `<button class="btn-ghost" onclick="archiveTask(${t.id},true)">📁 Arkivera</button>` : ""}
     ${isAdmin && isArchived ? `<button class="btn-ghost" onclick="archiveTask(${t.id},false)">↩ Aktivera</button>` : ""}
-    ${isAdmin ? `<button class="btn-ghost" onclick="doDelTask(${t.id})" style="margin-left:auto;color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
   </div>
-  <div class="comments-section" onclick="event.stopPropagation()">
-    <div class="comment-lbl">DAGLIGA UPPDATERINGAR (${(taskComments[t.id] || []).length})</div>
-    ${(taskComments[t.id] || []).map(c =>
-      `<div class="comment-item">
-        <div class="comment-text" style="white-space:pre-wrap">${esc(c.text)}</div>
-        <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}</div>
-      </div>`
-    ).join("")}
-    <div class="comment-input-row">
-      <input type="text" id="task-comment-input-${t.id}" placeholder="Lägg till daglig uppdatering..." onkeydown="if(event.key==='Enter')submitTaskComment(${t.id})">
-      <button class="btn-ghost" onclick="submitTaskComment(${t.id})">Skicka</button>
+</div>
+
+${t.description ? `<div class="card">
+  <div class="lbl">BESKRIVNING</div>
+  <div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${esc(t.description)}</div>
+</div>` : ""}
+
+<!-- CHECKLISTA -->
+<div class="card">
+  <div class="lbl">CHECKLISTA (${checkItems.filter(i=>i.done).length}/${checkItems.length})</div>
+  ${checkItems.length === 0 ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Inga punkter ännu — lägg till nedan</div>` : ""}
+  ${checkItems.map(item => `
+    <div class="checklist-item">
+      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;flex:1">
+        <input type="checkbox" ${item.done ? "checked" : ""} onchange="toggleChecklist(${t.id},${item.id},this.checked)"
+          style="width:18px;height:18px;margin-top:1px;flex-shrink:0;accent-color:var(--accent)">
+        <span style="font-size:13px;${item.done ? "text-decoration:line-through;color:var(--muted);" : ""}">${esc(item.text)}</span>
+      </label>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        <span style="font-size:10px;color:var(--dim)">${esc(item.created_by)}</span>
+        <button class="cmt-act-btn cmt-act-del" onclick="delChecklistAction(${t.id},${item.id})">🗑</button>
+      </div>
     </div>
+  `).join("")}
+  <div style="display:flex;gap:6px;margin-top:10px">
+    <input type="text" id="checklist-new-${t.id}" placeholder="Ny checklistpunkt..." style="flex:1"
+      onkeydown="if(event.key==='Enter')addChecklistAction(${t.id})">
+    <button class="btn-ghost" onclick="addChecklistAction(${t.id})">+ Lägg till</button>
   </div>
-  ${log.length > 0 ? `
-  <div class="comments-section" onclick="event.stopPropagation()">
-    <div class="comment-lbl">STATUSHISTORIK (${log.length})</div>
-    ${log.slice(0, 10).map(l =>
-      `<div class="comment-item">
-        <div class="comment-text">${esc(l.old_status ? TASK_STATS[l.old_status]?.label || l.old_status : "skapad")} → <b>${esc(TASK_STATS[l.new_status]?.label || l.new_status)}</b></div>
-        <div class="comment-meta">${esc(l.changed_by)} · ${fmtD(l.created_at)}</div>
-      </div>`
-    ).join("")}
+</div>
+
+<!-- DAGLIGA UPPDATERINGAR -->
+<div class="card">
+  <div class="lbl">DAGLIGA UPPDATERINGAR (${cmts.length})</div>
+  ${cmts.map(c => {
+    const canMod = isAdmin || c.created_by === user;
+    return `<div class="comment-item">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+        <div class="comment-text" style="white-space:pre-wrap;flex:1">${esc(c.text)}</div>
+        ${canMod ? `<div style="display:flex;gap:4px;flex-shrink:0">
+          <button class="cmt-act-btn" onclick="editTaskCommentAction(${t.id},${c.id},'${escAttr(c.text)}')">✎</button>
+          <button class="cmt-act-btn cmt-act-del" onclick="delTaskCommentAction(${t.id},${c.id})">🗑</button>
+        </div>` : ""}
+      </div>
+      <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}</div>
+    </div>`;
+  }).join("")}
+  <div class="comment-input-row" style="margin-top:10px">
+    <input type="text" id="task-comment-input-${t.id}" placeholder="Lägg till daglig uppdatering..."
+      onkeydown="if(event.key==='Enter')submitTaskComment(${t.id})">
+    <button class="btn-ghost" onclick="submitTaskComment(${t.id})">Skicka</button>
   </div>
-  ` : ""}
-  ` : ""}
-</div>`;
+</div>
+
+${log.length > 0 ? `<div class="card">
+  <div class="lbl">STATUSHISTORIK (${log.length})</div>
+  ${log.slice(0, 10).map(l =>
+    `<div class="comment-item">
+      <div class="comment-text">${esc(l.old_status ? TASK_STATS[l.old_status]?.label || l.old_status : "skapad")} → <b>${esc(TASK_STATS[l.new_status]?.label || l.new_status)}</b></div>
+      <div class="comment-meta">${esc(l.changed_by)} · ${fmtD(l.created_at)}</div>
+    </div>`
+  ).join("")}
+</div>` : ""}`;
 }
 
 // ============================================================
