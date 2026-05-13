@@ -177,6 +177,7 @@ async function setMatSubTab(t) {
 function setPlanSubTab(t) {
   planSubTab = t;
   openTaskId = null;
+  planPersonFilter = "alla";
   render();
 }
 
@@ -246,10 +247,29 @@ function copyExport() {
   copyTxt(txt);
 }
 
+// ---- KUGGHJULSMENY ----
+function toggleGearMenu(e) {
+  e.stopPropagation();
+  const menu = document.getElementById("hdr-gear-menu");
+  const btn  = document.querySelector(".hdr-gear-btn");
+  if (!menu) return;
+  const open = menu.classList.toggle("open");
+  btn?.classList.toggle("open", open);
+  if (open) {
+    const handler = () => { menu.classList.remove("open"); btn?.classList.remove("open"); document.removeEventListener("click", handler); };
+    setTimeout(() => document.addEventListener("click", handler), 0);
+  }
+}
+function closeGearMenu() {
+  document.getElementById("hdr-gear-menu")?.classList.remove("open");
+  document.querySelector(".hdr-gear-btn")?.classList.remove("open");
+}
+
 // ---- FILTER ----
 function setFC(c) { fCat = c; render(); }
 function setFS(s) { fStat = s; render(); }
 function setFA(a) { fAssigned = a; render(); }
+function setPlanPersonFilter(v) { planPersonFilter = v; render(); }
 
 // ---- VECKOSAMANFATTNING VIA MAIL ----
 async function sendWeeklyNow() {

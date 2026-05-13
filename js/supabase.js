@@ -373,6 +373,18 @@ async function addComment(noteId, text) {
   });
 }
 
+async function delComment(id) {
+  await sb("/rest/v1/comments?id=eq." + id, { method: "DELETE" });
+}
+
+async function editComment(id, text) {
+  await sb("/rest/v1/comments?id=eq." + id, {
+    method: "PATCH",
+    body: JSON.stringify({ text, updated_at: new Date().toISOString() }),
+    prefer: "return=minimal"
+  });
+}
+
 // ============================================================
 // KOMMENTARER PÅ UPPGIFTER (task_comments)
 // ============================================================
@@ -391,6 +403,51 @@ async function addTaskComment(task_id, text) {
     body: JSON.stringify({ task_id, text, created_by: user, created_at: new Date().toISOString() }),
     prefer: "return=minimal"
   });
+}
+
+async function delTaskComment(id) {
+  await sb("/rest/v1/task_comments?id=eq." + id, { method: "DELETE" });
+}
+
+async function editTaskComment(id, text) {
+  await sb("/rest/v1/task_comments?id=eq." + id, {
+    method: "PATCH",
+    body: JSON.stringify({ text, updated_at: new Date().toISOString() }),
+    prefer: "return=minimal"
+  });
+}
+
+// ============================================================
+// CHECKLISTA (task_checklist)
+// ============================================================
+async function loadTaskChecklist(task_id) {
+  try {
+    const data = await sb("/rest/v1/task_checklist?task_id=eq." + task_id + "&order=created_at.asc") || [];
+    taskChecklists[task_id] = data;
+  } catch (e) {
+    taskChecklists[task_id] = [];
+  }
+}
+
+async function addChecklistItem(task_id, text) {
+  const r = await sb("/rest/v1/task_checklist", {
+    method: "POST",
+    body: JSON.stringify({ task_id, text, done: false, created_by: user }),
+    headers: { "Prefer": "return=representation" }
+  });
+  return r?.[0]?.id;
+}
+
+async function toggleChecklistItem(id, done) {
+  await sb("/rest/v1/task_checklist?id=eq." + id, {
+    method: "PATCH",
+    body: JSON.stringify({ done }),
+    prefer: "return=minimal"
+  });
+}
+
+async function delChecklistItem(id) {
+  await sb("/rest/v1/task_checklist?id=eq." + id, { method: "DELETE" });
 }
 
 // ============================================================
@@ -430,11 +487,23 @@ async function setMatCommentStatus(commentId, status) {
 
 async function loadActionComments() {
   try {
-    const data = await sb("/rest/v1/material_comments?status=eq.åtgärd_krävs&order=created_at.desc") || [];
+    const data = await sb("/rest/v1/material_comments?status=in.(åtgärd_krävs,åtgärd_behövs)&order=created_at.desc") || [];
     actionComments = data;
   } catch (e) {
     actionComments = [];
   }
+}
+
+async function delMatComment(id) {
+  await sb("/rest/v1/material_comments?id=eq." + id, { method: "DELETE" });
+}
+
+async function editMatComment(id, text) {
+  await sb("/rest/v1/material_comments?id=eq." + id, {
+    method: "PATCH",
+    body: JSON.stringify({ text, updated_at: new Date().toISOString() }),
+    prefer: "return=minimal"
+  });
 }
 
 // ---- ARTIKELBILDER (material_item_images) ----

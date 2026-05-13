@@ -71,6 +71,43 @@ async function submitComment(noteId) {
   }
 }
 
+async function delNoteCommentAction(noteId, commentId) {
+  if (!confirm("Ta bort kommentaren?")) return;
+  try {
+    await delComment(commentId);
+    await loadComments(noteId);
+    render();
+    toast("🗑 Borttagen");
+  } catch (e) {
+    toast("Kunde inte ta bort", 1);
+  }
+}
+
+function editNoteCommentAction(noteId, commentId, currentText) {
+  openModal(`
+    <div class="modal-title">Redigera kommentar</div>
+    <textarea id="edit-note-cmt" rows="3">${esc(currentText)}</textarea>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()" style="flex:1">Avbryt</button>
+      <button class="btn" onclick="saveNoteCommentEdit(${noteId},${commentId})" style="flex:1">SPARA</button>
+    </div>
+  `);
+}
+
+async function saveNoteCommentEdit(noteId, commentId) {
+  const text = document.getElementById("edit-note-cmt")?.value?.trim();
+  if (!text) { toast("Kommentaren får inte vara tom", 1); return; }
+  try {
+    await editComment(commentId, text);
+    await loadComments(noteId);
+    closeModal();
+    render();
+    toast("✓ Sparad");
+  } catch (e) {
+    toast("Kunde inte spara", 1);
+  }
+}
+
 async function doDelete(id) {
   const note = notes.find(n => n.id === id);
   if (!note) return;
@@ -261,16 +298,60 @@ async function doDelMatImg(imgId, matId) {
 }
 
 // ---- KOMMENTARSSTATUS ----
-async function toggleCommentStatus(commentId, matId, itemId, currentStatus) {
-  const newStatus = currentStatus === "åtgärd_krävs" ? "klart" : "åtgärd_krävs";
+async function cycleCommentStatus(commentId, matId, itemId, currentStatus) {
+  const order = ["klart", "åtgärd_behövs", "åtgärd_krävs"];
+  const idx = order.indexOf(currentStatus);
+  const newStatus = order[(idx + 1) % order.length];
   try {
     await setMatCommentStatus(commentId, newStatus);
     await loadMatComments(matId);
     await loadActionComments();
-    toast(newStatus === "åtgärd_krävs" ? "⚠ Åtgärd markerad" : "✓ Markerad som klar");
+    const label = newStatus === "åtgärd_krävs" ? "🚨 Åtgärd krävs" : newStatus === "åtgärd_behövs" ? "⚠ Åtgärd behövs" : "✓ Markerad som klar";
+    toast(label);
     render();
   } catch (e) {
     toast("Kunde inte uppdatera", 1);
+  }
+}
+
+async function delMatCommentAction(commentId, matId) {
+  if (!confirm("Ta bort kommentaren?")) return;
+  try {
+    await delMatComment(commentId);
+    await loadMatComments(matId);
+    await loadActionComments();
+    render();
+    toast("🗑 Borttagen");
+  } catch (e) {
+    toast("Kunde inte ta bort", 1);
+  }
+}
+
+function editMatCommentAction(commentId, matId, itemId) {
+  const allCmts = materialComments[matId] || [];
+  const c = allCmts.find(c => c.id === commentId);
+  if (!c) return;
+  openModal(`
+    <div class="modal-title">Redigera kommentar</div>
+    <textarea id="edit-mat-cmt" rows="3">${esc(c.text)}</textarea>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()" style="flex:1">Avbryt</button>
+      <button class="btn" onclick="saveMatCommentEdit(${commentId},${matId})" style="flex:1">SPARA</button>
+    </div>
+  `);
+}
+
+async function saveMatCommentEdit(commentId, matId) {
+  const text = document.getElementById("edit-mat-cmt")?.value?.trim();
+  if (!text) { toast("Kommentaren får inte vara tom", 1); return; }
+  try {
+    await editMatComment(commentId, text);
+    await loadMatComments(matId);
+    closeModal();
+    render();
+    toast("✓ Sparad");
+  } catch (e) {
+    toast("Kunde inte spara", 1);
   }
 }
 
@@ -580,7 +661,7 @@ async function saveItemStatus(itemId, matId) {
   if (newStatus === it.status) { closeModal(); return; }
 
   // Bara Admin kan sätta "tillgänglig"
-  if (newStatus === "tillgänglig" && !isAdmin) {
+  if (newStatus === "tillgänglig" && !isAdmin && it.status !== "tillgänglig") {
     toast("Endast Admin kan sätta 'Tillgänglig'", 1);
     return;
   }
@@ -804,17 +885,19 @@ async function doDelReturn(id) {
 // ============================================================
 // ARBETSPLANERING (TASKS)
 // ============================================================
-function toggleTask(id) {
-  openTaskId = openTaskId === id ? null : id;
-  if (openTaskId) {
-    const loads = [];
-    if (!taskStatusLogs[id]) loads.push(loadTaskStatusLog(id));
-    if (!taskComments[id]) loads.push(loadTaskComments(id));
-    if (loads.length) Promise.all(loads).then(() => render());
-    else render();
-  } else {
-    render();
-  }
+async function openTaskDetail(id) {
+  openTaskId = id;
+  const loads = [];
+  if (!taskStatusLogs[id]) loads.push(loadTaskStatusLog(id));
+  if (!taskComments[id]) loads.push(loadTaskComments(id));
+  if (!taskChecklists[id]) loads.push(loadTaskChecklist(id));
+  if (loads.length) await Promise.all(loads);
+  render();
+}
+
+function closeTaskDetail() {
+  openTaskId = null;
+  render();
 }
 
 async function submitTaskComment(taskId) {
@@ -828,6 +911,78 @@ async function submitTaskComment(taskId) {
     toast("✓ Uppdatering sparad");
   } catch (e) {
     toast("Kunde inte spara uppdatering", 1);
+  }
+}
+
+async function delTaskCommentAction(taskId, commentId) {
+  if (!confirm("Ta bort kommentaren?")) return;
+  try {
+    await delTaskComment(commentId);
+    await loadTaskComments(taskId);
+    render();
+    toast("🗑 Borttagen");
+  } catch (e) {
+    toast("Kunde inte ta bort", 1);
+  }
+}
+
+function editTaskCommentAction(taskId, commentId, currentText) {
+  openModal(`
+    <div class="modal-title">Redigera uppdatering</div>
+    <textarea id="edit-task-cmt" rows="3">${esc(currentText)}</textarea>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()" style="flex:1">Avbryt</button>
+      <button class="btn" onclick="saveTaskCommentEdit(${taskId},${commentId})" style="flex:1">SPARA</button>
+    </div>
+  `);
+}
+
+async function saveTaskCommentEdit(taskId, commentId) {
+  const text = document.getElementById("edit-task-cmt")?.value?.trim();
+  if (!text) { toast("Får inte vara tom", 1); return; }
+  try {
+    await editTaskComment(commentId, text);
+    await loadTaskComments(taskId);
+    closeModal();
+    render();
+    toast("✓ Sparad");
+  } catch (e) {
+    toast("Kunde inte spara", 1);
+  }
+}
+
+// ---- CHECKLISTA ----
+async function toggleChecklist(taskId, itemId, done) {
+  try {
+    await toggleChecklistItem(itemId, done);
+    await loadTaskChecklist(taskId);
+    render();
+  } catch (e) {
+    toast("Kunde inte uppdatera", 1);
+  }
+}
+
+async function addChecklistAction(taskId) {
+  const inp = document.getElementById("checklist-new-" + taskId);
+  const text = inp?.value?.trim();
+  if (!text) return;
+  try {
+    await addChecklistItem(taskId, text);
+    await loadTaskChecklist(taskId);
+    render();
+  } catch (e) {
+    toast("Kunde inte lägga till", 1);
+  }
+}
+
+async function delChecklistAction(taskId, itemId) {
+  try {
+    await delChecklistItem(itemId);
+    await loadTaskChecklist(taskId);
+    render();
+    toast("🗑 Borttagen");
+  } catch (e) {
+    toast("Kunde inte ta bort", 1);
   }
 }
 
