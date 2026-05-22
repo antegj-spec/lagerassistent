@@ -14,12 +14,12 @@ Eftersom projektet inte har Supabase CLI installerad kör vi via Dashboard:
 
 ## Test (efter deploy)
 
-I terminalen (byt ut anon-key + project-ref):
+I terminalen (byt ut `<ANON_KEY>` mot anon-key från Supabase Dashboard → API):
 
 ```bash
-curl -X POST https://tzidalknfoumoknhsetx.supabase.co/functions/v1/verify-pin \
+curl -X POST https://<PROJECT_REF>.supabase.co/functions/v1/verify-pin \
   -H "Content-Type: application/json" \
-  -H "apikey: <anon-key>" \
+  -H "apikey: <ANON_KEY>" \
   -d '{"user_name":"Admin","pin":"0987"}'
 ```
 

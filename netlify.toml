@@ -1,6 +1,12 @@
 [build]
   functions = "netlify/functions"
 
+[build.environment]
+  # SUPABASE_ANON_KEY och SUPABASE_URL är MEDVETET publika.
+  # Anon-key:s syfte är att vara öppen — RLS skyddar data server-side (Fas 1).
+  # SUPABASE_SERVICE_ROLE_KEY och CRON_SECRET fortsätter scannas (de är hemliga).
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_ANON_KEY,SUPABASE_URL"
+
 # Cron-trigger tillfälligt inaktiverad i Fas 1:
 # send-weekly kräver nu JWT eller CRON_SECRET-header.
 # Netlify scheduled-trigger skickar ingen header, så cron-flöde är brutet.
