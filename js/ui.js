@@ -280,7 +280,10 @@ async function sendWeeklyNow() {
   try {
     const r = await fetch("/.netlify/functions/send-weekly", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + (sessionStorage.getItem("lager-token") || ""),
+      },
       body: JSON.stringify({ to: mail })
     });
     const d = await r.json();
@@ -292,6 +295,21 @@ async function sendWeeklyNow() {
 }
 
 // ---- AI-SAMMANFATTNING ----
+// Hjälpfunktion — bygger material-rad för AI-prompt baserat på faktiskt schema (B16/B17)
+function materialSummaryLine(m) {
+  if (m.is_article_based) {
+    const items = materialItems[m.id] || [];
+    const tillg = items.filter(i => i.status === "tillgänglig").length;
+    const issues = items.filter(i => i.status === "reparation" || i.status === "tvätt").length;
+    return `- ${m.name}: ${tillg}/${items.length} tillgängliga${issues ? `, ${issues} i åtgärd` : ""}`;
+  }
+  const c = materialCounts[m.id] || {};
+  const total = m.total_count || 0;
+  return `- ${m.name}: ${c.tillgänglig || 0}/${total} ${m.unit || "st"} tillgängliga` +
+         `${c.uthyrd ? `, ${c.uthyrd} uthyrt` : ""}` +
+         `${c.reparation ? `, ${c.reparation} reparation` : ""}`;
+}
+
 async function aiSum() {
   const btn = document.getElementById("ai-sum-btn");
   if (btn) btn.disabled = true;
@@ -303,12 +321,15 @@ async function aiSum() {
       `- [${CATS[n.category]?.label}][${PRIOS[n.priority]?.label}] ${n.text}${n.assigned_to ? ` → @${n.assigned_to}` : ""} (${n.created_by})${n.deadline ? ` [Deadline: ${deadlineLabel(n.deadline)}]` : ""}`
     ).join("\n")
   }\n\nMaterial:\n${
-    materials.map(m => `- ${m.name}: ${m.good} ok, ${m.defective} defekta av ${m.total}`).join("\n")
+    materials.map(materialSummaryLine).join("\n")
   }`;
   try {
     const r = await fetch("/.netlify/functions/claude", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + (sessionStorage.getItem("lager-token") || ""),
+      },
       body: JSON.stringify({
         model: "claude-sonnet-4-5",
         max_tokens: 1500,
@@ -351,12 +372,15 @@ async function sendChat() {
       `- [${CATS[n.category]?.label}][${PRIOS[n.priority]?.label}] ${n.text}${n.assigned_to ? ` → @${n.assigned_to}` : ""} (av ${n.created_by})${n.deadline ? ` [Deadline: ${deadlineLabel(n.deadline)}]` : ""}`
     ).join("\n") || "Inga"
   }\n\nMaterial:\n${
-    materials.map(m => `- ${m.name}: ${m.good} ok, ${m.defective} defekta av ${m.total}`).join("\n") || "Inget register"
+    materials.map(materialSummaryLine).join("\n") || "Inget register"
   }\n\nSvara på svenska. Var konkret och praktisk.`;
   try {
     const r = await fetch("/.netlify/functions/claude", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + (sessionStorage.getItem("lager-token") || ""),
+      },
       body: JSON.stringify({
         model: "claude-sonnet-4-5",
         max_tokens: 1000,

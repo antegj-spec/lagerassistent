@@ -1,6 +1,12 @@
 [build]
   functions = "netlify/functions"
 
-[[scheduled-functions]]
-  name = "send-weekly"
-  cron = "0 7 * * 1"
+# Cron-trigger tillfälligt inaktiverad i Fas 1:
+# send-weekly kräver nu JWT eller CRON_SECRET-header.
+# Netlify scheduled-trigger skickar ingen header, så cron-flöde är brutet.
+# Fixas i Fas 6 (flytta schedule till Supabase pg_cron eller GitHub Action
+# som kan skicka CRON_SECRET-header).
+#
+# [[scheduled-functions]]
+#   name = "send-weekly"
+#   cron = "0 7 * * 1"
