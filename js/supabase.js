@@ -4,17 +4,30 @@
 // ============================================================
 
 // ---- GRUNDLÄGGANDE FETCH-WRAPPER ----
+// Fas 1: skickar JWT från sessionStorage istället för anon-key (SB_KEY används bara
+// som apikey-header för att passera Supabase Gateway). Vid 401 auto-logout.
+function getAuthToken() {
+  return sessionStorage.getItem("lager-token") || SB_KEY;
+}
+
 async function sb(path, opts = {}) {
+  const token = getAuthToken();
   const r = await fetch(SB_URL + path, {
     ...opts,
     headers: {
-      "apikey": SB_KEY,
-      "Authorization": "Bearer " + SB_KEY,
+      "apikey": SB_KEY,                       // alltid anon-key — krävs av Supabase Gateway
+      "Authorization": "Bearer " + token,    // JWT om inloggad, annars anon-key
       "Content-Type": "application/json",
       "Prefer": opts.prefer || "",
       ...(opts.headers || {})
     }
   });
+  // Auto-logout vid 401 (utom på själva login-flödet)
+  if (r.status === 401 && token !== SB_KEY && typeof logout === "function") {
+    console.warn("Got 401 — session expired, logging out");
+    logout();
+    throw new Error("Session expired");
+  }
   if (!r.ok && r.status !== 204) {
     const e = await r.text();
     throw new Error(e);
@@ -29,9 +42,10 @@ async function sb(path, opts = {}) {
 // ============================================================
 async function loadNotes() {
   try {
+    // RLS filtrerar intern-noter server-side (löser B7).
+    // Klienten filtrerar fortfarande deleted_at för aktiv-vy vs papperskorg.
     const all = await sb("/rest/v1/notes?order=created_at.desc") || [];
-    const canSeeIntern = INTERN_USERS.includes(user);
-    notes = all.filter(n => !n.deleted_at && (n.category !== "intern" || canSeeIntern));
+    notes = all.filter(n => !n.deleted_at);
     if (isAdmin) {
       const cutoff = new Date(Date.now() - TRASH_DAYS * 86400000).toISOString();
       trashedNotes = all.filter(n => n.deleted_at && n.deleted_at > cutoff);
@@ -313,20 +327,39 @@ async function loadTaskStatusLog(task_id) {
 // PINS
 // ============================================================
 async function loadPins() {
+  // Fas 1: PIN-verifiering sker server-side via verify-pin Edge Function.
+  // Denna funktion behövs bara för att fylla pinSet[] efter login (för UI-flaggor).
+  // Vid 401 (pre-login) sväljs felet tyst.
   try {
     const data = await sb("/rest/v1/user_pins") || [];
     userPins = {};
     pinSet = {};
     data.forEach(p => {
-      userPins[p.user_name] = p.pin;
+      // pin-kolumnen finns inte längre (droppad i Fas 1) — bara pin_set behövs här
       pinSet[p.user_name] = p.pin_set || false;
     });
   } catch (e) {
-    userPins = { ...DEFAULT_PINS };
+    // Tyst: pre-login eller user saknar SELECT-rätt
+    userPins = {};
+    pinSet = {};
   }
-  USERS.forEach(u => {
-    if (!userPins[u]) userPins[u] = DEFAULT_PINS[u];
+}
+
+async function changePinViaEdge(currentPin, newPin) {
+  const token = sessionStorage.getItem("lager-token");
+  if (!token) throw new Error("Not logged in");
+  const r = await fetch(SB_URL + "/functions/v1/change-pin", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SB_KEY,
+      "Authorization": "Bearer " + token,
+    },
+    body: JSON.stringify({ current_pin: currentPin, new_pin: newPin }),
   });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || "Kunde inte byta PIN");
+  return data;
 }
 
 async function savePin(userName, pin, isSet = true) {

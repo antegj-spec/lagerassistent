@@ -24,6 +24,8 @@ function pinPress(d) {
   if (pinBuf.length >= 4) return;
   pinBuf += d;
   updDots();
+  // Haptic feedback för handskar/stress (Fas 1, prio 5.10)
+  if (navigator.vibrate) navigator.vibrate(20);
   if (pinBuf.length === 4) setTimeout(checkPin, 120);
 }
 
@@ -37,40 +39,62 @@ function updDots() {
     .forEach((d, i) => d.classList.toggle("filled", i < pinBuf.length));
 }
 
-// ---- KONTROLLERA PIN ----
+// ---- KONTROLLERA PIN (Fas 1: server-side verifiering via verify-pin Edge Function) ----
+function showPinError(msg) {
+  const errEl = document.getElementById("pin-error");
+  const dotsEl = document.getElementById("pin-dots");
+  errEl.textContent = msg;
+  dotsEl.style.animation = "none";
+  dotsEl.offsetHeight;
+  dotsEl.style.animation = "pinShake .35s ease";
+  pinBuf = "";
+  updDots();
+  setTimeout(() => { errEl.textContent = ""; dotsEl.style.animation = ""; }, 1800);
+}
+
 async function checkPin() {
   const inputEl = document.getElementById("username-input");
   const typedName = inputEl ? inputEl.value.trim() : "";
   const matchedUser = USERS.find(u => u.toLowerCase() === typedName.toLowerCase());
   if (!matchedUser) {
-    document.getElementById("pin-error").textContent = "Okänt användarnamn — försök igen";
-    pinBuf = "";
-    updDots();
-    setTimeout(() => document.getElementById("pin-error").textContent = "", 1800);
+    showPinError("Okänt användarnamn — försök igen");
     return;
   }
   selUser = matchedUser;
-  if (Object.keys(userPins).length === 0) await loadPins();
-  const correctPin = userPins[selUser] || DEFAULT_PINS[selUser];
-  if (pinBuf === correctPin) {
-    user = selUser;
-    // Visa PIN-setup om användaren inte satt en egen PIN än
-    const needsFirstPin = !pinSet[selUser];
-    if (needsFirstPin && user !== "Admin") {
-      showFirstPinScreen();
-    } else {
+
+  // POSTa till verify-pin Edge Function — bcrypt-jämför server-side
+  try {
+    const r = await fetch(SB_URL + "/functions/v1/verify-pin", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SB_KEY,
+      },
+      body: JSON.stringify({ user_name: matchedUser, pin: pinBuf }),
+    });
+    const data = await r.json().catch(() => ({}));
+
+    if (r.status === 200 && data.access_token) {
+      // Spara session
+      sessionStorage.setItem("lager-token", data.access_token);
+      sessionStorage.setItem("lager-refresh", data.refresh_token || "");
+      sessionStorage.setItem("lager-user", data.user_name);
+      sessionStorage.setItem("lager-role", data.role);
+      sessionStorage.setItem("lager-expires", String(data.expires_at || 0));
+      user = data.user_name;
+      isAdmin = data.role === "admin";
+      // Ladda pinSet i bakgrunden så "Byt PIN"-flöden ser första-gången-läget
+      loadPins().catch(() => {});
       completeLogin();
+    } else if (r.status === 429) {
+      const sec = data.retry_after_seconds || 300;
+      const min = Math.ceil(sec / 60);
+      showPinError(`Kontot låst — försök igen om ${min} min`);
+    } else {
+      showPinError("Fel PIN — försök igen");
     }
-  } else {
-    const errEl = document.getElementById("pin-error");
-    const dotsEl = document.getElementById("pin-dots");
-    errEl.textContent = "Fel PIN — försök igen";
-    dotsEl.style.animation = "none";
-    dotsEl.offsetHeight;
-    dotsEl.style.animation = "pinShake .35s ease";
-    pinBuf = "";
-    updDots();
-    setTimeout(() => { errEl.textContent = ""; dotsEl.style.animation = ""; }, 1800);
+  } catch (e) {
+    showPinError("Nätverksfel — kontrollera anslutning");
   }
 }
 
@@ -164,6 +188,10 @@ function completeLogin() {
 
 // ---- LOGGA UT ----
 function logout() {
+  // Rensa session-storage (JWT, refresh, user-info)
+  ["lager-token", "lager-refresh", "lager-user", "lager-role", "lager-expires"]
+    .forEach(k => sessionStorage.removeItem(k));
+
   user = null;
   isAdmin = false;
   pinBuf = "";
@@ -172,15 +200,20 @@ function logout() {
   trashedNotes = [];
   chat = [];
   comments = {};
+  userPins = {};
+  pinSet = {};
   firstPinStep = 1;
   firstPinNew = "";
   firstPinConfirm = "";
   updDots();
-  ["main-header", "main-nav", "main"].forEach(id =>
-    document.getElementById(id).style.display = "none"
-  );
-  document.getElementById("export-btn").style.display = "none";
-  document.getElementById("trash-btn").style.display = "none";
+  ["main-header", "main-nav", "main"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "none";
+  });
+  const exportBtn = document.getElementById("export-btn");
+  const trashBtn = document.getElementById("trash-btn");
+  if (exportBtn) exportBtn.style.display = "none";
+  if (trashBtn) trashBtn.style.display = "none";
   document.getElementById("pin-screen").style.display = "flex";
   selUser = USERS[0];
   initUsers();
@@ -208,21 +241,45 @@ function openChangePin() {
 }
 
 async function doChangePin() {
-  const cur  = document.getElementById("cur-pin")?.value;
-  const np   = document.getElementById("new-pin")?.value;
-  const np2  = document.getElementById("new-pin2")?.value;
+  const cur  = document.getElementById("cur-pin")?.value?.trim();
+  const np   = document.getElementById("new-pin")?.value?.trim();
+  const np2  = document.getElementById("new-pin2")?.value?.trim();
   const msg  = document.getElementById("pin-msg");
-  if (cur !== (userPins[user] || DEFAULT_PINS[user])) { msg.textContent = "Fel nuvarande PIN"; return; }
-  if (!np || np.length !== 4 || !/^\d{4}$/.test(np)) { msg.textContent = "Ny PIN måste vara 4 siffror"; return; }
-  if (np !== np2) { msg.textContent = "PIN-koderna matchar inte"; return; }
+  if (!cur || !/^\d{4}$/.test(cur)) { msg.textContent = "Nuvarande PIN måste vara 4 siffror"; return; }
+  if (!np || !/^\d{4}$/.test(np))   { msg.textContent = "Ny PIN måste vara 4 siffror"; return; }
+  if (np !== np2)                   { msg.textContent = "PIN-koderna matchar inte"; return; }
+  if (np === cur)                   { msg.textContent = "Ny PIN måste skilja från nuvarande"; return; }
   try {
-    await savePin(user, np, true);
+    await changePinViaEdge(cur, np);
+    pinSet[user] = true;
     closeModal();
     toast("✓ PIN ändrad");
   } catch (e) {
-    msg.textContent = "Kunde inte spara";
+    msg.textContent = e.message === "Invalid current PIN" ? "Fel nuvarande PIN" : "Kunde inte spara";
   }
 }
 
 // ---- BOOT ----
-loadPins().then(() => initUsers());
+// Fas 1: loadPins kräver authenticated → körs först efter login.
+// Här initierar vi bara UI för PIN-skärmen.
+initUsers();
+
+// Återställ session vid sidladdning om JWT fortfarande är giltig (refresh av flik)
+(function restoreSession() {
+  const token = sessionStorage.getItem("lager-token");
+  const expires = parseInt(sessionStorage.getItem("lager-expires") || "0", 10);
+  const userName = sessionStorage.getItem("lager-user");
+  const role = sessionStorage.getItem("lager-role");
+  if (!token || !userName) return;
+  // expires är Unix-sekunder
+  if (expires && expires * 1000 < Date.now()) {
+    // Token utgången — rensa
+    ["lager-token", "lager-refresh", "lager-user", "lager-role", "lager-expires"]
+      .forEach(k => sessionStorage.removeItem(k));
+    return;
+  }
+  user = userName;
+  isAdmin = role === "admin";
+  loadPins().catch(() => {});
+  completeLogin();
+})();
