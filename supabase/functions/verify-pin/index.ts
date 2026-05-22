@@ -28,19 +28,27 @@ const LOCKOUT_THRESHOLD = 5;     // antal fel innan lås
 const LOCKOUT_MINUTES = 5;        // hur länge låst
 const JWT_TTL_HOURS = 12;         // sessionens livslängd
 
-// CORS — bara vår Netlify-domän
+// CORS — produktion + lokala dev-portar + Netlify deploy-previews
 const ALLOWED_ORIGINS = [
-  "https://lagerassistent.netlify.app",  // TODO: justera om din domän är annorlunda
-  "http://localhost:5173",                // Vite dev (för Fas 2)
-  "http://localhost:8000",                // Python http.server (nuvarande dev)
+  "https://lagerassistent.netlify.app",
+  "http://localhost:5173",                // Vite (Fas 2)
+  "http://localhost:8000",                // python -m http.server
+  "http://localhost:3000",                // npx serve default
 ];
+// Matchar deploy-preview-N--lagerassistent.netlify.app + branch-deploys
+const PREVIEW_PATTERN = /^https:\/\/[a-z0-9-]+--lagerassistent\.netlify\.app$/;
+
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  return ALLOWED_ORIGINS.includes(origin) || PREVIEW_PATTERN.test(origin);
+}
 
 function corsHeaders(origin: string | null): Record<string, string> {
-  const allowOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allowOrigin = isAllowedOrigin(origin) ? origin! : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "content-type, authorization",
+    "Access-Control-Allow-Headers": "content-type, authorization, apikey",
     "Access-Control-Max-Age": "3600",
   };
 }

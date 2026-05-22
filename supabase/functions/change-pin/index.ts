@@ -26,10 +26,17 @@ const ALLOWED_ORIGINS = [
   "https://lagerassistent.netlify.app",
   "http://localhost:5173",
   "http://localhost:8000",
+  "http://localhost:3000",
 ];
+const PREVIEW_PATTERN = /^https:\/\/[a-z0-9-]+--lagerassistent\.netlify\.app$/;
+
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  return ALLOWED_ORIGINS.includes(origin) || PREVIEW_PATTERN.test(origin);
+}
 
 function corsHeaders(origin: string | null): Record<string, string> {
-  const allowOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allowOrigin = isAllowedOrigin(origin) ? origin! : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
