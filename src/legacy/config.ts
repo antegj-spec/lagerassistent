@@ -117,7 +117,7 @@ let searchQuery: string = "";
 let loading: boolean = false;
 
 // MATERIAL-VY STATE
-let matSubTab: "status" | "returer" = "status";
+let matSubTab: "status" | "returer" | "åtgärder" = "status";
 let openMatId: number | null = null;
 
 // PLAN-VY STATE
