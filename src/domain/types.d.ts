@@ -80,9 +80,12 @@ export interface Note extends BaseRow, SoftDeletable {
   priority?: Priority;
   image_url?: string | null;
   created_by?: UserName | string;
+  assigned_to?: string | null;
+  deadline?: string | null;
+  material_id?: number | null;
 }
 
-export interface Comment extends BaseRow {
+export interface NoteComment extends BaseRow {
   note_id: number;
   text: string;
   created_by: UserName | string;
@@ -96,12 +99,17 @@ export interface Material extends BaseRow, SoftDeletable {
   supplier?: string | null;
   category?: string | null;
   notes?: string | null;
+  emoji?: string | null;
+  unit?: string | null;
+  total_count?: number | null;
+  info_text?: string | null;
 }
 
 export interface MaterialItem extends BaseRow {
   material_id: number;
   article_id: string;
   status: MaterialStatus;
+  last_washed?: string | null;
 }
 
 export interface MaterialCount {
@@ -118,9 +126,14 @@ export interface MaterialHistory {
   item_id?: number | null;
   from_status?: MaterialStatus | null;
   to_status?: MaterialStatus | null;
+  old_status?: MaterialStatus | null;
+  new_status?: MaterialStatus | null;
   changed_by: UserName | string;
   created_at: Timestamp;
   notes?: string | null;
+  count_change?: number | null;
+  comment?: string | null;
+  article_id?: string | null;
 }
 
 export interface MaterialComment {
@@ -158,6 +171,9 @@ export interface BorrowedMaterial extends BaseRow, SoftDeletable {
   start_date: string;
   end_date?: string | null;
   notes?: string | null;
+  quantity?: number | null;
+  comment?: string | null;
+  reason?: string | null;
 }
 
 // ---------- Returer ----------
@@ -168,6 +184,10 @@ export interface Return extends BaseRow, SoftDeletable {
   notes?: string | null;
   image_url?: string | null;
   archived: boolean;
+  name?: string | null;
+  received_by?: UserName | string | null;
+  content?: string | null;
+  comment?: string | null;
 }
 
 // ---------- Tasks ----------
@@ -182,13 +202,15 @@ export interface Task extends BaseRow, SoftDeletable {
   responsible?: UserName | string | null;
   archived: boolean;
   created_by?: UserName | string;
+  extra_staff?: number | null;
+  start_date?: string | null;
 }
 
 export interface TaskStatusLog {
   id: number;
   task_id: number;
-  from_status?: TaskStatus | null;
-  to_status: TaskStatus;
+  old_status?: TaskStatus | null;
+  new_status: TaskStatus;
   changed_by: UserName | string;
   created_at: Timestamp;
 }

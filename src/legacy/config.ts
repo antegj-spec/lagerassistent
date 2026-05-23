@@ -107,7 +107,7 @@ let infoEditImages: string[] = [];                               // bild-urls
 let trashedNotes: Note[] = [];
 let chat: ChatMessage[] = [];
 let openId: number | null = null;
-let comments: Record<number, Comment[]> = {};
+let comments: Record<number, NoteComment[]> = {};
 
 // FILTER & SÖK
 let fCat: string = "alla";

@@ -27,7 +27,7 @@ declare global {
   type Timestamp = D.Timestamp;
 
   type Note = D.Note;
-  type Comment = D.Comment;
+  type NoteComment = D.NoteComment;
   type Material = D.Material;
   type MaterialItem = D.MaterialItem;
   type MaterialCount = D.MaterialCount;

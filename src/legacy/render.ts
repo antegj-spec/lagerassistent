@@ -4,7 +4,7 @@
 // ============================================================
 
 // ---- HUVUD-RENDER ----
-function render() {
+function render(): void {
   const m = document.getElementById("main");
   if (!m) return;
 
@@ -31,7 +31,7 @@ function render() {
 // ============================================================
 // HEM-FLIKEN
 // ============================================================
-function rHem() {
+function rHem(): string {
   const hp = notes.filter(n => n.priority === "hög" && n.status !== "klar");
   const today = notes.filter(n =>
     new Date(n.created_at).toDateString() === new Date().toDateString()
@@ -51,7 +51,7 @@ function rHem() {
   // Mina uppgifter (om jag är tilldelad eller huvudansvarig)
   const myTasks = tasks.filter(t =>
     t.status !== "klar" &&
-    (t.responsible === user || (t.assigned_to || []).includes(user))
+    (t.responsible === user || (t.assigned_to || []).includes(user || ""))
   );
 
   const matOpts  = materials.map(m => `<option value="${m.id}">${esc(m.emoji || "📦")} ${esc(m.name)}</option>`).join("");
@@ -63,7 +63,7 @@ function rHem() {
     <div class="lbl">NY ANTECKNING</div>
     <textarea id="note-input" rows="3" placeholder="Beskriv vad du observerat... (t.ex. 'Kravallstaket rad 3 trasig fot, brådskande')"></textarea>
     <label class="field-label">KATEGORI (auto)</label>
-    <select id="note-cat">${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(user)).map(([k, v]) => `<option value="${k}">${v.emoji} ${v.label}</option>`).join("")}</select>
+    <select id="note-cat">${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(user || "")).map(([k, v]) => `<option value="${k}">${v.emoji} ${v.label}</option>`).join("")}</select>
     <label class="field-label">PRIORITET (auto)</label>
     <select id="note-prio">${Object.entries(PRIOS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("")}</select>
     <label class="field-label">TILLDELA TILL (valfritt)</label>
@@ -119,7 +119,7 @@ function rHem() {
 // ============================================================
 // ANTECKNINGAR-FLIKEN
 // ============================================================
-function rNotes() {
+function rNotes(): string {
   const userOpts = USERS.filter(u => u !== "Admin");
   const filtered = notes.filter(n => {
     if (fCat !== "alla" && n.category !== fCat) return false;
@@ -140,7 +140,7 @@ function rNotes() {
 <div class="lbl">KATEGORI</div>
 <div class="filter-row">
   <button class="filter-btn ${fCat === "alla" ? "active" : ""}" onclick="setFC('alla')">Alla</button>
-  ${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(user)).map(([k, v]) =>
+  ${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(user || "")).map(([k, v]) =>
     `<button class="filter-btn ${fCat === k ? "active" : ""}" onclick="setFC('${k}')">${v.emoji} ${v.label}</button>`
   ).join("")}
 </div>
@@ -169,9 +169,9 @@ function rNotes() {
 }
 
 // ---- ANTECKNINGSKORT ----
-function rCard(n, inTrash = false) {
+function rCard(n: Note, inTrash: boolean = false): string {
   const cat = CATS[n.category];
-  const prio = PRIOS[n.priority];
+  const prio = PRIOS[n.priority || "medel"];
   const open = openId === n.id;
   const linkedMat = n.material_id ? materials.find(m => m.id === n.material_id) : null;
   const dlStatus = n.deadline ? deadlineStatus(n.deadline) : null;
@@ -197,7 +197,7 @@ function rCard(n, inTrash = false) {
   <div class="note-meta">
     <span>${fmtD(n.created_at)}</span>
     <span>· ${esc(n.created_by || "")}</span>
-    ${inTrash ? `<span style="color:var(--accent)">· raderad ${fmtDateOnly(n.deleted_at)}</span>` : ""}
+    ${inTrash ? `<span style="color:var(--accent)">· raderad ${fmtDateOnly(n.deleted_at || "")}</span>` : ""}
   </div>
   ${open && !inTrash ? `
   <div class="note-actions" onclick="event.stopPropagation()">
@@ -240,7 +240,7 @@ function rCard(n, inTrash = false) {
 // ============================================================
 // MATERIAL-FLIKEN — med sub-tabs (Status / Åtgärder / Returer)
 // ============================================================
-function rMat() {
+function rMat(): string {
   const actionCount = actionComments.length;
   const subTabs = `
 <div class="filter-row mb" style="border-bottom:1px solid var(--border);padding-bottom:8px">
@@ -255,7 +255,7 @@ function rMat() {
 }
 
 // ---- KOMMENTARSKORT MED STATUS ----
-function rMatCommentCard(c, matId) {
+function rMatCommentCard(c: MaterialComment, matId: number): string {
   const isUrgent = c.status === "åtgärd_krävs";
   const isNeeded = c.status === "åtgärd_behövs";
   const isAction = isUrgent || isNeeded;
@@ -284,15 +284,16 @@ function rMatCommentCard(c, matId) {
 }
 
 // ---- ÅTGÄRDER-VYN ----
-function rMatActions() {
-  const grouped = {};
+function rMatActions(): string {
+  interface ActionGroup { mat: Material; items: MaterialComment[]; }
+  const grouped: Record<number, ActionGroup> = {};
   actionComments.forEach(c => {
     const mat = materials.find(m => m.id === c.material_id);
     if (!mat) return;
     if (!grouped[c.material_id]) grouped[c.material_id] = { mat, items: [] };
     grouped[c.material_id].items.push(c);
   });
-  const groups = Object.values(grouped);
+  const groups: ActionGroup[] = Object.values(grouped);
 
   return `
 <div class="lbl">⚠ KRÄVER ÅTGÄRD (${actionComments.length})</div>
@@ -320,7 +321,7 @@ ${groups.length === 0
 }
 
 // ---- ARTIKELDETALJVY (full sida) ----
-function rItemDetail(it, m) {
+function rItemDetail(it: MaterialItem, m: Material): string {
   const stat = MAT_STATS[it.status] || MAT_STATS.tillgänglig;
   const images = materialItemImages[it.id] || [];
   const cmts = (materialComments[m.id] || []).filter(c => c.item_id === it.id);
@@ -379,7 +380,7 @@ function rItemDetail(it, m) {
         📷 Bifoga bild
         <input type="file" accept="image/*" style="display:none" onchange="handleItemCommentImg(this)">
       </label>
-      ${_itemCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
+      ${(globalThis as any)._itemCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
       <button class="btn-ghost" style="margin-left:auto" onclick="submitMatComment(${m.id},${it.id})">Skicka</button>
     </div>
   </div>
@@ -400,7 +401,7 @@ ${history.length > 0 ? `<div class="card">
 }
 
 // ---- MATERIAL STATUS-VYN ----
-function rMatStatus() {
+function rMatStatus(): string {
   // Om ett material är öppet — visa detaljvyn
   if (openMatId) {
     const m = materials.find(m => m.id === openMatId);
@@ -419,10 +420,10 @@ ${materials.length === 0
 }
 
 // ---- KORT FÖR MATERIAL-LISTAN ----
-function rMatCardSummary(m) {
+function rMatCardSummary(m: Material): string {
   if (m.is_article_based) {
     const items = materialItems[m.id] || [];
-    const counts = {};
+    const counts: Record<string, number> = {};
     Object.keys(MAT_STATS).forEach(s => counts[s] = 0);
     items.forEach(it => { if (counts[it.status] !== undefined) counts[it.status]++; });
 
@@ -460,7 +461,7 @@ function rMatCardSummary(m) {
   <div class="mat-bar"><div class="mat-fill" style="width:${pct}%;background:${col}"></div></div>
   <div class="mat-stats">
     ${Object.entries(MAT_STATS).map(([k, v]) =>
-      counts[k] > 0 ? `<div class="mat-stat"><span style="color:${v.color}">${counts[k]}</span>${v.label.toUpperCase()}</div>` : ""
+      (counts[k as MaterialStatus] || 0) > 0 ? `<div class="mat-stat"><span style="color:${v.color}">${counts[k as MaterialStatus]}</span>${v.label.toUpperCase()}</div>` : ""
     ).join("")}
   </div>
 </div>`;
@@ -468,7 +469,7 @@ function rMatCardSummary(m) {
 }
 
 // ---- DETALJVY FÖR ETT MATERIAL ----
-function rMatDetail(m) {
+function rMatDetail(m: Material): string {
   // Om en artikel är öppen — visa full artikelvy
   if (openItemId && m.is_article_based) {
     const items = materialItems[m.id] || [];
@@ -564,7 +565,7 @@ ${m.info_text ? `<div class="card">
         📷 Bifoga bild
         <input type="file" accept="image/*" style="display:none" onchange="handleMatCommentImg(this)">
       </label>
-      ${_matCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
+      ${(globalThis as any)._matCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
       <button class="btn-ghost" style="margin-left:auto" onclick="submitMatComment(${m.id},null)">Skicka</button>
     </div>
   </div>
@@ -592,7 +593,7 @@ ${m.info_text ? `<div class="card">
 }
 
 // ---- ARTIKELBASERAD VY (lista över artiklar) ----
-function rMatItemsView(m) {
+function rMatItemsView(m: Material): string {
   const items = materialItems[m.id] || [];
   const sortedItems = [...items].sort((a, b) =>
     (a.article_id || "").localeCompare(b.article_id || "", "sv", { numeric: true })
@@ -634,7 +635,7 @@ function rMatItemsView(m) {
 }
 
 // ---- LAGERRÄKNANDE VY (status-räkning) ----
-function rMatCountsView(m) {
+function rMatCountsView(m: Material): string {
   const counts = materialCounts[m.id] || {};
   const borrowed = (borrowedMaterial[m.id] || []).reduce((sum, b) => sum + (b.quantity || 0), 0);
   const own = m.total_count || 0;
@@ -653,7 +654,7 @@ function rMatCountsView(m) {
 
   <div class="lbl">STATUS-FÖRDELNING</div>
   ${Object.entries(MAT_STATS).map(([k, v]) => {
-    const count = counts[k] || 0;
+    const count = counts[k as MaterialStatus] || 0;
     const pct = total > 0 ? Math.round(count / total * 100) : 0;
     return `<div style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
@@ -671,7 +672,7 @@ function rMatCountsView(m) {
 // ============================================================
 // RETURER-FLIKEN
 // ============================================================
-function rReturer() {
+function rReturer(): string {
   return `
 <button class="btn mb" onclick="openAddReturn()" style="width:100%">+ NY RETUR</button>
 <div class="lbl">AKTIVA RETURER (${returnsList.length})</div>
@@ -685,7 +686,7 @@ ${archivedReturns.map(r => rReturCard(r, true)).join("")}
 ` : ""}`;
 }
 
-function rReturCard(r, isArchived = false) {
+function rReturCard(r: Return, isArchived: boolean = false): string {
   return `<div class="mat-card" style="${isArchived ? "opacity:.6;" : ""}">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
     <div style="flex:1">
@@ -709,7 +710,7 @@ function rReturCard(r, isArchived = false) {
 // ============================================================
 // PLAN-FLIKEN (Arbetsplanering)
 // ============================================================
-function rPlan() {
+function rPlan(): string {
   // Detaljvy
   if (openTaskId) {
     const t = [...tasks, ...archivedTasks].find(t => t.id === openTaskId);
@@ -726,7 +727,7 @@ function rPlan() {
   return subTabs + rPlanActive();
 }
 
-function rPlanActive() {
+function rPlanActive(): string {
   const allUsers = USERS.filter(u => u !== "Admin");
   const filtered = tasks.filter(t => {
     if (planPersonFilter === "alla") return true;
@@ -749,7 +750,7 @@ ${filtered.length === 0
 }`;
 }
 
-function rPlanArchive() {
+function rPlanArchive(): string {
   return `
 ${archivedTasks.length === 0
   ? `<div class="empty">Inget arkiverat</div>`
@@ -758,8 +759,8 @@ ${archivedTasks.length === 0
 }
 
 // ---- KOMPAKT UPPGIFTSRAD I LISTAN ----
-function rTaskListRow(t, isArchived = false) {
-  const prio = PRIOS[t.priority] || PRIOS.medel;
+function rTaskListRow(t: Task, isArchived: boolean = false): string {
+  const prio = PRIOS[t.priority || "medel"] || PRIOS.medel;
   const stat = TASK_STATS[t.status] || TASK_STATS.ny;
   const dlStatus = t.deadline ? deadlineStatus(t.deadline) : null;
   const dlLabel  = t.deadline ? deadlineLabel(t.deadline) : "";
@@ -769,7 +770,7 @@ function rTaskListRow(t, isArchived = false) {
   const doneItems = checkItems.filter(i => i.done).length;
 
   const lastUpdate = cmtCount
-    ? fmtD((taskComments[t.id] || []).at(-1)?.created_at)
+    ? fmtD((taskComments[t.id] || []).at(-1)?.created_at || "")
     : fmtD(t.updated_at || t.created_at);
 
   return `<div class="task-row" onclick="openTaskDetail(${t.id})" style="border-left:3px solid ${prio.color};${isDone ? "opacity:.55;" : ""}${
@@ -802,8 +803,8 @@ function rTaskListRow(t, isArchived = false) {
 }
 
 // ---- FULL DETALJSIDA FÖR UPPGIFT ----
-function rTaskDetail(t) {
-  const prio = PRIOS[t.priority] || PRIOS.medel;
+function rTaskDetail(t: Task): string {
+  const prio = PRIOS[t.priority || "medel"] || PRIOS.medel;
   const stat = TASK_STATS[t.status] || TASK_STATS.ny;
   const dlStatus = t.deadline ? deadlineStatus(t.deadline) : null;
   const dlLabel  = t.deadline ? deadlineLabel(t.deadline) : "";
@@ -840,7 +841,7 @@ function rTaskDetail(t) {
   <div style="display:flex;flex-wrap:wrap;gap:6px">
     ${t.responsible ? `<span class="note-assign" style="font-size:12px;padding:4px 10px">⭐ ${esc(t.responsible)}</span>` : ""}
     ${(t.assigned_to || []).filter(u => u !== t.responsible).map(u => `<span class="note-assign" style="font-size:12px;padding:4px 10px">@${esc(u)}</span>`).join("")}
-    ${t.extra_staff > 0 ? `<span class="note-assign" style="font-size:12px;padding:4px 10px">+${t.extra_staff} extra inhyrd</span>` : ""}
+    ${(t.extra_staff || 0) > 0 ? `<span class="note-assign" style="font-size:12px;padding:4px 10px">+${t.extra_staff} extra inhyrd</span>` : ""}
     ${!t.responsible && !(t.assigned_to || []).length ? `<span style="font-size:12px;color:var(--muted)">Ingen tilldelad</span>` : ""}
   </div>
 
@@ -920,7 +921,7 @@ ${log.length > 0 ? `<div class="card">
 // ============================================================
 // PAPPERSKORG-FLIKEN
 // ============================================================
-function rTrash() {
+function rTrash(): string {
   return `
 <div class="lbl">PAPPERSKORG (${trashedNotes.length})</div>
 <p style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.6">
@@ -936,7 +937,7 @@ ${trashedNotes.length === 0
 // ============================================================
 // CHATT-FLIKEN
 // ============================================================
-function rChat() {
+function rChat(): string {
   const msgs = chat.map(m =>
     `<div class="chat-msg ${m.role}">
       <div class="chat-bubble ${m.role === "user" ? "user" : "ai"}">${esc(m.content)}</div>
@@ -969,7 +970,7 @@ function rChat() {
 // ============================================================
 // EXPORT-FLIKEN
 // ============================================================
-function rExport() {
+function rExport(): string {
   const now = new Date().toLocaleDateString("sv-SE", {
     weekday: "long", year: "numeric", month: "long", day: "numeric"
   });
@@ -998,7 +999,7 @@ function rExport() {
     out += `${v.emoji} ${v.label.toUpperCase()} (${cn.length} st)\n`;
     cn.forEach(n => {
       const linkedMat = n.material_id ? materials.find(m => m.id === n.material_id) : null;
-      out += `  ${n.status === "pågår" ? "⏳" : "○"} ${n.text} [${PRIOS[n.priority]?.label}]${
+      out += `  ${n.status === "pågår" ? "⏳" : "○"} ${n.text} [${PRIOS[n.priority || "medel"]?.label}]${
         n.assigned_to ? ` → @${n.assigned_to}` : ""
       }${linkedMat ? ` (📦 ${linkedMat.name})` : ""} (${n.created_by}, ${fmtD(n.created_at)})${
         n.deadline ? ` [${deadlineLabel(n.deadline)}]` : ""
@@ -1012,15 +1013,15 @@ function rExport() {
     materials.forEach(m => {
       if (m.is_article_based) {
         const items = materialItems[m.id] || [];
-        const counts = {};
+        const counts: Record<string, number> = {};
         Object.keys(MAT_STATS).forEach(s => counts[s] = 0);
         items.forEach(it => { if (counts[it.status] !== undefined) counts[it.status]++; });
-        out += `  ${m.emoji || "📦"} ${m.name} (${items.length} artiklar): ${Object.entries(counts).filter(([_, n]) => n > 0).map(([s, n]) => `${n} ${MAT_STATS[s]?.label || s}`).join(", ")}\n`;
+        out += `  ${m.emoji || "📦"} ${m.name} (${items.length} artiklar): ${Object.entries(counts).filter(([_, n]) => n > 0).map(([s, n]) => `${n} ${MAT_STATS[s as MaterialStatus]?.label || s}`).join(", ")}\n`;
       } else {
         const counts = materialCounts[m.id] || {};
         const borrowed = (borrowedMaterial[m.id] || []).reduce((s, b) => s + (b.quantity || 0), 0);
         const total = (m.total_count || 0) + borrowed;
-        out += `  ${m.emoji || "📦"} ${m.name}: ${total} ${m.unit || "st"} totalt — ${Object.entries(counts).filter(([_, n]) => n > 0).map(([s, n]) => `${n} ${MAT_STATS[s]?.label || s}`).join(", ")}\n`;
+        out += `  ${m.emoji || "📦"} ${m.name}: ${total} ${m.unit || "st"} totalt — ${Object.entries(counts).filter(([_, n]) => (n as number) > 0).map(([s, n]) => `${n} ${MAT_STATS[s as MaterialStatus]?.label || s}`).join(", ")}\n`;
       }
     });
     out += "\n";
@@ -1029,7 +1030,7 @@ function rExport() {
   if (tasks.length) {
     out += "📋 ARBETSPLANERING\n";
     tasks.forEach(t => {
-      out += `  ${t.status === "klar" ? "✓" : t.status === "pågår" ? "⏳" : "○"} ${t.title} [${PRIOS[t.priority]?.label}]${t.responsible ? ` ⭐ ${t.responsible}` : ""}${(t.assigned_to || []).length ? ` (${(t.assigned_to || []).join(", ")})` : ""}${t.extra_staff > 0 ? ` +${t.extra_staff} extra` : ""}${t.deadline ? ` [${deadlineLabel(t.deadline)}]` : ""}\n`;
+      out += `  ${t.status === "klar" ? "✓" : t.status === "pågår" ? "⏳" : "○"} ${t.title} [${PRIOS[t.priority || "medel"]?.label}]${t.responsible ? ` ⭐ ${t.responsible}` : ""}${(t.assigned_to || []).length ? ` (${(t.assigned_to || []).join(", ")})` : ""}${(t.extra_staff || 0) > 0 ? ` +${t.extra_staff} extra` : ""}${t.deadline ? ` [${deadlineLabel(t.deadline)}]` : ""}\n`;
     });
   }
 
@@ -1054,7 +1055,7 @@ function rExport() {
 // ============================================================
 // INFO/FAQ-FLIKEN
 // ============================================================
-function rInfo() {
+function rInfo(): string {
   return `
 <div class="info-split">
   <div class="info-sidebar">${rInfoList()}</div>
@@ -1062,7 +1063,7 @@ function rInfo() {
 </div>`;
 }
 
-function rInfoList() {
+function rInfoList(): string {
   let html = `<button class="btn mb" onclick="startNewInfo()" style="width:100%">+ NYTT FÖRSLAG</button>`;
   Object.entries(INFO_CATS).forEach(([catName, catCfg]) => {
     const articles = infoArticles.filter(a => a.category === catName);
@@ -1084,7 +1085,7 @@ function rInfoList() {
   return html;
 }
 
-function rInfoListItem(a, catCfg) {
+function rInfoListItem(a: InfoArticle, catCfg: { emoji: string; color: string }): string {
   const active = openInfoId === a.id ? " active" : "";
   const imgCount = (infoImages[a.id] || []).length;
   const cmtCount = (infoComments[a.id] || []).length;
@@ -1099,7 +1100,7 @@ function rInfoListItem(a, catCfg) {
   </div>`;
 }
 
-function rInfoContent() {
+function rInfoContent(): string {
   if (infoEditMode === "new" || infoEditMode === "edit") return rInfoEditor();
   if (openInfoId == null) {
     return `<div class="info-empty-state">
@@ -1115,7 +1116,7 @@ function rInfoContent() {
   return rInfoArticle(a);
 }
 
-function rInfoArticle(a) {
+function rInfoArticle(a: InfoArticle): string {
   const catCfg = INFO_CATS[a.category] || INFO_CATS.Utrustning;
   const images = infoImages[a.id] || [];
   const comments = infoComments[a.id] || [];
@@ -1167,17 +1168,17 @@ ${a.body ? `<div class="info-art-body">${esc(a.body)}</div>` : ""}
         📷 Bifoga bild
         <input type="file" accept="image/*" style="display:none" onchange="handleInfoCommentImg(${a.id}, this)">
       </label>
-      ${_infoCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
+      ${(globalThis as any)._infoCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
       <button class="btn" style="margin-left:auto" onclick="submitInfoComment(${a.id})">Skicka</button>
     </div>
   </div>
 </div>`;
 }
 
-function rInfoEditor() {
+function rInfoEditor(): string {
   const isNew = infoEditMode === "new";
   const a = !isNew && openInfoId ? infoArticles.find(x => x.id === openInfoId) : null;
-  const presetCat = isNew ? (window._infoEditPreset || "Utrustning") : (a?.category || "Utrustning");
+  const presetCat = isNew ? ((window as any)._infoEditPreset || "Utrustning") : (a?.category || "Utrustning");
   const existingImgs = !isNew && a ? (infoImages[a.id] || []) : [];
 
   return `

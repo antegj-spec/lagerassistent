@@ -400,7 +400,7 @@ async function savePin(userName: string, pin: string, isSet: boolean = true): Pr
 // ============================================================
 async function loadComments(noteId: number): Promise<void> {
   try {
-    const data = await sb<Comment[]>("/rest/v1/comments?note_id=eq." + noteId + "&order=created_at.asc") || [];
+    const data = await sb<NoteComment[]>("/rest/v1/comments?note_id=eq." + noteId + "&order=created_at.asc") || [];
     comments[noteId] = data;
   } catch (e) {
     comments[noteId] = [];
