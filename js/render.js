@@ -6,6 +6,16 @@
 // ---- HUVUD-RENDER ----
 function render() {
   const m = document.getElementById("main");
+  if (!m) return;
+
+  // SÄKERHET (defense in depth): blockera admin-only tabs för icke-admin.
+  // Förhindrar att ett tab-state från tidigare session leder till
+  // rendering av admin-data (t.ex. AI-sammanfattning som genererats av Admin).
+  const ADMIN_ONLY_TABS = ["chat", "export", "trash"];
+  if (!isAdmin && ADMIN_ONLY_TABS.includes(tab)) {
+    tab = "hem";
+  }
+
   if (tab === "hem")               m.innerHTML = rHem();
   else if (tab === "anteckningar") m.innerHTML = rNotes();
   else if (tab === "material")     m.innerHTML = rMat();
@@ -14,6 +24,7 @@ function render() {
   else if (tab === "chat")         m.innerHTML = rChat();
   else if (tab === "export")       m.innerHTML = rExport();
   else if (tab === "trash")        m.innerHTML = rTrash();
+  else                              m.innerHTML = rHem();  // fallback
   bindEvents();
 }
 

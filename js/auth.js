@@ -172,48 +172,112 @@ async function confirmFirstPin() {
 
 // ---- SLUTFÖR INLOGGNING ----
 function completeLogin() {
-  isAdmin = user === "Admin";
+  // OBS: isAdmin sätts redan av checkPin/restoreSession från JWT-role,
+  // INTE från user === "Admin". Behåll värdet.
   document.getElementById("pin-screen").style.display = "none";
   document.getElementById("first-pin-screen").style.display = "none";
   document.getElementById("main-header").style.display = "block";
   document.getElementById("main-nav").style.display = "flex";
   document.getElementById("main").style.display = "block";
   document.getElementById("user-display").textContent = user;
-  if (isAdmin) {
-    document.getElementById("export-btn").style.display = "flex";
-    document.getElementById("trash-btn").style.display = "flex";
+
+  // Admin-only nav-knappar
+  const exportBtn = document.getElementById("export-btn");
+  const trashBtn = document.getElementById("trash-btn");
+  const aiBtn = document.getElementById("ai-btn");
+  if (exportBtn) exportBtn.style.display = isAdmin ? "flex" : "none";
+  if (trashBtn)  trashBtn.style.display  = isAdmin ? "flex" : "none";
+  if (aiBtn)     aiBtn.style.display     = isAdmin ? "flex" : "none";
+
+  // SÄKERHET: om current tab är admin-only och user inte är admin → fallback hem.
+  // Förhindrar att t.ex. Andreas hamnar på AI-fliken om Admin var där sist.
+  const ADMIN_ONLY_TABS = ["chat", "export", "trash"];
+  if (!isAdmin && ADMIN_ONLY_TABS.includes(tab)) {
+    tab = "hem";
   }
+
   initApp();
 }
 
 // ---- LOGGA UT ----
 function logout() {
-  // Rensa session-storage (JWT, refresh, user-info)
+  // 1) Rensa session-storage (JWT, refresh, user-info)
   ["lager-token", "lager-refresh", "lager-user", "lager-role", "lager-expires"]
     .forEach(k => sessionStorage.removeItem(k));
 
+  // 2) Rensa identity + roll
   user = null;
   isAdmin = false;
-  pinBuf = "";
+
+  // 3) Rensa ALL applikations-state så ingen data läcker mellan användare
   notes = [];
   materials = [];
+  materialItems = {};
+  materialCounts = {};
+  materialHistory = {};
+  borrowedMaterial = {};
+  returnsList = [];
+  archivedReturns = [];
+  tasks = [];
+  archivedTasks = [];
+  taskStatusLogs = {};
+  taskComments = {};
+  taskChecklists = {};
+  materialComments = {};
+  materialItemImages = {};
+  materialImages = {};
+  actionComments = [];
+  infoArticles = [];
+  infoImages = {};
+  infoComments = {};
   trashedNotes = [];
   chat = [];
   comments = {};
   userPins = {};
   pinSet = {};
+
+  // 4) Återställ NAVIGATIONS-state (kritiskt — annars hamnar nästa
+  //    inloggning på admin-flik om Admin var där sist).
+  tab = "hem";
+  openId = null;
+  openMatId = null;
+  openItemId = null;
+  openTaskId = null;
+  openInfoId = null;
+  matSubTab = "status";
+  planSubTab = "aktiva";
+  planPersonFilter = "alla";
+  infoEditMode = null;
+  infoEditImages = [];
+  searchQuery = "";
+  fCat = "alla";
+  fStat = "alla";
+  fAssigned = "alla";
+  imgData = null;
+  imgFile = null;
+
+  // 5) Pin-state
+  pinBuf = "";
   firstPinStep = 1;
   firstPinNew = "";
   firstPinConfirm = "";
   updDots();
+
+  // 6) DOM — göm appen, visa PIN-skärm
   ["main-header", "main-nav", "main"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = "none";
   });
+  // Töm main-innehåll så Admin-data inte syns en frame innan nästa render
+  const mainEl = document.getElementById("main");
+  if (mainEl) mainEl.innerHTML = "";
   const exportBtn = document.getElementById("export-btn");
   const trashBtn = document.getElementById("trash-btn");
+  const aiBtn = document.getElementById("ai-btn");
   if (exportBtn) exportBtn.style.display = "none";
   if (trashBtn) trashBtn.style.display = "none";
+  if (aiBtn) aiBtn.style.display = "none";
+
   document.getElementById("pin-screen").style.display = "flex";
   selUser = USERS[0];
   initUsers();
@@ -264,22 +328,53 @@ async function doChangePin() {
 // Här initierar vi bara UI för PIN-skärmen.
 initUsers();
 
-// Återställ session vid sidladdning om JWT fortfarande är giltig (refresh av flik)
-(function restoreSession() {
+// Återställ session vid sidladdning om JWT fortfarande är giltig.
+// Validerar token mot Supabase /auth/v1/user (källan-till-sanning)
+// istället för att förlita sig på lokal expires-timestamp som kan vara
+// felaktig eller saknas.
+async function restoreSession() {
   const token = sessionStorage.getItem("lager-token");
-  const expires = parseInt(sessionStorage.getItem("lager-expires") || "0", 10);
   const userName = sessionStorage.getItem("lager-user");
-  const role = sessionStorage.getItem("lager-role");
   if (!token || !userName) return;
-  // expires är Unix-sekunder
-  if (expires && expires * 1000 < Date.now()) {
-    // Token utgången — rensa
-    ["lager-token", "lager-refresh", "lager-user", "lager-role", "lager-expires"]
-      .forEach(k => sessionStorage.removeItem(k));
-    return;
+
+  try {
+    const r = await fetch(SB_URL + "/auth/v1/user", {
+      headers: {
+        "apikey": SB_KEY,
+        "Authorization": "Bearer " + token,
+      },
+    });
+    if (!r.ok) {
+      // Token ogiltig eller utgången — rensa och visa PIN-skärm
+      ["lager-token", "lager-refresh", "lager-user", "lager-role", "lager-expires"]
+        .forEach(k => sessionStorage.removeItem(k));
+      return;
+    }
+    // Token är giltig — läs identity från svaret (källan till sanning),
+    // INTE från sessionStorage (kan ha trasslats).
+    const u = await r.json();
+    const claimUser = u?.user_metadata?.user_name;
+    const claimRole = u?.user_metadata?.role;
+
+    if (!claimUser) {
+      // Token utan claims → korrupt session, rensa
+      ["lager-token", "lager-refresh", "lager-user", "lager-role", "lager-expires"]
+        .forEach(k => sessionStorage.removeItem(k));
+      return;
+    }
+
+    user = claimUser;
+    isAdmin = claimRole === "admin";
+    // Uppdatera sessionStorage så den matchar JWT-claims
+    sessionStorage.setItem("lager-user", claimUser);
+    sessionStorage.setItem("lager-role", claimRole || "user");
+
+    loadPins().catch(() => {});
+    completeLogin();
+  } catch (e) {
+    // Nätverksfel vid restore — visa PIN-skärm tyst, användaren får logga in på nytt
+    console.warn("Session-restore failed:", e);
   }
-  user = userName;
-  isAdmin = role === "admin";
-  loadPins().catch(() => {});
-  completeLogin();
-})();
+}
+
+restoreSession();
