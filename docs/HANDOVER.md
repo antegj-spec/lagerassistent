@@ -12,7 +12,8 @@ Lagerassistent är en webapp (svenska) för en eventlagerverksamhet, deployad p�
 **Status:**
 - **Fas 1 (säkerhet)** — KLAR och deployad. RLS aktiverat på 20 tabeller, bcrypt-PIN via Edge Functions, JWT-auth, härdad backend.
 - **Fas 2 (Vite + TypeScript)** — KLAR och deployad. Hela kodbasen migrerad till TS, byggs via Vite/Netlify-pipeline.
-- **Fas 3-6** återstår enligt detaljerad plan nedan.
+- **Fas 3 (data-integritet, UX, realtime)** — KLAR (3.8 hoppad). Atomic `move_count()` RPC, CHECK constraints på alla status-kolumner, batch-DELETE, paginering, custom modal, comments.updated_at-fix, Supabase Realtime-subscribe, plus B6/B10/B12/B14-buggfixar.
+- **Fas 4-6** återstår enligt detaljerad plan nedan.
 
 **Arbetsmodell mellan användare och dig (Claude):**
 - Användaren är Admin på Supabase + Netlify, kan köra SQL och deploya Edge Functions
@@ -50,6 +51,7 @@ lagerassistent/
 │       ├── auth.ts         # PIN-login, JWT-restore, byt-PIN
 │       ├── ui.ts           # esc/escAttr, modal, toast, AI-funktioner
 │       ├── render.ts       # bygger innerHTML per tab
+│       ├── realtime.ts     # Supabase Realtime WebSocket (Fas 3.5)
 │       └── actions.ts      # alla user-action-handlers (@ts-nocheck — Fas 4 typar)
 ├── public/
 │   ├── assets/             # logo.png etc. — serveras på /assets/
@@ -61,7 +63,7 @@ lagerassistent/
 ├── supabase/functions/
 │   ├── verify-pin/         # Edge Function: bcrypt-PIN-check + JWT
 │   └── change-pin/         # Edge Function: säker PIN-byte
-├── migrations/             # 001-010 — kördes manuellt via SQL Editor
+├── migrations/             # 001-013 — kördes manuellt via SQL Editor
 └── docs/
     ├── SECURITY.md         # Säkerhetsmodell, rollback-procedurer
     └── HANDOVER.md         # ← DETTA DOKUMENT
@@ -88,7 +90,8 @@ NPM-scripts kallar `node node_modules/<bin>/...` direkt — bypassar npm cmd-shi
 <script src="/js/auth.js"></script>       <!-- 3: behöver supabase. OBS escAttr -->
 <script src="/js/ui.js"></script>         <!-- 4: definierar escAttr -->
 <script src="/js/render.js"></script>     <!-- 5: behöver ui -->
-<script src="/js/actions.js"></script>    <!-- 6: behöver alla ovan -->
+<script src="/js/realtime.js"></script>   <!-- 6: Fas 3.5 — behöver supabase + auth -->
+<script src="/js/actions.js"></script>    <!-- 7: behöver alla ovan -->
 ```
 
 **FALLGROP:** `auth.ts` använder `escAttr` (från ui.ts) men laddas FÖRE ui.ts. Lösningen är `DOMContentLoaded`-listener i auth.ts boot. **Rör inte detta utan att förstå varför.** Se commit `539a336`.
@@ -106,6 +109,19 @@ NPM-scripts kallar `node node_modules/<bin>/...` direkt — bypassar npm cmd-shi
 3. Kallar matching `load*()` för att uppdatera in-memory state
 4. Kallar `render()` för att bygga om tab-HTML
 5. Efter render körs `bindEvents()` för icke-inline event listeners
+
+### Realtime-flöde (Fas 3.5)
+Parallellt med ovan triggar `src/legacy/realtime.ts` `load*() + render()`
+när en *annan* användare ändrar en prenumererad tabell. Mappningen:
+- `notes` → `loadNotes`
+- `materials_v2|material_counts|material_items|borrowed_material` → `loadMats`
+- `tasks` → `loadTasks`
+- `returns` → `loadReturns`
+
+Debounce på 300ms slår ihop bursts. `initRealtime()` anropas i
+`completeLogin()` (täcker både PIN-login och F5-restore), `closeRealtime()`
+först i `logout()`. Migration 013 lägger berörda tabeller i
+`supabase_realtime`-publication.
 
 ### TypeScript-modell
 
@@ -226,21 +242,57 @@ is_intern_or_admin() → boolean
 
 ---
 
-## 5. Återstående plan (Fas 3-6)
+## 5. Återstående plan (Fas 4-6)
 
-### FAS 3 — Data-integritet och alla B-buggar (~3-4 dagar)
+### FAS 3 — KLAR (2026-05-23 → 2026-05-24)
 
 ```
-3.1 Postgres-funktion move_count() — atomic flytt + log (B2, B3)
-3.2 CHECK constraints på status-kolumner (B1)
-3.3 Batch-DELETE för emptyTrash via DELETE ?id=in.(...) (B8)
-3.4 Paginering i loadMats med Range-headers (B9)
-3.5 Subscribe-pattern: invalidera cache när annan användare ändrar (B19)
-3.6 Fixa småbuggar: B4, B5, B6, B10, B11, B12, B14, B15, B18
-3.7 Custom modal-system ersätter alla confirm() (B20)
-3.8 Härda branch-tabeller (cars, drive_logs, info_pdfs) om mergeats
-3.9 Fix editComment: ta bort updated_at från body ELLER lägga till kolumnen
+3.1 ✅ move_count(material_id, from, to, qty, comment) RPC — atomic
+    flytt + history-log inom transaktion, FOR UPDATE-lås, SECURITY
+    DEFINER, läser changed_by ur JWT. Migration 010.
+3.2 ✅ CHECK constraints på material_counts.status, material_items.status,
+    material_history.old/new_status, notes.status, tasks.status,
+    task_status_log.old/new_status. Migration 012.
+3.3 ✅ emptyTrash batchad till ett DELETE ?id=in.(…) via ny helper
+    delNotesPermBatch i supabase.ts.
+3.4 ✅ Paginering: ny sbPaged<T>(path, pageSize=1000) i supabase.ts
+    läser via Range-headers tills page.length < pageSize (eller 416).
+    loadMats använder den för materials_v2 + material_counts +
+    material_items.
+3.5 ✅ Supabase Realtime via rå WebSocket (Phoenix-protokoll). Filen
+    src/legacy/realtime.ts (~150 rader). Subscribe på notes/materials_v2/
+    material_counts/material_items/borrowed_material/tasks/returns.
+    Debounced load*() + render() vid postgres_changes. Heartbeat 30s,
+    reconnect med exponential backoff. Anslutning sker i completeLogin
+    (täcker både PIN-login och F5-restore), stängs i logout.
+    Migration 013 lägger tabellerna i supabase_realtime publication.
+3.6 ✅ Småbuggar:
+      - B6  filter (fCat/fStat/fAssigned/planPersonFilter) nollställs
+            på tab-byte i showTab
+      - B10 deadlineLabel visar minuter under 1h ("för 5m sedan",
+            "om 20m") istället för "0h sedan"
+      - B12 compressImg använder URL.createObjectURL + revokeObjectURL
+            istället för FileReader+dataURL (sparar RAM på iPhone)
+      - B14 _matCommentImgUrl/_itemCommentImgUrl/_infoCommentImgUrl
+            rensas i closeMat, closeInfo och showTab (var ambient-
+            deklarerade i src/legacy/types.d.ts för att ui.ts ska se dem)
+      - B5+B15 SKIPPADE: pinSet och userPins är dead state (skrivs
+            men läses ingenstans — gamla "first-time PIN"-flow är borta)
+      - B4, B11, B18 SKIPPADE: semantiska/feature-frågor, inte buggar
+3.7 ✅ confirmModal(message, opts) Promise-baserad i ui.ts ersätter
+    alla 15 confirm()-anrop i actions.ts. Stödjer danger:true för röd
+    knapp och custom confirmLabel ("Radera", "Töm papperskorg", etc.).
+3.8 ⏭ SKIPPAD: branch-tabellerna cars/drive_logs/info_pdfs är inte
+    mergeats till main → ingen åtgärd behövs här. Plocka upp om/när
+    de mergar.
+3.9 ✅ Migration 011 lägger till updated_at på comments + initierar
+    äldre rader till created_at. Klient-koden var redan korrekt
+    (skickade updated_at i PATCH) — det var DB-kolumnen som saknades.
 ```
+
+**Migrationer 010-013** kördes manuellt i Supabase SQL Editor. Pre-flight
+för 012 (CHECK constraints) returnerade 0 rader → migrationen passerade
+utan justering av befintlig data.
 
 ### FAS 4 — Arkitektur (~4-5 dagar)
 
@@ -335,6 +387,21 @@ Användarens prio: **6.2 (auto-task), 6.14 (daglig backup)**.
 6. **`Comment` är en built-in DOM-typ** — vår domän-typ måste döpas om för att inte kollidera
 7. **Many Note/Material/Task-fält saknades på interfaces** initialt — upptäcktes under render.ts-konvertering
 
+### Fas 3 — Data-integritet, UX, realtime
+- **Postgres-RPC för flerstegs-mutationer** — `move_count()` är mallen för Fas 4: ett HTTP-anrop, atomic transaktion, server-side validering av JWT-user. Återanvänd mönstret för andra multi-write actions.
+- **`SECURITY DEFINER` + manuell `current_user_name()`-check** — bypass:ar RLS för att kunna skriva flera tabeller i en transaktion, men säkrar anon-block via tom JWT-claim. Anrop från SQL Editor (utan JWT) failar med felmeddelandet "ingen inloggad användare" — det är önskat, inte en bugg.
+- **Pre-flight queries i CHECK-constraint-migrations** — utan dem failar `ALTER TABLE` på första raden med ogiltigt värde och rollbackar hela migrationen. Vi körde pre-flight i 012 och fick 0 träffar.
+- **Supabase Realtime utan @supabase/supabase-js-klient** — Phoenix-protokollet är enkelt nog att implementera direkt (~150 rader). Sparar dependency och tvingar inte ES-modul-refaktor. Heartbeat var 30s, reconnect med exponential backoff (max ~30s, max 10 försök).
+- **Realtime kräver att tabellen är i `supabase_realtime`-publication** — annars failar `phx_join` med error-status (loggas av realtime.ts till console). Lägg in nya tabeller via `alter publication supabase_realtime add table x`.
+- **`confirmModal()` är pure Promise** — fungerar i WebView och Android-browsers där `window.confirm()` returnerar `false` direkt. Default `OK`/`Avbryt`-labels men varje destruktiv action sätter eget `confirmLabel` ("Radera", "Töm papperskorg", "Arkivera").
+
+### Fallgropar från Fas 3
+1. **`closeRealtime()` måste anropas FÖRE `logout()`-state-rensning** — annars börjar reconnect-loopen försöka med tom JWT mellan stängning och fullständig logout
+2. **`material_counts` UNIQUE-index på (material_id, status) krävs implicit av `move_count()`** — funktionen gör UPSERT via separat SELECT FOR UPDATE och INSERT. Vid race kan dubbletter uppstå om constraint saknas. Verifiera schema. (Sannolikt redan så p.g.a. legacy code men inte testat.)
+3. **`pinSet` och `userPins` i config.ts är dead state** — skrivs av loadPins/changePin men läses ingenstans. Rester efter borttagen "first-time-PIN"-UI-flow i Fas 1. Kandidat för cleanup i Fas 4.
+4. **`_matCommentImgUrl` etc. är top-level `let` i actions.ts** — för att ui.ts ska kunna nollställa dem behövde de ambient-deklareras i types.d.ts (`declare global { let _xxx: ... }`). Annars TS-fel "Cannot find name".
+5. **`@ts-nocheck` på actions.ts** maskerar att vi använder de tre `_*ImgUrl` före deras `let`-deklaration i samma fil (hoisting + TDZ skulle vara ett runtime-problem om de inte initialiserades till `null` vid load). Funkar idag men en fas 4-typing av actions.ts kommer behöva flytta deklarationerna till config.ts.
+
 ### Saker att INTE göra
 - Inte ändra script load-order utan att förstå konsekvenserna
 - Inte köra `DROP TABLE` utan backup
@@ -384,27 +451,38 @@ Efter varje deploy ska minimum testas:
 
 ## 8. Föreslagna första-prompts för nästa session
 
-### För Fas 3 (data-fix)
-
-```
-Läs docs/HANDOVER.md först.
-
-Vi är klara med Fas 1 (säkerhet) och Fas 2 (Vite + TS). Nu Fas 3 —
-alla B-buggar (B2, B3, B8, B9, B19, m.fl.) + atomic move_count via
-Postgres-funktion + fix på editComment (i project_todo.md).
-
-Börja med detaljerad plan, börja sen med move_count som första leverabel.
-```
-
 ### För Fas 4 (arkitektur)
 
 ```
 Läs docs/HANDOVER.md först.
 
 Fas 4 — refaktorera till aggregate-services + reactive store.
-Eliminerar shared `window.*`-state, byter till ES modules, typar actions.ts.
+Eliminerar shared global-state, byter till ES modules, typar actions.ts.
+
+Förstudera först:
+- 80+ event-handlers i src/legacy/actions.ts (alla med @ts-nocheck)
+- Hur src/legacy/realtime.ts redan triggar load*() + render() per tabell
+  — kan användas som "subscribe"-källa i nya store-modellen
+- pinSet/userPins i config.ts är dead state — rensa som del av Fas 4.10
 
 Börja med detaljerad plan + arkitekturskiss innan vi börjar koda.
+```
+
+### För Fas 5/6 (UX/features)
+
+```
+Läs docs/HANDOVER.md först.
+
+Jag vill implementera <feature från Fas 5/6 — t.ex. QR-scanning, foto-
+först-flöde, dashboard>.
+
+Detta är fristående feature. Skissa minsta möjliga implementation som
+integrerar med befintlig arkitektur (ingen Fas 4-refactor först).
+
+OBS: All Fas 3-foundation finns på plats — atomic RPC-mönster i
+migrations/010_move_count.sql är mall för flerstegs-mutationer,
+realtime-subscribe i src/legacy/realtime.ts ger live-uppdateringar,
+confirmModal() istället för window.confirm() i destruktiva flöden.
 ```
 
 ### För akut bug-fix
@@ -438,7 +516,7 @@ integrerar med befintlig arkitektur (ingen Fas 4-refactor).
 
 ## 9. Sista raden
 
-Detta dokument speglar tillståndet efter Fas 2-merge. Sista commit som ingår: `56eadce` (Fas 2.11 actions → TS) + slutstädning.
+Detta dokument speglar tillståndet efter Fas 3-merge. Sista commits som ingår: `d0db01c` (Fas 3.1-3.4, 3.7, 3.9) och `f936edf` (Fas 3.5 + 3.6).
 
 Om något i koden inte stämmer med vad som står här — koden vinner. Uppdatera detta dokument när arkitekturen förändras i Fas 3+.
 
