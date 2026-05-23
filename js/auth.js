@@ -324,14 +324,14 @@ async function doChangePin() {
 }
 
 // ---- BOOT ----
-// Fas 1: loadPins kräver authenticated → körs först efter login.
-// Här initierar vi bara UI för PIN-skärmen.
-initUsers();
+// VIKTIGT: initUsers() använder escAttr() som definieras i ui.js (laddas EFTER
+// auth.js). Vi MÅSTE därför vänta på DOMContentLoaded innan vi anropar
+// initUsers/restoreSession — då har alla scripts hunnit laddas och DOM är klar.
+//
+// Tidigare bugg: direkt-anrop av initUsers() kraschade på "escAttr is not
+// defined" → resten av filen kördes inte → restoreSession var aldrig
+// definierad → F5 hamnade alltid på PIN-skärmen.
 
-// Återställ session vid sidladdning om JWT fortfarande är giltig.
-// Validerar token mot Supabase /auth/v1/user (källan-till-sanning)
-// istället för att förlita sig på lokal expires-timestamp som kan vara
-// felaktig eller saknas.
 async function restoreSession() {
   const token = sessionStorage.getItem("lager-token");
   const userName = sessionStorage.getItem("lager-user");
@@ -377,4 +377,15 @@ async function restoreSession() {
   }
 }
 
-restoreSession();
+// Boot — vänta tills alla scripts laddats och DOM är klar.
+// Om DOM redan är klar (script kommer sist i body), kör direkt på nästa tick.
+function boot() {
+  initUsers();
+  restoreSession();
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", boot, { once: true });
+} else {
+  // DOM redan klar (våra scripts ligger i botten av body)
+  setTimeout(boot, 0);
+}
