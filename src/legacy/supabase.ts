@@ -1,16 +1,23 @@
 // ============================================================
-// supabase.js — All kommunikation med Supabase och Storage
-// Beror på: config.js
+// supabase.ts — All kommunikation med Supabase och Storage
+// Beror på: config.ts
 // ============================================================
 
 // ---- GRUNDLÄGGANDE FETCH-WRAPPER ----
+interface SbOptions {
+  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
+  body?: string;
+  headers?: Record<string, string>;
+  prefer?: string;
+}
+
 // Fas 1: skickar JWT från sessionStorage istället för anon-key (SB_KEY används bara
 // som apikey-header för att passera Supabase Gateway). Vid 401 auto-logout.
-function getAuthToken() {
+function getAuthToken(): string {
   return sessionStorage.getItem("lager-token") || SB_KEY;
 }
 
-async function sb(path, opts = {}) {
+async function sb<T = unknown>(path: string, opts: SbOptions = {}): Promise<T | null> {
   const token = getAuthToken();
   const r = await fetch(SB_URL + path, {
     ...opts,
@@ -34,17 +41,17 @@ async function sb(path, opts = {}) {
   }
   if (r.status === 204) return null;
   const text = await r.text();
-  return text ? JSON.parse(text) : null;
+  return text ? JSON.parse(text) as T : null;
 }
 
 // ============================================================
 // ANTECKNINGAR
 // ============================================================
-async function loadNotes() {
+async function loadNotes(): Promise<void> {
   try {
     // RLS filtrerar intern-noter server-side (löser B7).
     // Klienten filtrerar fortfarande deleted_at för aktiv-vy vs papperskorg.
-    const all = await sb("/rest/v1/notes?order=created_at.desc") || [];
+    const all = await sb<Note[]>("/rest/v1/notes?order=created_at.desc") || [];
     notes = all.filter(n => !n.deleted_at);
     if (isAdmin) {
       const cutoff = new Date(Date.now() - TRASH_DAYS * 86400000).toISOString();
@@ -55,7 +62,7 @@ async function loadNotes() {
   }
 }
 
-async function saveNote(n) {
+async function saveNote(n: Partial<Note> & { id?: number }): Promise<Note | undefined> {
   const { id, ...b } = n;
   if (id) {
     await sb("/rest/v1/notes?id=eq." + id, {
@@ -63,8 +70,9 @@ async function saveNote(n) {
       body: JSON.stringify({ ...b, updated_at: new Date().toISOString() }),
       prefer: "return=minimal"
     });
+    return undefined;
   } else {
-    const r = await sb("/rest/v1/notes", {
+    const r = await sb<Note[]>("/rest/v1/notes", {
       method: "POST",
       body: JSON.stringify(b),
       headers: { "Prefer": "return=representation" }
@@ -73,20 +81,20 @@ async function saveNote(n) {
   }
 }
 
-async function delNotePerm(id) {
+async function delNotePerm(id: number): Promise<void> {
   await sb("/rest/v1/notes?id=eq." + id, { method: "DELETE" });
 }
 
 // ============================================================
 // MATERIAL — materials_v2 (ny struktur)
 // ============================================================
-async function loadMats() {
+async function loadMats(): Promise<void> {
   try {
-    const all = await sb("/rest/v1/materials_v2?order=name.asc") || [];
+    const all = await sb<Material[]>("/rest/v1/materials_v2?order=name.asc") || [];
     materials = all.filter(m => !m.deleted_at);
 
     // Ladda counts för alla lagerräknande material
-    const counts = await sb("/rest/v1/material_counts") || [];
+    const counts = await sb<MaterialCount[]>("/rest/v1/material_counts") || [];
     materialCounts = {};
     counts.forEach(c => {
       if (!materialCounts[c.material_id]) materialCounts[c.material_id] = {};
@@ -94,7 +102,7 @@ async function loadMats() {
     });
 
     // Ladda items för alla artikelbaserade material
-    const items = await sb("/rest/v1/material_items?order=article_id.asc") || [];
+    const items = await sb<MaterialItem[]>("/rest/v1/material_items?order=article_id.asc") || [];
     materialItems = {};
     items.forEach(it => {
       if (!materialItems[it.material_id]) materialItems[it.material_id] = [];
@@ -102,7 +110,7 @@ async function loadMats() {
     });
 
     // Ladda inhyrt material (icke-raderat)
-    const borrowed = await sb("/rest/v1/borrowed_material?order=start_date.desc") || [];
+    const borrowed = await sb<BorrowedMaterial[]>("/rest/v1/borrowed_material?order=start_date.desc") || [];
     borrowedMaterial = {};
     borrowed.filter(b => !b.deleted_at).forEach(b => {
       if (!borrowedMaterial[b.material_id]) borrowedMaterial[b.material_id] = [];
@@ -113,7 +121,7 @@ async function loadMats() {
   }
 }
 
-async function saveMat(m) {
+async function saveMat(m: Partial<Material> & { id?: number; created_at?: string }): Promise<number | undefined> {
   const { id, created_at, ...b } = m;
   if (id) {
     await sb("/rest/v1/materials_v2?id=eq." + id, {
@@ -123,7 +131,7 @@ async function saveMat(m) {
     });
     return id;
   } else {
-    const r = await sb("/rest/v1/materials_v2", {
+    const r = await sb<{ id: number }[]>("/rest/v1/materials_v2", {
       method: "POST",
       body: JSON.stringify(b),
       headers: { "Prefer": "return=representation" }
@@ -132,12 +140,12 @@ async function saveMat(m) {
   }
 }
 
-async function delMatPerm(id) {
+async function delMatPerm(id: number): Promise<void> {
   await sb("/rest/v1/materials_v2?id=eq." + id, { method: "DELETE" });
 }
 
 // ---- ARTIKLAR (material_items) ----
-async function saveMatItem(item) {
+async function saveMatItem(item: Partial<MaterialItem> & { id?: number; created_at?: string }): Promise<number | undefined> {
   const { id, created_at, ...b } = item;
   if (id) {
     await sb("/rest/v1/material_items?id=eq." + id, {
@@ -147,7 +155,7 @@ async function saveMatItem(item) {
     });
     return id;
   } else {
-    const r = await sb("/rest/v1/material_items", {
+    const r = await sb<{ id: number }[]>("/rest/v1/material_items", {
       method: "POST",
       body: JSON.stringify(b),
       headers: { "Prefer": "return=representation" }
@@ -156,14 +164,14 @@ async function saveMatItem(item) {
   }
 }
 
-async function delMatItem(id) {
+async function delMatItem(id: number): Promise<void> {
   await sb("/rest/v1/material_items?id=eq." + id, { method: "DELETE" });
 }
 
 // ---- COUNTS (material_counts) ----
-async function setMatCount(material_id, status, count) {
+async function setMatCount(material_id: number, status: MaterialStatus, count: number): Promise<void> {
   // Försök PATCH först
-  const existing = await sb("/rest/v1/material_counts?material_id=eq." + material_id + "&status=eq." + encodeURIComponent(status));
+  const existing = await sb<{ id: number }[]>("/rest/v1/material_counts?material_id=eq." + material_id + "&status=eq." + encodeURIComponent(status));
   if (existing && existing.length > 0) {
     await sb("/rest/v1/material_counts?id=eq." + existing[0].id, {
       method: "PATCH",
@@ -180,7 +188,7 @@ async function setMatCount(material_id, status, count) {
 }
 
 // ---- HISTORIK ----
-async function logMatHistory(entry) {
+async function logMatHistory(entry: Partial<MaterialHistory>): Promise<void> {
   await sb("/rest/v1/material_history", {
     method: "POST",
     body: JSON.stringify(entry),
@@ -188,9 +196,9 @@ async function logMatHistory(entry) {
   });
 }
 
-async function loadMatHistory(material_id) {
+async function loadMatHistory(material_id: number): Promise<void> {
   try {
-    const data = await sb("/rest/v1/material_history?material_id=eq." + material_id + "&order=created_at.desc&limit=50") || [];
+    const data = await sb<MaterialHistory[]>("/rest/v1/material_history?material_id=eq." + material_id + "&order=created_at.desc&limit=50") || [];
     materialHistory[material_id] = data;
   } catch (e) {
     materialHistory[material_id] = [];
@@ -198,7 +206,7 @@ async function loadMatHistory(material_id) {
 }
 
 // ---- INHYRT MATERIAL ----
-async function saveBorrowed(b) {
+async function saveBorrowed(b: Partial<BorrowedMaterial> & { id?: number; created_at?: string }): Promise<number | undefined> {
   const { id, created_at, ...body } = b;
   if (id) {
     await sb("/rest/v1/borrowed_material?id=eq." + id, {
@@ -208,7 +216,7 @@ async function saveBorrowed(b) {
     });
     return id;
   } else {
-    const r = await sb("/rest/v1/borrowed_material", {
+    const r = await sb<{ id: number }[]>("/rest/v1/borrowed_material", {
       method: "POST",
       body: JSON.stringify(body),
       headers: { "Prefer": "return=representation" }
@@ -217,7 +225,7 @@ async function saveBorrowed(b) {
   }
 }
 
-async function delBorrowed(id) {
+async function delBorrowed(id: number): Promise<void> {
   await sb("/rest/v1/borrowed_material?id=eq." + id, {
     method: "PATCH",
     body: JSON.stringify({ deleted_at: new Date().toISOString() }),
@@ -228,9 +236,9 @@ async function delBorrowed(id) {
 // ============================================================
 // RETURER
 // ============================================================
-async function loadReturns() {
+async function loadReturns(): Promise<void> {
   try {
-    const all = await sb("/rest/v1/returns?order=return_date.desc") || [];
+    const all = await sb<Return[]>("/rest/v1/returns?order=return_date.desc") || [];
     const active = all.filter(r => !r.deleted_at);
     returnsList = active.filter(r => !r.archived);
     archivedReturns = active.filter(r => r.archived);
@@ -239,7 +247,7 @@ async function loadReturns() {
   }
 }
 
-async function saveReturn(r) {
+async function saveReturn(r: Partial<Return> & { id?: number; created_at?: string }): Promise<number | undefined> {
   const { id, created_at, ...b } = r;
   if (id) {
     await sb("/rest/v1/returns?id=eq." + id, {
@@ -249,7 +257,7 @@ async function saveReturn(r) {
     });
     return id;
   } else {
-    const res = await sb("/rest/v1/returns", {
+    const res = await sb<{ id: number }[]>("/rest/v1/returns", {
       method: "POST",
       body: JSON.stringify(b),
       headers: { "Prefer": "return=representation" }
@@ -258,7 +266,7 @@ async function saveReturn(r) {
   }
 }
 
-async function delReturn(id) {
+async function delReturn(id: number): Promise<void> {
   await sb("/rest/v1/returns?id=eq." + id, {
     method: "PATCH",
     body: JSON.stringify({ deleted_at: new Date().toISOString() }),
@@ -269,9 +277,9 @@ async function delReturn(id) {
 // ============================================================
 // TASKS (Arbetsplanering)
 // ============================================================
-async function loadTasks() {
+async function loadTasks(): Promise<void> {
   try {
-    const all = await sb("/rest/v1/tasks?order=created_at.desc") || [];
+    const all = await sb<Task[]>("/rest/v1/tasks?order=created_at.desc") || [];
     const active = all.filter(t => !t.deleted_at);
     tasks = active.filter(t => !t.archived);
     if (isAdmin) {
@@ -282,7 +290,7 @@ async function loadTasks() {
   }
 }
 
-async function saveTask(t) {
+async function saveTask(t: Partial<Task> & { id?: number; created_at?: string }): Promise<number | undefined> {
   const { id, created_at, ...b } = t;
   if (id) {
     await sb("/rest/v1/tasks?id=eq." + id, {
@@ -292,7 +300,7 @@ async function saveTask(t) {
     });
     return id;
   } else {
-    const r = await sb("/rest/v1/tasks", {
+    const r = await sb<{ id: number }[]>("/rest/v1/tasks", {
       method: "POST",
       body: JSON.stringify(b),
       headers: { "Prefer": "return=representation" }
@@ -301,12 +309,12 @@ async function saveTask(t) {
   }
 }
 
-async function delTaskPerm(id) {
+async function delTaskPerm(id: number): Promise<void> {
   await sb("/rest/v1/tasks?id=eq." + id, { method: "DELETE" });
 }
 
 // ---- TASK STATUS LOG ----
-async function logTaskStatus(entry) {
+async function logTaskStatus(entry: Partial<TaskStatusLog>): Promise<void> {
   await sb("/rest/v1/task_status_log", {
     method: "POST",
     body: JSON.stringify(entry),
@@ -314,9 +322,9 @@ async function logTaskStatus(entry) {
   });
 }
 
-async function loadTaskStatusLog(task_id) {
+async function loadTaskStatusLog(task_id: number): Promise<void> {
   try {
-    const data = await sb("/rest/v1/task_status_log?task_id=eq." + task_id + "&order=created_at.desc&limit=30") || [];
+    const data = await sb<TaskStatusLog[]>("/rest/v1/task_status_log?task_id=eq." + task_id + "&order=created_at.desc&limit=30") || [];
     taskStatusLogs[task_id] = data;
   } catch (e) {
     taskStatusLogs[task_id] = [];
@@ -326,12 +334,12 @@ async function loadTaskStatusLog(task_id) {
 // ============================================================
 // PINS
 // ============================================================
-async function loadPins() {
+async function loadPins(): Promise<void> {
   // Fas 1: PIN-verifiering sker server-side via verify-pin Edge Function.
   // Denna funktion behövs bara för att fylla pinSet[] efter login (för UI-flaggor).
   // Vid 401 (pre-login) sväljs felet tyst.
   try {
-    const data = await sb("/rest/v1/user_pins") || [];
+    const data = await sb<UserPin[]>("/rest/v1/user_pins") || [];
     userPins = {};
     pinSet = {};
     data.forEach(p => {
@@ -345,7 +353,13 @@ async function loadPins() {
   }
 }
 
-async function changePinViaEdge(currentPin, newPin) {
+interface ChangePinResponse {
+  ok?: boolean;
+  error?: string;
+  [k: string]: unknown;
+}
+
+async function changePinViaEdge(currentPin: string, newPin: string): Promise<ChangePinResponse> {
   const token = sessionStorage.getItem("lager-token");
   if (!token) throw new Error("Not logged in");
   const r = await fetch(SB_URL + "/functions/v1/change-pin", {
@@ -357,12 +371,12 @@ async function changePinViaEdge(currentPin, newPin) {
     },
     body: JSON.stringify({ current_pin: currentPin, new_pin: newPin }),
   });
-  const data = await r.json().catch(() => ({}));
+  const data: ChangePinResponse = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || "Kunde inte byta PIN");
   return data;
 }
 
-async function savePin(userName, pin, isSet = true) {
+async function savePin(userName: string, pin: string, isSet: boolean = true): Promise<void> {
   try {
     await sb("/rest/v1/user_pins?user_name=eq." + encodeURIComponent(userName), {
       method: "PATCH",
@@ -384,16 +398,16 @@ async function savePin(userName, pin, isSet = true) {
 // ============================================================
 // KOMMENTARER (på anteckningar)
 // ============================================================
-async function loadComments(noteId) {
+async function loadComments(noteId: number): Promise<void> {
   try {
-    const data = await sb("/rest/v1/comments?note_id=eq." + noteId + "&order=created_at.asc") || [];
+    const data = await sb<Comment[]>("/rest/v1/comments?note_id=eq." + noteId + "&order=created_at.asc") || [];
     comments[noteId] = data;
   } catch (e) {
     comments[noteId] = [];
   }
 }
 
-async function addComment(noteId, text) {
+async function addComment(noteId: number, text: string): Promise<void> {
   await sb("/rest/v1/comments", {
     method: "POST",
     body: JSON.stringify({
@@ -406,11 +420,11 @@ async function addComment(noteId, text) {
   });
 }
 
-async function delComment(id) {
+async function delComment(id: number): Promise<void> {
   await sb("/rest/v1/comments?id=eq." + id, { method: "DELETE" });
 }
 
-async function editComment(id, text) {
+async function editComment(id: number, text: string): Promise<void> {
   await sb("/rest/v1/comments?id=eq." + id, {
     method: "PATCH",
     body: JSON.stringify({ text, updated_at: new Date().toISOString() }),
@@ -421,16 +435,16 @@ async function editComment(id, text) {
 // ============================================================
 // KOMMENTARER PÅ UPPGIFTER (task_comments)
 // ============================================================
-async function loadTaskComments(task_id) {
+async function loadTaskComments(task_id: number): Promise<void> {
   try {
-    const data = await sb("/rest/v1/task_comments?task_id=eq." + task_id + "&order=created_at.asc") || [];
+    const data = await sb<TaskComment[]>("/rest/v1/task_comments?task_id=eq." + task_id + "&order=created_at.asc") || [];
     taskComments[task_id] = data;
   } catch (e) {
     taskComments[task_id] = [];
   }
 }
 
-async function addTaskComment(task_id, text) {
+async function addTaskComment(task_id: number, text: string): Promise<void> {
   await sb("/rest/v1/task_comments", {
     method: "POST",
     body: JSON.stringify({ task_id, text, created_by: user, created_at: new Date().toISOString() }),
@@ -438,11 +452,11 @@ async function addTaskComment(task_id, text) {
   });
 }
 
-async function delTaskComment(id) {
+async function delTaskComment(id: number): Promise<void> {
   await sb("/rest/v1/task_comments?id=eq." + id, { method: "DELETE" });
 }
 
-async function editTaskComment(id, text) {
+async function editTaskComment(id: number, text: string): Promise<void> {
   await sb("/rest/v1/task_comments?id=eq." + id, {
     method: "PATCH",
     body: JSON.stringify({ text, updated_at: new Date().toISOString() }),
@@ -453,17 +467,17 @@ async function editTaskComment(id, text) {
 // ============================================================
 // CHECKLISTA (task_checklist)
 // ============================================================
-async function loadTaskChecklist(task_id) {
+async function loadTaskChecklist(task_id: number): Promise<void> {
   try {
-    const data = await sb("/rest/v1/task_checklist?task_id=eq." + task_id + "&order=created_at.asc") || [];
+    const data = await sb<TaskChecklistItem[]>("/rest/v1/task_checklist?task_id=eq." + task_id + "&order=created_at.asc") || [];
     taskChecklists[task_id] = data;
   } catch (e) {
     taskChecklists[task_id] = [];
   }
 }
 
-async function addChecklistItem(task_id, text) {
-  const r = await sb("/rest/v1/task_checklist", {
+async function addChecklistItem(task_id: number, text: string): Promise<number | undefined> {
+  const r = await sb<{ id: number }[]>("/rest/v1/task_checklist", {
     method: "POST",
     body: JSON.stringify({ task_id, text, done: false, created_by: user }),
     headers: { "Prefer": "return=representation" }
@@ -471,7 +485,7 @@ async function addChecklistItem(task_id, text) {
   return r?.[0]?.id;
 }
 
-async function toggleChecklistItem(id, done) {
+async function toggleChecklistItem(id: number, done: boolean): Promise<void> {
   await sb("/rest/v1/task_checklist?id=eq." + id, {
     method: "PATCH",
     body: JSON.stringify({ done }),
@@ -479,24 +493,30 @@ async function toggleChecklistItem(id, done) {
   });
 }
 
-async function delChecklistItem(id) {
+async function delChecklistItem(id: number): Promise<void> {
   await sb("/rest/v1/task_checklist?id=eq." + id, { method: "DELETE" });
 }
 
 // ============================================================
 // KOMMENTARER PÅ MATERIAL/ARTIKLAR (material_comments)
 // ============================================================
-async function loadMatComments(material_id) {
+async function loadMatComments(material_id: number): Promise<void> {
   try {
-    const data = await sb("/rest/v1/material_comments?material_id=eq." + material_id + "&order=created_at.asc") || [];
+    const data = await sb<MaterialComment[]>("/rest/v1/material_comments?material_id=eq." + material_id + "&order=created_at.asc") || [];
     materialComments[material_id] = data;
   } catch (e) {
     materialComments[material_id] = [];
   }
 }
 
-async function addMatComment(material_id, item_id, text, image_url, status) {
-  const body = {
+async function addMatComment(
+  material_id: number,
+  item_id: number | null,
+  text: string,
+  image_url: string | null,
+  status: MaterialCommentStatus | null
+): Promise<void> {
+  const body: Record<string, unknown> = {
     material_id, text, created_by: user,
     created_at: new Date().toISOString(),
     status: status || "klart"
@@ -510,7 +530,7 @@ async function addMatComment(material_id, item_id, text, image_url, status) {
   });
 }
 
-async function setMatCommentStatus(commentId, status) {
+async function setMatCommentStatus(commentId: number, status: MaterialCommentStatus): Promise<void> {
   await sb("/rest/v1/material_comments?id=eq." + commentId, {
     method: "PATCH",
     body: JSON.stringify({ status }),
@@ -518,20 +538,20 @@ async function setMatCommentStatus(commentId, status) {
   });
 }
 
-async function loadActionComments() {
+async function loadActionComments(): Promise<void> {
   try {
-    const data = await sb("/rest/v1/material_comments?status=in.(åtgärd_krävs,åtgärd_behövs)&order=created_at.desc") || [];
+    const data = await sb<MaterialComment[]>("/rest/v1/material_comments?status=in.(åtgärd_krävs,åtgärd_behövs)&order=created_at.desc") || [];
     actionComments = data;
   } catch (e) {
     actionComments = [];
   }
 }
 
-async function delMatComment(id) {
+async function delMatComment(id: number): Promise<void> {
   await sb("/rest/v1/material_comments?id=eq." + id, { method: "DELETE" });
 }
 
-async function editMatComment(id, text) {
+async function editMatComment(id: number, text: string): Promise<void> {
   await sb("/rest/v1/material_comments?id=eq." + id, {
     method: "PATCH",
     body: JSON.stringify({ text, updated_at: new Date().toISOString() }),
@@ -540,16 +560,16 @@ async function editMatComment(id, text) {
 }
 
 // ---- ARTIKELBILDER (material_item_images) ----
-async function loadMatItemImages(item_id) {
+async function loadMatItemImages(item_id: number): Promise<void> {
   try {
-    const data = await sb("/rest/v1/material_item_images?item_id=eq." + item_id + "&order=created_at.asc") || [];
+    const data = await sb<MaterialItemImage[]>("/rest/v1/material_item_images?item_id=eq." + item_id + "&order=created_at.asc") || [];
     materialItemImages[item_id] = data;
   } catch (e) {
     materialItemImages[item_id] = [];
   }
 }
 
-async function addMatItemImage(item_id, material_id, image_url) {
+async function addMatItemImage(item_id: number, material_id: number, image_url: string): Promise<void> {
   await sb("/rest/v1/material_item_images", {
     method: "POST",
     body: JSON.stringify({ item_id, material_id, image_url, uploaded_by: user }),
@@ -557,21 +577,21 @@ async function addMatItemImage(item_id, material_id, image_url) {
   });
 }
 
-async function delMatItemImage(id) {
+async function delMatItemImage(id: number): Promise<void> {
   await sb("/rest/v1/material_item_images?id=eq." + id, { method: "DELETE" });
 }
 
 // ---- MATERIALBILDER (material_images) ----
-async function loadMatImages(material_id) {
+async function loadMatImages(material_id: number): Promise<void> {
   try {
-    const data = await sb("/rest/v1/material_images?material_id=eq." + material_id + "&order=created_at.asc") || [];
+    const data = await sb<MaterialImage[]>("/rest/v1/material_images?material_id=eq." + material_id + "&order=created_at.asc") || [];
     materialImages[material_id] = data;
   } catch (e) {
     materialImages[material_id] = [];
   }
 }
 
-async function addMatImage(material_id, image_url) {
+async function addMatImage(material_id: number, image_url: string): Promise<void> {
   await sb("/rest/v1/material_images", {
     method: "POST",
     body: JSON.stringify({ material_id, image_url, uploaded_by: user }),
@@ -579,25 +599,25 @@ async function addMatImage(material_id, image_url) {
   });
 }
 
-async function delMatImage(id) {
+async function delMatImage(id: number): Promise<void> {
   await sb("/rest/v1/material_images?id=eq." + id, { method: "DELETE" });
 }
 
 // ============================================================
 // INFO-ARTIKLAR (FAQ/info-flik)
 // ============================================================
-async function loadInfoArticles() {
+async function loadInfoArticles(): Promise<void> {
   try {
-    const all = await sb("/rest/v1/info_articles?order=is_pinned.desc,created_at.desc") || [];
+    const all = await sb<InfoArticle[]>("/rest/v1/info_articles?order=is_pinned.desc,created_at.desc") || [];
     infoArticles = all.filter(a => !a.deleted_at);
     // Ladda alla bilder och kommentarer i en svep
-    const imgs = await sb("/rest/v1/info_images?order=created_at.asc") || [];
+    const imgs = await sb<InfoImage[]>("/rest/v1/info_images?order=created_at.asc") || [];
     infoImages = {};
     imgs.forEach(img => {
       if (!infoImages[img.article_id]) infoImages[img.article_id] = [];
       infoImages[img.article_id].push(img);
     });
-    const cmts = await sb("/rest/v1/info_comments?order=created_at.asc") || [];
+    const cmts = await sb<InfoComment[]>("/rest/v1/info_comments?order=created_at.asc") || [];
     infoComments = {};
     cmts.forEach(c => {
       if (!infoComments[c.article_id]) infoComments[c.article_id] = [];
@@ -608,7 +628,7 @@ async function loadInfoArticles() {
   }
 }
 
-async function saveInfoArticle(a) {
+async function saveInfoArticle(a: Partial<InfoArticle> & { id?: number; created_at?: string }): Promise<number | undefined> {
   const { id, created_at, ...b } = a;
   if (id) {
     await sb("/rest/v1/info_articles?id=eq." + id, {
@@ -618,7 +638,7 @@ async function saveInfoArticle(a) {
     });
     return id;
   } else {
-    const r = await sb("/rest/v1/info_articles", {
+    const r = await sb<{ id: number }[]>("/rest/v1/info_articles", {
       method: "POST",
       body: JSON.stringify(b),
       headers: { "Prefer": "return=representation" }
@@ -627,7 +647,7 @@ async function saveInfoArticle(a) {
   }
 }
 
-async function delInfoArticle(id) {
+async function delInfoArticle(id: number): Promise<void> {
   await sb("/rest/v1/info_articles?id=eq." + id, {
     method: "PATCH",
     body: JSON.stringify({ deleted_at: new Date().toISOString() }),
@@ -635,7 +655,7 @@ async function delInfoArticle(id) {
   });
 }
 
-async function addInfoImage(article_id, image_url) {
+async function addInfoImage(article_id: number, image_url: string): Promise<void> {
   await sb("/rest/v1/info_images", {
     method: "POST",
     body: JSON.stringify({ article_id, image_url, uploaded_by: user }),
@@ -643,11 +663,11 @@ async function addInfoImage(article_id, image_url) {
   });
 }
 
-async function delInfoImage(id) {
+async function delInfoImage(id: number): Promise<void> {
   await sb("/rest/v1/info_images?id=eq." + id, { method: "DELETE" });
 }
 
-async function addInfoComment(article_id, body, image_url) {
+async function addInfoComment(article_id: number, body: string, image_url?: string | null): Promise<void> {
   await sb("/rest/v1/info_comments", {
     method: "POST",
     body: JSON.stringify({ article_id, body, image_url: image_url || null, created_by: user }),
@@ -655,14 +675,14 @@ async function addInfoComment(article_id, body, image_url) {
   });
 }
 
-async function delInfoComment(id) {
+async function delInfoComment(id: number): Promise<void> {
   await sb("/rest/v1/info_comments?id=eq." + id, { method: "DELETE" });
 }
 
 // ============================================================
 // BILDHANTERING
 // ============================================================
-async function uploadImg(file) {
+async function uploadImg(file: File): Promise<string> {
   const blob = await compressImg(file, 800, 0.72);
   const name = Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9.]/g, "_");
   const r = await fetch(SB_URL + "/storage/v1/object/lager-images/" + name, {
@@ -678,7 +698,7 @@ async function uploadImg(file) {
   return SB_URL + "/storage/v1/object/public/lager-images/" + name;
 }
 
-function compressImg(file, maxW, q) {
+function compressImg(file: File, maxW: number, q: number): Promise<Blob> {
   return new Promise(res => {
     const fr = new FileReader();
     fr.onload = e => {
@@ -688,10 +708,10 @@ function compressImg(file, maxW, q) {
         let w = img.width, h = img.height;
         if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
         c.width = w; c.height = h;
-        c.getContext("2d").drawImage(img, 0, 0, w, h);
-        c.toBlob(res, "image/jpeg", q);
+        c.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        c.toBlob(b => res(b!), "image/jpeg", q);
       };
-      img.src = e.target.result;
+      img.src = e.target!.result as string;
     };
     fr.readAsDataURL(file);
   });
