@@ -17,6 +17,50 @@ function getAuthToken(): string {
   return sessionStorage.getItem("lager-token") || SB_KEY;
 }
 
+// Fas 3.4 (B9): Paginerad GET via PostgREST Range-headers.
+// PostgREST default-limit är 1000 rader per request. För kollektioner
+// som kan växa förbi det (material_items, material_history, ...) måste
+// vi iterera. Stannar när sidan är mindre än pageSize ELLER när
+// Content-Range visar att vi har alla rader. 416 = Range past end =
+// inga fler rader (tyst exit).
+async function sbPaged<T = unknown>(path: string, pageSize = 1000): Promise<T[]> {
+  const token = getAuthToken();
+  const all: T[] = [];
+  let offset = 0;
+  while (true) {
+    const end = offset + pageSize - 1;
+    const r = await fetch(SB_URL + path, {
+      headers: {
+        "apikey": SB_KEY,
+        "Authorization": "Bearer " + token,
+        "Content-Type": "application/json",
+        "Range-Unit": "items",
+        "Range": offset + "-" + end
+      }
+    });
+    if (r.status === 401 && token !== SB_KEY && typeof logout === "function") {
+      console.warn("Got 401 — session expired, logging out");
+      logout();
+      throw new Error("Session expired");
+    }
+    if (r.status === 416) return all; // past end — done
+    if (!r.ok) throw new Error(await r.text());
+
+    const text = await r.text();
+    const page = (text ? JSON.parse(text) : []) as T[];
+    all.push(...page);
+    if (page.length < pageSize) return all;
+
+    // Belt-and-suspenders: Content-Range tells us total
+    const cr = r.headers.get("Content-Range"); // "0-999/15234" eller "0-999/*"
+    if (cr) {
+      const m = cr.match(/\/(\d+)$/);
+      if (m && offset + page.length >= parseInt(m[1], 10)) return all;
+    }
+    offset += pageSize;
+  }
+}
+
 async function sb<T = unknown>(path: string, opts: SbOptions = {}): Promise<T | null> {
   const token = getAuthToken();
   const r = await fetch(SB_URL + path, {
@@ -85,16 +129,25 @@ async function delNotePerm(id: number): Promise<void> {
   await sb("/rest/v1/notes?id=eq." + id, { method: "DELETE" });
 }
 
+// Fas 3.3 (B8): Batch-radering — ett HTTP-anrop istället för N.
+// Används av emptyTrash. Returnerar utan att göra något om listan är tom
+// (PostgREST ?id=in.() returnerar 400 för tom lista).
+async function delNotesPermBatch(ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  await sb("/rest/v1/notes?id=in.(" + ids.join(",") + ")", { method: "DELETE" });
+}
+
 // ============================================================
 // MATERIAL — materials_v2 (ny struktur)
 // ============================================================
 async function loadMats(): Promise<void> {
   try {
-    const all = await sb<Material[]>("/rest/v1/materials_v2?order=name.asc") || [];
+    // Fas 3.4: paginerad fetch — undviker tyst trunkering vid >1000 rader.
+    const all = await sbPaged<Material>("/rest/v1/materials_v2?order=name.asc");
     materials = all.filter(m => !m.deleted_at);
 
     // Ladda counts för alla lagerräknande material
-    const counts = await sb<MaterialCount[]>("/rest/v1/material_counts") || [];
+    const counts = await sbPaged<MaterialCount>("/rest/v1/material_counts");
     materialCounts = {};
     counts.forEach(c => {
       if (!materialCounts[c.material_id]) materialCounts[c.material_id] = {};
@@ -102,7 +155,7 @@ async function loadMats(): Promise<void> {
     });
 
     // Ladda items för alla artikelbaserade material
-    const items = await sb<MaterialItem[]>("/rest/v1/material_items?order=article_id.asc") || [];
+    const items = await sbPaged<MaterialItem>("/rest/v1/material_items?order=article_id.asc");
     materialItems = {};
     items.forEach(it => {
       if (!materialItems[it.material_id]) materialItems[it.material_id] = [];
@@ -194,6 +247,41 @@ async function logMatHistory(entry: Partial<MaterialHistory>): Promise<void> {
     body: JSON.stringify(entry),
     prefer: "return=minimal"
   });
+}
+
+// ---- ATOMIC MOVE (Fas 3.1) ----
+// Anropar Postgres-funktionen move_count() via PostgREST RPC.
+// Servern validerar JWT, låser raden, uppdaterar counts och loggar history
+// i en transaktion. Ersätter setMatCount+setMatCount+logMatHistory-mönstret.
+async function moveCount(
+  material_id: number,
+  from_status: MaterialStatus,
+  to_status: MaterialStatus,
+  qty: number,
+  comment: string | null = null
+): Promise<void> {
+  try {
+    await sb("/rest/v1/rpc/move_count", {
+      method: "POST",
+      body: JSON.stringify({
+        p_material_id: material_id,
+        p_from_status: from_status,
+        p_to_status: to_status,
+        p_qty: qty,
+        p_comment: comment
+      }),
+      prefer: "return=minimal"
+    });
+  } catch (e: any) {
+    // PostgREST returnerar { code, message, hint, details } som JSON.
+    // Extrahera message så toast kan visa något läsbart.
+    let msg = e?.message ?? String(e);
+    try {
+      const parsed = JSON.parse(msg);
+      if (parsed?.message) msg = parsed.message;
+    } catch { /* var inte JSON — behåll originalet */ }
+    throw new Error(msg);
+  }
 }
 
 async function loadMatHistory(material_id: number): Promise<void> {
