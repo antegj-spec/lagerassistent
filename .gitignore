@@ -10,6 +10,9 @@ dist/
 .env
 .env.local
 
+# Genererat: tsc transpilerar src/legacy/ → public/js/ vid build (Fas 2.3)
+public/js/
+
 # OS
 .DS_Store
 Thumbs.db
