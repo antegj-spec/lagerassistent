@@ -1,6 +1,15 @@
+// @ts-nocheck
 // ============================================================
-// actions.js — Alla användarhandlingar
-// Beror på: config.js, supabase.js, ui.js, render.js
+// actions.ts — Alla användarhandlingar
+// Beror på: config.ts, supabase.ts, ui.ts, render.ts
+//
+// Fas 2.11: Filen är .ts (transpileras av tsc) men typecheck
+// är pausad via @ts-nocheck. Skälet: 1458 rader, 80+ funktioner,
+// mycket onclick-handler-kod som inte är värd att typecheka
+// individuellt under Fas 2.
+//
+// Fas 4 refaktorerar denna till aggregate-services (notes/, materials/,
+// tasks/ etc.) — då görs riktig typing samtidigt.
 // ============================================================
 
 // ============================================================
