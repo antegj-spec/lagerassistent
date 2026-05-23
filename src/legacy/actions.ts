@@ -81,7 +81,7 @@ async function submitComment(noteId) {
 }
 
 async function delNoteCommentAction(noteId, commentId) {
-  if (!confirm("Ta bort kommentaren?")) return;
+  if (!await confirmModal("Ta bort kommentaren?", { confirmLabel: "Ta bort", danger: true })) return;
   try {
     await delComment(commentId);
     await loadComments(noteId);
@@ -157,7 +157,7 @@ async function restoreNote(id) {
 }
 
 async function permDelete(id) {
-  if (!confirm("Radera permanent? Detta kan inte ångras.")) return;
+  if (!await confirmModal("Radera permanent? Detta kan inte ångras.", { confirmLabel: "Radera", danger: true })) return;
   try {
     await delNotePerm(id);
     trashedNotes = trashedNotes.filter(n => n.id !== id);
@@ -169,9 +169,11 @@ async function permDelete(id) {
 }
 
 async function emptyTrash() {
-  if (!confirm(`Radera alla ${trashedNotes.length} anteckningar i papperskorgen permanent? Kan inte ångras.`)) return;
+  if (!await confirmModal(`Radera alla ${trashedNotes.length} anteckningar i papperskorgen permanent? Kan inte ångras.`, { confirmLabel: "Töm papperskorg", danger: true })) return;
   try {
-    for (const n of trashedNotes) await delNotePerm(n.id);
+    // Fas 3.3: ett batch-DELETE istället för N separata. Snabbare + atomiskt
+    // (alla raderas eller ingen — undviker halv-tömd papperskorg vid fel).
+    await delNotesPermBatch(trashedNotes.map(n => n.id));
     trashedNotes = [];
     render();
     toast("🗑 Papperskorgen tömd");
@@ -295,7 +297,7 @@ async function handleMatImg(matId, inputEl) {
 
 async function doDelMatImg(imgId, matId) {
   if (!isAdmin) return;
-  if (!confirm("Ta bort bilden?")) return;
+  if (!await confirmModal("Ta bort bilden?", { confirmLabel: "Ta bort", danger: true })) return;
   try {
     await delMatImage(imgId);
     await loadMatImages(matId);
@@ -324,7 +326,7 @@ async function cycleCommentStatus(commentId, matId, itemId, currentStatus) {
 }
 
 async function delMatCommentAction(commentId, matId) {
-  if (!confirm("Ta bort kommentaren?")) return;
+  if (!await confirmModal("Ta bort kommentaren?", { confirmLabel: "Ta bort", danger: true })) return;
   try {
     await delMatComment(commentId);
     await loadMatComments(matId);
@@ -485,7 +487,7 @@ async function saveEditMat(id) {
 }
 
 async function doDelMat(id) {
-  if (!confirm("Radera material och alla dess artiklar/historik? Kan inte ångras.")) return;
+  if (!await confirmModal("Radera material och alla dess artiklar/historik? Kan inte ångras.", { confirmLabel: "Radera material", danger: true })) return;
   try {
     await delMatPerm(id);
     materials = materials.filter(m => m.id !== id);
@@ -575,16 +577,11 @@ async function doMoveCount(matId) {
   if (qty > fromCount) { toast(`Du kan flytta max ${fromCount}`, 1); return; }
 
   try {
-    await setMatCount(matId, from, fromCount - qty);
-    await setMatCount(matId, to, (counts[to] || 0) + qty);
-    await logMatHistory({
-      material_id: matId,
-      old_status: from,
-      new_status: to,
-      count_change: qty,
-      changed_by: user,
-      comment
-    });
+    // Fas 3.1: Atomic flytt via Postgres-funktion. Ersätter de tidigare
+    // tre separata anropen (setMatCount × 2 + logMatHistory) som kunde
+    // lämna korrupt state om något steg failade halvvägs. changed_by
+    // sätts server-side från JWT — kan inte längre fejkas av klienten.
+    await moveCount(matId, from, to, qty, comment);
     await loadMats();
     await loadMatHistory(matId);
     closeModal();
@@ -702,7 +699,7 @@ async function saveItemStatus(itemId, matId) {
 }
 
 async function doDelItem(itemId, matId) {
-  if (!confirm("Radera artikeln permanent?")) return;
+  if (!await confirmModal("Radera artikeln permanent?", { confirmLabel: "Radera", danger: true })) return;
   try {
     await delMatItem(itemId);
     await loadMats();
@@ -765,7 +762,7 @@ async function addBorrowed(matId) {
 }
 
 async function doDelBorrowed(borrowId, matId) {
-  if (!confirm("Ta bort inhyrt material?")) return;
+  if (!await confirmModal("Ta bort inhyrt material?", { confirmLabel: "Ta bort", danger: true })) return;
   try {
     await delBorrowed(borrowId);
     await loadMats();
@@ -880,7 +877,7 @@ async function toggleReturnArchive(id, archived) {
 }
 
 async function doDelReturn(id) {
-  if (!confirm("Radera returen permanent?")) return;
+  if (!await confirmModal("Radera returen permanent?", { confirmLabel: "Radera", danger: true })) return;
   try {
     await delReturn(id);
     await loadReturns();
@@ -924,7 +921,7 @@ async function submitTaskComment(taskId) {
 }
 
 async function delTaskCommentAction(taskId, commentId) {
-  if (!confirm("Ta bort kommentaren?")) return;
+  if (!await confirmModal("Ta bort kommentaren?", { confirmLabel: "Ta bort", danger: true })) return;
   try {
     await delTaskComment(commentId);
     await loadTaskComments(taskId);
@@ -1014,7 +1011,7 @@ async function handleItemImg(itemId, matId, inputEl) {
 
 async function doDelItemImg(imgId, itemId) {
   if (!isAdmin) return;
-  if (!confirm("Ta bort bilden?")) return;
+  if (!await confirmModal("Ta bort bilden?", { confirmLabel: "Ta bort", danger: true })) return;
   try {
     await delMatItemImage(imgId);
     await loadMatItemImages(itemId);
@@ -1253,7 +1250,7 @@ async function archiveTask(id, archive) {
 }
 
 async function doDelTask(id) {
-  if (!confirm("Radera uppgiften permanent? Kan inte ångras.")) return;
+  if (!await confirmModal("Radera uppgiften permanent? Kan inte ångras.", { confirmLabel: "Radera", danger: true })) return;
   try {
     await delTaskPerm(id);
     await loadTasks();
@@ -1367,7 +1364,7 @@ async function unpinInfoArticle(id) {
 
 async function doDelInfoArticle(id) {
   if (!isAdmin) return;
-  if (!confirm("Ta bort artikeln? Den arkiveras (soft-delete).")) return;
+  if (!await confirmModal("Ta bort artikeln? Den arkiveras (soft-delete).", { confirmLabel: "Arkivera" })) return;
   try {
     await delInfoArticle(id);
     await loadInfoArticles();
@@ -1412,7 +1409,7 @@ async function handleInfoAddImg(articleId, inputEl) {
 
 async function doDelInfoImage(imgId) {
   if (!isAdmin) return;
-  if (!confirm("Ta bort bilden?")) return;
+  if (!await confirmModal("Ta bort bilden?", { confirmLabel: "Ta bort", danger: true })) return;
   try {
     await delInfoImage(imgId);
     await loadInfoArticles();
@@ -1455,7 +1452,7 @@ async function submitInfoComment(articleId) {
 
 async function doDelInfoComment(commentId) {
   if (!isAdmin) return;
-  if (!confirm("Ta bort kommentaren?")) return;
+  if (!await confirmModal("Ta bort kommentaren?", { confirmLabel: "Ta bort", danger: true })) return;
   try {
     await delInfoComment(commentId);
     await loadInfoArticles();

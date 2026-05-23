@@ -143,6 +143,56 @@ function closeModal(): void {
   if (c) c.innerHTML = "";
 }
 
+// Fas 3.7 (B20): Promise-baserad ersättare för window.confirm().
+// Använder samma modal-overlay men returnerar true/false så att
+// destruktiva action-funktioner kan await:a svaret. Ger tema-konsistent
+// UI och tillåter dangerLabel för rödfärgad knapp.
+//
+// Användning:
+//   if (!await confirmModal("Radera permanent?", { danger: true, confirmLabel: "Radera" })) return;
+let _confirmResolve: ((v: boolean) => void) | null = null;
+
+interface ConfirmModalOpts {
+  title?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  danger?: boolean;
+}
+
+function confirmModal(message: string, opts: ConfirmModalOpts = {}): Promise<boolean> {
+  const title = opts.title ?? "Bekräfta";
+  const confirmLabel = opts.confirmLabel ?? "OK";
+  const cancelLabel = opts.cancelLabel ?? "Avbryt";
+  const danger = opts.danger ?? false;
+  return new Promise<boolean>((resolve) => {
+    // Om förra modalen hängde kvar — resolva den som false innan ny öppnas.
+    if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
+    _confirmResolve = resolve;
+    const c = document.getElementById("modal-container");
+    if (!c) { resolve(false); _confirmResolve = null; return; }
+    c.innerHTML = `
+      <div class="modal-overlay" onclick="if(event.target===this)resolveConfirm(false)">
+        <div class="modal">
+          <div class="modal-title">${esc(title)}</div>
+          <p style="margin:0 0 16px;line-height:1.5;white-space:pre-wrap">${esc(message)}</p>
+          <div class="modal-actions">
+            <button class="btn-ghost" onclick="resolveConfirm(false)" style="flex:1">${esc(cancelLabel)}</button>
+            <button class="${danger ? 'btn btn-red' : 'btn'}" onclick="resolveConfirm(true)" style="flex:1">${esc(confirmLabel)}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+}
+
+// Anropas från knapparna i confirmModal — global pga inline onclick.
+function resolveConfirm(value: boolean): void {
+  closeModal();
+  const r = _confirmResolve;
+  _confirmResolve = null;
+  if (r) r(value);
+}
+
 // ---- INIT & TABS ----
 async function initApp(): Promise<void> {
   const main = document.getElementById("main");
