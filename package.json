@@ -6,9 +6,10 @@
   "scripts": {
     "_comment": "node-anrop direkt bypassar npm cmd-shim som kraschar pa OneDrive-pathar med mellanslag (Windows). Funkar oforandrat pa Linux/Netlify.",
     "tsc:legacy": "node node_modules/typescript/bin/tsc -p tsconfig.legacy.json",
-    "typecheck": "node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit && node node_modules/typescript/bin/tsc -p tsconfig.legacy.json --noEmit",
+    "tsc:check": "node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
+    "typecheck": "npm run tsc:check && node node_modules/typescript/bin/tsc -p tsconfig.legacy.json --noEmit",
     "dev": "npm run tsc:legacy && node node_modules/vite/bin/vite.js",
-    "build": "npm run tsc:legacy && node node_modules/vite/bin/vite.js build",
+    "build": "npm run tsc:check && npm run tsc:legacy && node node_modules/vite/bin/vite.js build",
     "preview": "node node_modules/vite/bin/vite.js preview"
   },
   "devDependencies": {
