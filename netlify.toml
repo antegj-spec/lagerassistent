@@ -1,7 +1,12 @@
 [build]
+  command = "npm run build"
+  publish = "dist"
   functions = "netlify/functions"
 
 [build.environment]
+  # Vite kraver Node 18+. Netlify defaultar till en aldre version.
+  NODE_VERSION = "20"
+
   # SUPABASE_ANON_KEY och SUPABASE_URL är MEDVETET publika.
   # Anon-key:s syfte är att vara öppen — RLS skyddar data server-side (Fas 1).
   # SUPABASE_SERVICE_ROLE_KEY och CRON_SECRET fortsätter scannas (de är hemliga).

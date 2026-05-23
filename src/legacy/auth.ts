@@ -1,26 +1,26 @@
 // ============================================================
-// auth.js — PIN-login, första inloggning och logout
-// Beror på: config.js, supabase.js
+// auth.ts — PIN-login, första inloggning och logout
+// Beror på: config.ts, supabase.ts
 // ============================================================
 
 // ---- INITIERA ANVÄNDARVAL ----
-function initUsers() {
+function initUsers(): void {
   const dl = document.getElementById("username-list");
   if (dl) dl.innerHTML = USERS.map(u => `<option value="${escAttr(u)}">`).join("");
-  const input = document.getElementById("username-input");
+  const input = document.getElementById("username-input") as HTMLInputElement | null;
   if (input) { input.value = ""; input.focus(); }
   pinBuf = "";
   updDots();
 }
 
-function pickUser(u) {
+function pickUser(u: string): void {
   selUser = u;
   pinBuf = "";
   updDots();
 }
 
 // ---- PIN-KNAPPAR ----
-function pinPress(d) {
+function pinPress(d: string): void {
   if (pinBuf.length >= 4) return;
   pinBuf += d;
   updDots();
@@ -29,31 +29,46 @@ function pinPress(d) {
   if (pinBuf.length === 4) setTimeout(checkPin, 120);
 }
 
-function pinDel() {
+function pinDel(): void {
   pinBuf = pinBuf.slice(0, -1);
   updDots();
 }
 
-function updDots() {
+function updDots(): void {
   document.querySelectorAll("#pin-dots .pin-dot")
     .forEach((d, i) => d.classList.toggle("filled", i < pinBuf.length));
 }
 
 // ---- KONTROLLERA PIN (Fas 1: server-side verifiering via verify-pin Edge Function) ----
-function showPinError(msg) {
+function showPinError(msg: string): void {
   const errEl = document.getElementById("pin-error");
-  const dotsEl = document.getElementById("pin-dots");
-  errEl.textContent = msg;
-  dotsEl.style.animation = "none";
-  dotsEl.offsetHeight;
-  dotsEl.style.animation = "pinShake .35s ease";
+  const dotsEl = document.getElementById("pin-dots") as HTMLElement | null;
+  if (errEl) errEl.textContent = msg;
+  if (dotsEl) {
+    dotsEl.style.animation = "none";
+    void dotsEl.offsetHeight;
+    dotsEl.style.animation = "pinShake .35s ease";
+  }
   pinBuf = "";
   updDots();
-  setTimeout(() => { errEl.textContent = ""; dotsEl.style.animation = ""; }, 1800);
+  setTimeout(() => {
+    if (errEl) errEl.textContent = "";
+    if (dotsEl) dotsEl.style.animation = "";
+  }, 1800);
 }
 
-async function checkPin() {
-  const inputEl = document.getElementById("username-input");
+interface VerifyPinResponse {
+  access_token?: string;
+  refresh_token?: string;
+  user_name?: string;
+  role?: Role;
+  expires_at?: number;
+  retry_after_seconds?: number;
+  error?: string;
+}
+
+async function checkPin(): Promise<void> {
+  const inputEl = document.getElementById("username-input") as HTMLInputElement | null;
   const typedName = inputEl ? inputEl.value.trim() : "";
   const matchedUser = USERS.find(u => u.toLowerCase() === typedName.toLowerCase());
   if (!matchedUser) {
@@ -72,16 +87,16 @@ async function checkPin() {
       },
       body: JSON.stringify({ user_name: matchedUser, pin: pinBuf }),
     });
-    const data = await r.json().catch(() => ({}));
+    const data: VerifyPinResponse = await r.json().catch(() => ({}));
 
     if (r.status === 200 && data.access_token) {
       // Spara session
       sessionStorage.setItem("lager-token", data.access_token);
       sessionStorage.setItem("lager-refresh", data.refresh_token || "");
-      sessionStorage.setItem("lager-user", data.user_name);
-      sessionStorage.setItem("lager-role", data.role);
+      sessionStorage.setItem("lager-user", data.user_name || "");
+      sessionStorage.setItem("lager-role", data.role || "user");
       sessionStorage.setItem("lager-expires", String(data.expires_at || 0));
-      user = data.user_name;
+      user = data.user_name || null;
       isAdmin = data.role === "admin";
       // Ladda pinSet i bakgrunden så "Byt PIN"-flöden ser första-gången-läget
       loadPins().catch(() => {});
@@ -99,20 +114,24 @@ async function checkPin() {
 }
 
 // ---- FÖRSTA INLOGGNING — VÄLJ EGEN PIN ----
-function showFirstPinScreen() {
-  document.getElementById("pin-screen").style.display = "none";
+function showFirstPinScreen(): void {
+  const pinScr = document.getElementById("pin-screen");
+  if (pinScr) pinScr.style.display = "none";
   const s = document.getElementById("first-pin-screen");
-  s.style.display = "flex";
-  document.getElementById("first-pin-name").textContent = "Hej, " + user + "!";
+  if (s) s.style.display = "flex";
+  const nameEl = document.getElementById("first-pin-name");
+  if (nameEl) nameEl.textContent = "Hej, " + user + "!";
   firstPinStep = 1;
   firstPinNew = "";
   firstPinConfirm = "";
   updFirstPinDots();
-  document.getElementById("first-pin-step-lbl").textContent = "NY PIN";
-  document.getElementById("first-pin-error").textContent = "";
+  const lblEl = document.getElementById("first-pin-step-lbl");
+  if (lblEl) lblEl.textContent = "NY PIN";
+  const errEl = document.getElementById("first-pin-error");
+  if (errEl) errEl.textContent = "";
 }
 
-function firstPinPress(d) {
+function firstPinPress(d: string): void {
   if (firstPinStep === 1) {
     if (firstPinNew.length >= 4) return;
     firstPinNew += d;
@@ -122,7 +141,8 @@ function firstPinPress(d) {
         firstPinStep = 2;
         firstPinConfirm = "";
         updFirstPinDots();
-        document.getElementById("first-pin-step-lbl").textContent = "BEKRÄFTA PIN";
+        const lblEl = document.getElementById("first-pin-step-lbl");
+        if (lblEl) lblEl.textContent = "BEKRÄFTA PIN";
       }, 200);
     }
   } else {
@@ -133,65 +153,79 @@ function firstPinPress(d) {
   }
 }
 
-function firstPinDel() {
+function firstPinDel(): void {
   if (firstPinStep === 1) firstPinNew = firstPinNew.slice(0, -1);
   else firstPinConfirm = firstPinConfirm.slice(0, -1);
   updFirstPinDots();
 }
 
-function updFirstPinDots() {
+function updFirstPinDots(): void {
   const len = firstPinStep === 1 ? firstPinNew.length : firstPinConfirm.length;
   document.querySelectorAll("#first-pin-dots .pin-dot")
     .forEach((d, i) => d.classList.toggle("filled", i < len));
 }
 
-async function confirmFirstPin() {
+async function confirmFirstPin(): Promise<void> {
   if (firstPinNew !== firstPinConfirm) {
-    document.getElementById("first-pin-error").textContent = "PIN-koderna matchar inte — försök igen";
+    const errEl = document.getElementById("first-pin-error");
+    if (errEl) errEl.textContent = "PIN-koderna matchar inte — försök igen";
     firstPinStep = 1;
     firstPinNew = "";
     firstPinConfirm = "";
     updFirstPinDots();
-    document.getElementById("first-pin-step-lbl").textContent = "NY PIN";
-    setTimeout(() => document.getElementById("first-pin-error").textContent = "", 2000);
+    const lblEl = document.getElementById("first-pin-step-lbl");
+    if (lblEl) lblEl.textContent = "NY PIN";
+    setTimeout(() => {
+      const e = document.getElementById("first-pin-error");
+      if (e) e.textContent = "";
+    }, 2000);
     return;
   }
   try {
-    await savePin(user, firstPinNew, true);
-    document.getElementById("first-pin-screen").style.display = "none";
+    await savePin(user || "", firstPinNew, true);
+    const scr = document.getElementById("first-pin-screen");
+    if (scr) scr.style.display = "none";
     completeLogin();
     toast("✓ PIN satt! Välkommen, " + user);
   } catch (e) {
-    document.getElementById("first-pin-error").textContent = "Kunde inte spara PIN — försöker ändå";
+    const errEl = document.getElementById("first-pin-error");
+    if (errEl) errEl.textContent = "Kunde inte spara PIN — försöker ändå";
     setTimeout(() => {
-      document.getElementById("first-pin-screen").style.display = "none";
+      const scr = document.getElementById("first-pin-screen");
+      if (scr) scr.style.display = "none";
       completeLogin();
     }, 1500);
   }
 }
 
 // ---- SLUTFÖR INLOGGNING ----
-function completeLogin() {
+function completeLogin(): void {
   // OBS: isAdmin sätts redan av checkPin/restoreSession från JWT-role,
   // INTE från user === "Admin". Behåll värdet.
-  document.getElementById("pin-screen").style.display = "none";
-  document.getElementById("first-pin-screen").style.display = "none";
-  document.getElementById("main-header").style.display = "block";
-  document.getElementById("main-nav").style.display = "flex";
-  document.getElementById("main").style.display = "block";
-  document.getElementById("user-display").textContent = user;
+  const pinScr = document.getElementById("pin-screen");
+  if (pinScr) pinScr.style.display = "none";
+  const fpScr = document.getElementById("first-pin-screen");
+  if (fpScr) fpScr.style.display = "none";
+  const hdr = document.getElementById("main-header");
+  if (hdr) hdr.style.display = "block";
+  const nav = document.getElementById("main-nav");
+  if (nav) nav.style.display = "flex";
+  const main = document.getElementById("main");
+  if (main) main.style.display = "block";
+  const userDisp = document.getElementById("user-display");
+  if (userDisp) userDisp.textContent = user;
 
   // Admin-only nav-knappar
-  const exportBtn = document.getElementById("export-btn");
-  const trashBtn = document.getElementById("trash-btn");
-  const aiBtn = document.getElementById("ai-btn");
+  const exportBtn = document.getElementById("export-btn") as HTMLElement | null;
+  const trashBtn = document.getElementById("trash-btn") as HTMLElement | null;
+  const aiBtn = document.getElementById("ai-btn") as HTMLElement | null;
   if (exportBtn) exportBtn.style.display = isAdmin ? "flex" : "none";
   if (trashBtn)  trashBtn.style.display  = isAdmin ? "flex" : "none";
   if (aiBtn)     aiBtn.style.display     = isAdmin ? "flex" : "none";
 
   // SÄKERHET: om current tab är admin-only och user inte är admin → fallback hem.
   // Förhindrar att t.ex. Andreas hamnar på AI-fliken om Admin var där sist.
-  const ADMIN_ONLY_TABS = ["chat", "export", "trash"];
+  const ADMIN_ONLY_TABS: TabName[] = ["chat", "export", "trash"];
   if (!isAdmin && ADMIN_ONLY_TABS.includes(tab)) {
     tab = "hem";
   }
@@ -200,7 +234,7 @@ function completeLogin() {
 }
 
 // ---- LOGGA UT ----
-function logout() {
+function logout(): void {
   // 1) Rensa session-storage (JWT, refresh, user-info)
   ["lager-token", "lager-refresh", "lager-user", "lager-role", "lager-expires"]
     .forEach(k => sessionStorage.removeItem(k));
@@ -271,22 +305,23 @@ function logout() {
   // Töm main-innehåll så Admin-data inte syns en frame innan nästa render
   const mainEl = document.getElementById("main");
   if (mainEl) mainEl.innerHTML = "";
-  const exportBtn = document.getElementById("export-btn");
-  const trashBtn = document.getElementById("trash-btn");
-  const aiBtn = document.getElementById("ai-btn");
+  const exportBtn = document.getElementById("export-btn") as HTMLElement | null;
+  const trashBtn = document.getElementById("trash-btn") as HTMLElement | null;
+  const aiBtn = document.getElementById("ai-btn") as HTMLElement | null;
   if (exportBtn) exportBtn.style.display = "none";
   if (trashBtn) trashBtn.style.display = "none";
   if (aiBtn) aiBtn.style.display = "none";
 
-  document.getElementById("pin-screen").style.display = "flex";
+  const pinScr = document.getElementById("pin-screen") as HTMLElement | null;
+  if (pinScr) pinScr.style.display = "flex";
   selUser = USERS[0];
   initUsers();
-  const input = document.getElementById("username-input");
+  const input = document.getElementById("username-input") as HTMLInputElement | null;
   if (input) { input.value = ""; input.focus(); }
 }
 
 // ---- BYT PIN (inloggad) ----
-function openChangePin() {
+function openChangePin(): void {
   openModal(`
     <div class="modal-title">Byt PIN</div>
     <div class="lbl">NUVARANDE PIN</div>
@@ -301,38 +336,48 @@ function openChangePin() {
       <button class="btn" onclick="doChangePin()" style="flex:1">Spara</button>
     </div>
   `);
-  setTimeout(() => document.getElementById("cur-pin")?.focus(), 100);
+  setTimeout(() => (document.getElementById("cur-pin") as HTMLInputElement | null)?.focus(), 100);
 }
 
-async function doChangePin() {
-  const cur  = document.getElementById("cur-pin")?.value?.trim();
-  const np   = document.getElementById("new-pin")?.value?.trim();
-  const np2  = document.getElementById("new-pin2")?.value?.trim();
+async function doChangePin(): Promise<void> {
+  const cur  = (document.getElementById("cur-pin") as HTMLInputElement | null)?.value?.trim();
+  const np   = (document.getElementById("new-pin") as HTMLInputElement | null)?.value?.trim();
+  const np2  = (document.getElementById("new-pin2") as HTMLInputElement | null)?.value?.trim();
   const msg  = document.getElementById("pin-msg");
+  if (!msg) return;
   if (!cur || !/^\d{4}$/.test(cur)) { msg.textContent = "Nuvarande PIN måste vara 4 siffror"; return; }
   if (!np || !/^\d{4}$/.test(np))   { msg.textContent = "Ny PIN måste vara 4 siffror"; return; }
   if (np !== np2)                   { msg.textContent = "PIN-koderna matchar inte"; return; }
   if (np === cur)                   { msg.textContent = "Ny PIN måste skilja från nuvarande"; return; }
   try {
     await changePinViaEdge(cur, np);
-    pinSet[user] = true;
+    if (user) pinSet[user] = true;
     closeModal();
     toast("✓ PIN ändrad");
   } catch (e) {
-    msg.textContent = e.message === "Invalid current PIN" ? "Fel nuvarande PIN" : "Kunde inte spara";
+    const errMsg = (e as Error).message;
+    msg.textContent = errMsg === "Invalid current PIN" ? "Fel nuvarande PIN" : "Kunde inte spara";
   }
 }
 
 // ---- BOOT ----
-// VIKTIGT: initUsers() använder escAttr() som definieras i ui.js (laddas EFTER
-// auth.js). Vi MÅSTE därför vänta på DOMContentLoaded innan vi anropar
+// VIKTIGT: initUsers() använder escAttr() som definieras i ui.ts (laddas EFTER
+// auth.ts). Vi MÅSTE därför vänta på DOMContentLoaded innan vi anropar
 // initUsers/restoreSession — då har alla scripts hunnit laddas och DOM är klar.
 //
 // Tidigare bugg: direkt-anrop av initUsers() kraschade på "escAttr is not
 // defined" → resten av filen kördes inte → restoreSession var aldrig
 // definierad → F5 hamnade alltid på PIN-skärmen.
 
-async function restoreSession() {
+interface JwtUserResponse {
+  user_metadata?: {
+    user_name?: string;
+    role?: Role;
+  };
+  [k: string]: unknown;
+}
+
+async function restoreSession(): Promise<void> {
   const token = sessionStorage.getItem("lager-token");
   const userName = sessionStorage.getItem("lager-user");
   if (!token || !userName) return;
@@ -352,7 +397,7 @@ async function restoreSession() {
     }
     // Token är giltig — läs identity från svaret (källan till sanning),
     // INTE från sessionStorage (kan ha trasslats).
-    const u = await r.json();
+    const u: JwtUserResponse = await r.json();
     const claimUser = u?.user_metadata?.user_name;
     const claimRole = u?.user_metadata?.role;
 
@@ -379,7 +424,7 @@ async function restoreSession() {
 
 // Boot — vänta tills alla scripts laddats och DOM är klar.
 // Om DOM redan är klar (script kommer sist i body), kör direkt på nästa tick.
-function boot() {
+function boot(): void {
   initUsers();
   restoreSession();
 }

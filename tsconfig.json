@@ -1,0 +1,20 @@
+{
+  "//": "ES module-config för src/main.js + framtida src/domain, src/services etc. Endast typecheck (noEmit) — Vite bundlar runtime-koden. Legacy-filer har egen tsconfig.legacy.json.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowImportingTsExtensions": false,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noImplicitOverride": true
+  },
+  "include": ["src/main.js", "src/domain/**/*", "src/services/**/*", "src/state/**/*", "src/ui/**/*", "src/utils/**/*"],
+  "exclude": ["node_modules", "dist", "src/legacy/**/*"]
+}
