@@ -231,10 +231,17 @@ function completeLogin(): void {
   }
 
   initApp();
+
+  // Fas 3.5: starta realtime-subscriptions — när annan användare ändrar
+  // notes/material/tasks/returns laddas berörd store om och tab re-rendereras.
+  if (typeof initRealtime === "function") initRealtime();
 }
 
 // ---- LOGGA UT ----
 function logout(): void {
+  // Fas 3.5: stäng realtime först så vi inte tar emot events efter logout.
+  if (typeof closeRealtime === "function") closeRealtime();
+
   // 1) Rensa session-storage (JWT, refresh, user-info)
   ["lager-token", "lager-refresh", "lager-user", "lager-role", "lager-expires"]
     .forEach(k => sessionStorage.removeItem(k));

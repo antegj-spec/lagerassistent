@@ -1,0 +1,162 @@
+// ============================================================
+// realtime.ts — Supabase Realtime subscriptions (Fas 3.5, B19)
+// Beror på: config.ts, supabase.ts, auth.ts (getAuthToken, logout)
+//
+// Rå WebSocket mot Supabase Realtime Phoenix-protokoll. När en annan
+// användare ändrar något i en prenumererad tabell laddas motsvarande
+// store om (debounced) och nuvarande tab re-rendereras. Inga nya
+// beroenden — passar classic-script-paradigmet.
+//
+// Protokoll-referens:
+//   wss://<ref>.supabase.co/realtime/v1/websocket?apikey=<anon>&vsn=1.0.0
+//   Join:      {topic:"realtime:<tbl>",event:"phx_join",payload:{config:{...},access_token}}
+//   Heartbeat: {topic:"phoenix",event:"heartbeat",payload:{},ref}
+//   Receive:   {topic,event:"postgres_changes",payload:{data:{table,type,record,old_record}}}
+// ============================================================
+
+// ---- KONFIG ----
+// Per tabell: vilken load*()-funktion som ska köras vid ändring.
+// Flera tabeller kan mappa mot samma load (loadMats laddar
+// materials_v2 + material_counts + material_items + borrowed_material
+// i ett svep — debouncen säkerställer att vi inte gör fyra omladdningar
+// i rad vid en burst).
+const RT_TABLE_RELOADERS: Record<string, () => Promise<void>> = {
+  notes:             async () => { await loadNotes(); },
+  materials_v2:      async () => { await loadMats(); },
+  material_counts:   async () => { await loadMats(); },
+  material_items:    async () => { await loadMats(); },
+  borrowed_material: async () => { await loadMats(); },
+  tasks:             async () => { await loadTasks(); },
+  returns:           async () => { await loadReturns(); }
+};
+
+// ---- STATE (modul-globalt) ----
+let rtWs: WebSocket | null = null;
+let rtRef = 0;
+let rtHeartbeat: number | null = null;
+let rtReconnectTimer: number | null = null;
+let rtReconnectAttempts = 0;
+let rtClosedByUs = false;
+const rtDebounce: Record<string, number | null> = {};
+
+// ---- DEBOUNCED RELOAD ----
+function scheduleReload(table: string): void {
+  const reload = RT_TABLE_RELOADERS[table];
+  if (!reload) return;
+  if (rtDebounce[table] != null) clearTimeout(rtDebounce[table]!);
+  rtDebounce[table] = window.setTimeout(async () => {
+    rtDebounce[table] = null;
+    try {
+      await reload();
+      if (typeof render === "function") render();
+    } catch (e) {
+      console.warn("Realtime reload failed for " + table + ":", e);
+    }
+  }, 300);
+}
+
+// ---- LIVSCYKEL ----
+function initRealtime(): void {
+  // Stäng eventuell tidigare anslutning (t.ex. efter re-login utan logout)
+  closeRealtimeInternal(false);
+
+  const token = getAuthToken();
+  if (token === SB_KEY) return; // inte inloggad → ingen realtime
+
+  rtClosedByUs = false;
+  const wsUrl = SB_URL.replace(/^https?:\/\//, "wss://")
+    + "/realtime/v1/websocket?apikey=" + encodeURIComponent(SB_KEY)
+    + "&vsn=1.0.0";
+
+  let ws: WebSocket;
+  try {
+    ws = new WebSocket(wsUrl);
+  } catch (e) {
+    console.warn("Realtime WebSocket konstruktion failed:", e);
+    return;
+  }
+  rtWs = ws;
+
+  ws.onopen = () => {
+    rtReconnectAttempts = 0;
+    // Joina en kanal per tabell
+    for (const table of Object.keys(RT_TABLE_RELOADERS)) {
+      const ref = String(++rtRef);
+      ws.send(JSON.stringify({
+        topic: "realtime:" + table,
+        event: "phx_join",
+        payload: {
+          config: {
+            postgres_changes: [{ event: "*", schema: "public", table }]
+          },
+          access_token: token
+        },
+        ref,
+        join_ref: ref
+      }));
+    }
+    // Heartbeat var 30s (Phoenix timeout är 60s)
+    rtHeartbeat = window.setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          topic: "phoenix",
+          event: "heartbeat",
+          payload: {},
+          ref: "hb-" + (++rtRef)
+        }));
+      }
+    }, 30000);
+  };
+
+  ws.onmessage = (e: MessageEvent) => {
+    try {
+      const msg = JSON.parse(e.data);
+      // postgres_changes-event har payload.data.table
+      if (msg?.event === "postgres_changes") {
+        const table = msg.payload?.data?.table;
+        if (typeof table === "string") scheduleReload(table);
+      }
+      // phx_reply med status=error loggas för diagnostik (t.ex. om RLS
+      // blockerar prenumeration, eller om tabell saknas i publication)
+      if (msg?.event === "phx_reply" && msg?.payload?.status === "error") {
+        console.warn("Realtime join error:", msg.topic, msg.payload?.response);
+      }
+    } catch (err) {
+      // Ignorera korrupt frame — heartbeat fortsätter
+    }
+  };
+
+  ws.onerror = (e: Event) => {
+    console.warn("Realtime ws error:", e);
+  };
+
+  ws.onclose = () => {
+    if (rtHeartbeat != null) { clearInterval(rtHeartbeat); rtHeartbeat = null; }
+    if (rtWs === ws) rtWs = null;
+    if (rtClosedByUs) return;
+    // Reconnect med exponential backoff (max ~30s, max 10 försök)
+    if (rtReconnectAttempts < 10 && getAuthToken() !== SB_KEY) {
+      const delay = Math.min(1000 * Math.pow(2, rtReconnectAttempts), 30000);
+      rtReconnectAttempts++;
+      rtReconnectTimer = window.setTimeout(initRealtime, delay);
+    }
+  };
+}
+
+function closeRealtime(): void {
+  closeRealtimeInternal(true);
+}
+
+function closeRealtimeInternal(byUser: boolean): void {
+  rtClosedByUs = byUser;
+  if (rtReconnectTimer != null) { clearTimeout(rtReconnectTimer); rtReconnectTimer = null; }
+  if (rtHeartbeat != null) { clearInterval(rtHeartbeat); rtHeartbeat = null; }
+  if (rtWs) {
+    try { rtWs.close(); } catch { /* ignore */ }
+    rtWs = null;
+  }
+  for (const k of Object.keys(rtDebounce)) {
+    if (rtDebounce[k] != null) { clearTimeout(rtDebounce[k]!); rtDebounce[k] = null; }
+  }
+  if (byUser) rtReconnectAttempts = 0;
+}
