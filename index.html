@@ -6,14 +6,13 @@
   <title>Lagerassistent</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>(function(){var t=localStorage.getItem('lager-theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
-  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
 
   <!-- PIN SCREEN -->
   <div id="pin-screen">
-    <img src="assets/logo.png" class="pin-logo-img" alt="Logo">
+    <img src="/assets/logo.png" class="pin-logo-img" alt="Logo">
     <div class="pin-field-group">
       <div class="pin-field-label">ANVÄNDARNAMN</div>
       <input type="text" id="username-input" class="pin-username-input" placeholder="Ditt namn" autocomplete="off" autocapitalize="words" list="username-list">
@@ -45,7 +44,7 @@
 
   <!-- FIRST LOGIN: SET OWN PIN -->
   <div id="first-pin-screen" style="display:none">
-    <img src="assets/logo.png" class="pin-logo-img" alt="Logo">
+    <img src="/assets/logo.png" class="pin-logo-img" alt="Logo">
     <div class="pin-sub">VÄLJ DIN PIN-KOD</div>
     <div class="first-pin-title" id="first-pin-name"></div>
     <div class="first-pin-sub">Det är första gången du loggar in.<br>Välj en egen PIN-kod (4 siffror).</div>
@@ -74,7 +73,7 @@
   <!-- HEADER -->
   <header id="main-header" style="display:none">
     <div class="hdr-top">
-      <img src="assets/logo.png" class="hdr-logo-img" alt="Logo">
+      <img src="/assets/logo.png" class="hdr-logo-img" alt="Logo">
       <div class="hdr-meta" id="header-meta">Laddar...</div>
       <div class="hdr-right">
         <b class="hdr-username" id="user-display">—</b>
@@ -136,13 +135,17 @@
 <div id="toast"></div>
 <div id="modal-container"></div>
 
-<!-- JavaScript — laddas i rätt ordning -->
-<script src="js/config.js"></script>
-<script src="js/supabase.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/render.js"></script>
-<script src="js/actions.js"></script>
+<!-- Vite entrypoint (Fas 2.1: bara CSS-pipeline). I Fas 2.3 flyttas
+     legacy-filerna nedan in i src/ och blir riktiga ES modules. -->
+<script type="module" src="/src/main.js"></script>
+
+<!-- JavaScript — laddas i rätt ordning (paritet med pre-Vite-läget) -->
+<script src="/js/config.js"></script>
+<script src="/js/supabase.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/render.js"></script>
+<script src="/js/actions.js"></script>
 <script>
 function toggleTheme() {
   var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
