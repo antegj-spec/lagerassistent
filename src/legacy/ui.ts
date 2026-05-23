@@ -72,10 +72,16 @@ function deadlineLabel(deadline: string | null | undefined): string {
   const now = new Date();
   const diff = dl.getTime() - now.getTime();
   if (diff < 0) {
-    const h = Math.abs(Math.round(diff / 3600000));
+    // Fas 3.6 (B10): visa minuter under 1h sen istället för "0h sedan"
+    const absMin = Math.abs(Math.round(diff / 60000));
+    if (absMin < 60) return `⏰ Förfallen för ${absMin}m sedan`;
+    const h = Math.round(absMin / 60);
     if (h < 24) return `⏰ Förfallen för ${h}h sedan`;
     return `⏰ Förfallen ${dl.toLocaleDateString("sv-SE", { day: "numeric", month: "short" })}`;
   }
+  // Fas 3.6 (B10): visa minuter under 1h kvar istället för bara "inom 1h"
+  const mins = Math.round(diff / 60000);
+  if (mins < 60) return `⚡ Förfaller om ${mins}m`;
   const h = Math.round(diff / 3600000);
   if (h < 1) return "⚡ Förfaller inom 1h";
   if (h < 24) return `⚡ Förfaller om ${h}h`;
@@ -215,6 +221,17 @@ function showTab(t: TabName): void {
   imgData = null;
   imgFile = null;
   searchQuery = "";
+  // Fas 3.6 (B6): nollställ filter ihop med searchQuery — annars hänger
+  // en "Reparation"-status med från material-fliken in i anteckningar
+  // (där status-domänen är en annan).
+  fCat = "alla";
+  fStat = "alla";
+  fAssigned = "alla";
+  planPersonFilter = "alla";
+  // Fas 3.6 (B14): rensa även kommentar-bild-globals vid tab-byte
+  _matCommentImgUrl = null;
+  _itemCommentImgUrl = null;
+  _infoCommentImgUrl = null;
   document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
   const tabs: TabName[] = ["hem", "anteckningar", "material", "plan", "info", "chat", "export", "trash"];
   document.querySelectorAll("nav button")[tabs.indexOf(t)]?.classList.add("active");

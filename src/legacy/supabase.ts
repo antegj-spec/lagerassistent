@@ -787,20 +787,24 @@ async function uploadImg(file: File): Promise<string> {
 }
 
 function compressImg(file: File, maxW: number, q: number): Promise<Blob> {
-  return new Promise(res => {
-    const fr = new FileReader();
-    fr.onload = e => {
-      const img = new Image();
-      img.onload = () => {
-        const c = document.createElement("canvas");
-        let w = img.width, h = img.height;
-        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
-        c.width = w; c.height = h;
-        c.getContext("2d")!.drawImage(img, 0, 0, w, h);
-        c.toBlob(b => res(b!), "image/jpeg", q);
-      };
-      img.src = e.target!.result as string;
+  // Fas 3.6 (B12): object URL + revoke. Sparar ~30% minne vs. base64 data-URL
+  // och frigör resursen direkt — viktigt på iPhone Safari vid många foton.
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      c.width = w; c.height = h;
+      c.getContext("2d")!.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => res(b!), "image/jpeg", q);
     };
-    fr.readAsDataURL(file);
+    img.onerror = (e) => {
+      URL.revokeObjectURL(url);
+      rej(e);
+    };
+    img.src = url;
   });
 }

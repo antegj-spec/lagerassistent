@@ -47,6 +47,13 @@ declare global {
   type UserPin = D.UserPin;
   type UserRole = D.UserRole;
   type ChatMessage = D.ChatMessage;
+
+  // Fas 3.6 (B14): kommentar-bild-globals deklareras i actions.ts
+  // (med @ts-nocheck) men nollställs från ui.ts på tab-byte.
+  // Ambient-deklareras här så ui.ts ser dem.
+  let _matCommentImgUrl: string | null;
+  let _itemCommentImgUrl: string | null;
+  let _infoCommentImgUrl: string | null;
 }
 
 export {};

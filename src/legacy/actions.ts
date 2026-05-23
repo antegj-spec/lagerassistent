@@ -259,6 +259,10 @@ async function openMat(id) {
 function closeMat() {
   openMatId = null;
   openItemId = null;
+  // Fas 3.6 (B14): rensa bifogad kommentar-bild — annars hänger den med
+  // till nästa material och fästs på fel objekt.
+  _matCommentImgUrl = null;
+  _itemCommentImgUrl = null;
   render();
 }
 
@@ -1276,6 +1280,8 @@ function closeInfo() {
   openInfoId = null;
   infoEditMode = null;
   infoEditImages = [];
+  // Fas 3.6 (B14): rensa bifogad kommentar-bild
+  _infoCommentImgUrl = null;
   render();
 }
 
