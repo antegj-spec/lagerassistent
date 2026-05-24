@@ -12,18 +12,18 @@ function render(): void {
   // Förhindrar att ett tab-state från tidigare session leder till
   // rendering av admin-data (t.ex. AI-sammanfattning som genererats av Admin).
   const ADMIN_ONLY_TABS = ["chat", "export", "trash"];
-  if (!isAdmin && ADMIN_ONLY_TABS.includes(tab)) {
-    tab = "hem";
+  if (!auth.isAdmin && ADMIN_ONLY_TABS.includes(ui.tab)) {
+    ui.tab = "hem";
   }
 
-  if (tab === "hem")               m.innerHTML = rHem();
-  else if (tab === "anteckningar") m.innerHTML = rNotes();
-  else if (tab === "material")     m.innerHTML = rMat();
-  else if (tab === "plan")         m.innerHTML = rPlan();
-  else if (tab === "info")         m.innerHTML = rInfo();
-  else if (tab === "chat")         m.innerHTML = rChat();
-  else if (tab === "export")       m.innerHTML = rExport();
-  else if (tab === "trash")        m.innerHTML = rTrash();
+  if (ui.tab === "hem")               m.innerHTML = rHem();
+  else if (ui.tab === "anteckningar") m.innerHTML = rNotes();
+  else if (ui.tab === "material")     m.innerHTML = rMat();
+  else if (ui.tab === "plan")         m.innerHTML = rPlan();
+  else if (ui.tab === "info")         m.innerHTML = rInfo();
+  else if (ui.tab === "chat")         m.innerHTML = rChat();
+  else if (ui.tab === "export")       m.innerHTML = rExport();
+  else if (ui.tab === "trash")        m.innerHTML = rTrash();
   else                              m.innerHTML = rHem();  // fallback
   bindEvents();
 }
@@ -32,11 +32,11 @@ function render(): void {
 // HEM-FLIKEN
 // ============================================================
 function rHem(): string {
-  const hp = notes.filter(n => n.priority === "hög" && n.status !== "klar");
-  const today = notes.filter(n =>
+  const hp = notes.list.filter(n => n.priority === "hög" && n.status !== "klar");
+  const today = notes.list.filter(n =>
     new Date(n.created_at).toDateString() === new Date().toDateString()
   );
-  const deadlineUrgent = notes.filter(n =>
+  const deadlineUrgent = notes.list.filter(n =>
     n.status !== "klar" && n.deadline &&
     (deadlineStatus(n.deadline) === "urgent" ||
      deadlineStatus(n.deadline) === "overdue" ||
@@ -44,17 +44,17 @@ function rHem(): string {
   );
   const cs = Object.entries(CATS).map(([k, v]) => ({
     k, v,
-    a: notes.filter(n => n.category === k && n.status !== "klar").length,
-    t: notes.filter(n => n.category === k).length
+    a: notes.list.filter(n => n.category === k && n.status !== "klar").length,
+    t: notes.list.filter(n => n.category === k).length
   })).filter(s => s.t > 0);
 
   // Mina uppgifter (om jag är tilldelad eller huvudansvarig)
-  const myTasks = tasks.filter(t =>
+  const myTasks = tasks.list.filter(t =>
     t.status !== "klar" &&
-    (t.responsible === user || (t.assigned_to || []).includes(user || ""))
+    (t.responsible === auth.user || (t.assigned_to || []).includes(auth.user || ""))
   );
 
-  const matOpts  = materials.map(m => `<option value="${m.id}">${esc(m.emoji || "📦")} ${esc(m.name)}</option>`).join("");
+  const matOpts  = materials.list.map(m => `<option value="${m.id}">${esc(m.emoji || "📦")} ${esc(m.name)}</option>`).join("");
   const userOpts = USERS.filter(u => u !== "Admin").map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join("");
 
   return `
@@ -63,18 +63,18 @@ function rHem(): string {
     <div class="lbl">NY ANTECKNING</div>
     <textarea id="note-input" rows="3" placeholder="Beskriv vad du observerat... (t.ex. 'Kravallstaket rad 3 trasig fot, brådskande')"></textarea>
     <label class="field-label">KATEGORI (auto)</label>
-    <select id="note-cat">${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(user || "")).map(([k, v]) => `<option value="${k}">${v.emoji} ${v.label}</option>`).join("")}</select>
+    <select id="note-cat">${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(auth.user || "")).map(([k, v]) => `<option value="${k}">${v.emoji} ${v.label}</option>`).join("")}</select>
     <label class="field-label">PRIORITET (auto)</label>
     <select id="note-prio">${Object.entries(PRIOS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("")}</select>
     <label class="field-label">TILLDELA TILL (valfritt)</label>
     <select id="note-assign"><option value="">— Ingen —</option>${userOpts}</select>
-    ${materials.length ? `<label class="field-label">KOPPLA TILL MATERIAL (valfritt)</label>
+    ${materials.list.length ? `<label class="field-label">KOPPLA TILL MATERIAL (valfritt)</label>
     <select id="note-material"><option value="">— Inget —</option>${matOpts}</select>` : ""}
     <label class="field-label">DEADLINE (valfritt)</label>
     <input type="datetime-local" id="note-deadline">
     <div class="img-upload-area" onclick="document.getElementById('img-file').click()">
-      ${imgData
-        ? `<img class="img-preview" src="${imgData}">`
+      ${ui.imgData
+        ? `<img class="img-preview" src="${ui.imgData}">`
         : `<div style="color:var(--muted);font-size:12px">📸 Lägg till foto<br><span style="font-size:10px;color:var(--dim)">Öppnar kameran direkt</span></div>`
       }
     </div>
@@ -94,7 +94,7 @@ function rHem(): string {
     }</div>` : ""}
     ${myTasks.length ? `<div class="alert" style="background:#0E1A1E;border-color:var(--blue)"><div class="alert-title" style="color:var(--blue)">📋 MINA UPPGIFTER (${myTasks.length})</div>${
       myTasks.slice(0, 4).map(t =>
-        `<div class="alert-item" style="border-left-color:var(--blue)">${esc(t.title)}${t.responsible === user ? " (huvudansvarig)" : ""}</div>`
+        `<div class="alert-item" style="border-left-color:var(--blue)">${esc(t.title)}${t.responsible === auth.user ? " (huvudansvarig)" : ""}</div>`
       ).join("")
     }</div>` : ""}
     <div class="lbl">ÖVERSIKT</div>
@@ -121,45 +121,45 @@ function rHem(): string {
 // ============================================================
 function rNotes(): string {
   const userOpts = USERS.filter(u => u !== "Admin");
-  const filtered = notes.filter(n => {
-    if (fCat !== "alla" && n.category !== fCat) return false;
-    if (fStat !== "alla" && n.status !== fStat) return false;
-    if (fAssigned !== "alla") {
-      if (fAssigned === "ingen" && n.assigned_to) return false;
-      if (fAssigned !== "ingen" && n.assigned_to !== fAssigned) return false;
+  const filtered = notes.list.filter(n => {
+    if (ui.fCat !== "alla" && n.category !== ui.fCat) return false;
+    if (ui.fStat !== "alla" && n.status !== ui.fStat) return false;
+    if (ui.fAssigned !== "alla") {
+      if (ui.fAssigned === "ingen" && n.assigned_to) return false;
+      if (ui.fAssigned !== "ingen" && n.assigned_to !== ui.fAssigned) return false;
     }
-    if (searchQuery && !n.text.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (ui.searchQuery && !n.text.toLowerCase().includes(ui.searchQuery.toLowerCase())) return false;
     return true;
   });
 
   return `
 <div class="search-box">
-  <input type="text" id="search-input" placeholder="Sök bland anteckningar..." value="${escAttr(searchQuery)}" oninput="setSearch(this.value)">
-  ${searchQuery ? `<button class="search-clear" onclick="clearSearch()">×</button>` : ""}
+  <input type="text" id="search-input" placeholder="Sök bland anteckningar..." value="${escAttr(ui.searchQuery)}" oninput="setSearch(this.value)">
+  ${ui.searchQuery ? `<button class="search-clear" onclick="clearSearch()">×</button>` : ""}
 </div>
 <div class="lbl">KATEGORI</div>
 <div class="filter-row">
-  <button class="filter-btn ${fCat === "alla" ? "active" : ""}" onclick="setFC('alla')">Alla</button>
-  ${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(user || "")).map(([k, v]) =>
-    `<button class="filter-btn ${fCat === k ? "active" : ""}" onclick="setFC('${k}')">${v.emoji} ${v.label}</button>`
+  <button class="filter-btn ${ui.fCat === "alla" ? "active" : ""}" onclick="setFC('alla')">Alla</button>
+  ${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(auth.user || "")).map(([k, v]) =>
+    `<button class="filter-btn ${ui.fCat === k ? "active" : ""}" onclick="setFC('${k}')">${v.emoji} ${v.label}</button>`
   ).join("")}
 </div>
 <div class="lbl">STATUS</div>
 <div class="filter-row">
-  <button class="filter-btn ${fStat === "alla" ? "active" : ""}" onclick="setFS('alla')">Alla</button>
+  <button class="filter-btn ${ui.fStat === "alla" ? "active" : ""}" onclick="setFS('alla')">Alla</button>
   ${Object.entries(STATS).map(([k, v]) =>
-    `<button class="filter-btn ${fStat === k ? "active" : ""}" onclick="setFS('${k}')">${v}</button>`
+    `<button class="filter-btn ${ui.fStat === k ? "active" : ""}" onclick="setFS('${k}')">${v}</button>`
   ).join("")}
 </div>
 <div class="lbl">TILLDELAD</div>
 <div class="filter-row mb">
-  <button class="filter-btn ${fAssigned === "alla" ? "active" : ""}" onclick="setFA('alla')">Alla</button>
-  <button class="filter-btn ${fAssigned === "ingen" ? "active" : ""}" onclick="setFA('ingen')">Ingen</button>
+  <button class="filter-btn ${ui.fAssigned === "alla" ? "active" : ""}" onclick="setFA('alla')">Alla</button>
+  <button class="filter-btn ${ui.fAssigned === "ingen" ? "active" : ""}" onclick="setFA('ingen')">Ingen</button>
   ${userOpts.map(u =>
-    `<button class="filter-btn ${fAssigned === u ? "active" : ""}" onclick="setFA('${esc(u)}')">@${esc(u)}</button>`
+    `<button class="filter-btn ${ui.fAssigned === u ? "active" : ""}" onclick="setFA('${esc(u)}')">@${esc(u)}</button>`
   ).join("")}
 </div>
-<div class="lbl">${filtered.length} ANTECKNINGAR ${searchQuery ? `("${esc(searchQuery)}")` : ""}</div>
+<div class="lbl">${filtered.length} ANTECKNINGAR ${ui.searchQuery ? `("${esc(ui.searchQuery)}")` : ""}</div>
 <div class="note-list">
   ${filtered.length === 0
     ? `<div class="empty">Inga matchar filtret</div>`
@@ -172,11 +172,11 @@ function rNotes(): string {
 function rCard(n: Note, inTrash: boolean = false): string {
   const cat = CATS[n.category];
   const prio = PRIOS[n.priority || "medel"];
-  const open = openId === n.id;
-  const linkedMat = n.material_id ? materials.find(m => m.id === n.material_id) : null;
+  const open = notes.openId === n.id;
+  const linkedMat = n.material_id ? materials.list.find(m => m.id === n.material_id) : null;
   const dlStatus = n.deadline ? deadlineStatus(n.deadline) : null;
   const dlLabel  = n.deadline ? deadlineLabel(n.deadline) : "";
-  const noteComments = comments[n.id] || [];
+  const noteComments = notes.comments[n.id] || [];
   const commentCount = noteComments.length;
 
   return `<div class="note-card" onclick="toggleNote(${n.id})" style="border-left:3px solid ${cat?.color}${
@@ -210,7 +210,7 @@ function rCard(n: Note, inTrash: boolean = false): string {
   <div class="comments-section" onclick="event.stopPropagation()">
     <div class="comment-lbl">KOMMENTARER (${commentCount})</div>
     ${noteComments.map(c => {
-      const canMod = isAdmin || c.created_by === user;
+      const canMod = auth.isAdmin || c.created_by === auth.user;
       return `<div class="comment-item">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
           <div class="comment-text" style="flex:1">${esc(c.text)}</div>
@@ -241,16 +241,16 @@ function rCard(n: Note, inTrash: boolean = false): string {
 // MATERIAL-FLIKEN — med sub-tabs (Status / Åtgärder / Returer)
 // ============================================================
 function rMat(): string {
-  const actionCount = actionComments.length;
+  const actionCount = materials.actionComments.length;
   const subTabs = `
 <div class="filter-row mb" style="border-bottom:1px solid var(--border);padding-bottom:8px">
-  <button class="filter-btn ${matSubTab === "status" ? "active" : ""}" onclick="setMatSubTab('status')">📦 MATERIAL STATUS</button>
-  <button class="filter-btn ${matSubTab === "åtgärder" ? "active" : ""}" onclick="setMatSubTab('åtgärder')" style="${actionCount > 0 ? "border-color:#E8521A;color:#E8521A" : ""}">🚨 ÅTGÄRDER${actionCount > 0 ? ` (${actionCount})` : ""}</button>
-  <button class="filter-btn ${matSubTab === "returer" ? "active" : ""}" onclick="setMatSubTab('returer')">↩ RETURER (${returnsList.length})</button>
+  <button class="filter-btn ${ui.matSubTab === "status" ? "active" : ""}" onclick="setMatSubTab('status')">📦 MATERIAL STATUS</button>
+  <button class="filter-btn ${ui.matSubTab === "åtgärder" ? "active" : ""}" onclick="setMatSubTab('åtgärder')" style="${actionCount > 0 ? "border-color:#E8521A;color:#E8521A" : ""}">🚨 ÅTGÄRDER${actionCount > 0 ? ` (${actionCount})` : ""}</button>
+  <button class="filter-btn ${ui.matSubTab === "returer" ? "active" : ""}" onclick="setMatSubTab('returer')">↩ RETURER (${returns.list.length})</button>
 </div>`;
 
-  if (matSubTab === "returer") return subTabs + rReturer();
-  if (matSubTab === "åtgärder") return subTabs + rMatActions();
+  if (ui.matSubTab === "returer") return subTabs + rReturer();
+  if (ui.matSubTab === "åtgärder") return subTabs + rMatActions();
   return subTabs + rMatStatus();
 }
 
@@ -262,7 +262,7 @@ function rMatCommentCard(c: MaterialComment, matId: number): string {
   const itemId = c.item_id ?? "null";
   const accentColor = isUrgent ? "#E8521A" : isNeeded ? "#E8A81A" : "#4CAF7D";
   const accentLabel = isUrgent ? "⚠ Åtgärd krävs" : isNeeded ? "⚠ Åtgärd behövs" : "✅ Klart";
-  const canMod = isAdmin || c.created_by === user;
+  const canMod = auth.isAdmin || c.created_by === auth.user;
 
   return `<div class="comment-item" style="${isAction ? `border-left:2px solid ${accentColor};padding-left:10px;` : ""}">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
@@ -287,8 +287,8 @@ function rMatCommentCard(c: MaterialComment, matId: number): string {
 function rMatActions(): string {
   interface ActionGroup { mat: Material; items: MaterialComment[]; }
   const grouped: Record<number, ActionGroup> = {};
-  actionComments.forEach(c => {
-    const mat = materials.find(m => m.id === c.material_id);
+  materials.actionComments.forEach(c => {
+    const mat = materials.list.find(m => m.id === c.material_id);
     if (!mat) return;
     if (!grouped[c.material_id]) grouped[c.material_id] = { mat, items: [] };
     grouped[c.material_id].items.push(c);
@@ -296,11 +296,11 @@ function rMatActions(): string {
   const groups: ActionGroup[] = Object.values(grouped);
 
   return `
-<div class="lbl">⚠ KRÄVER ÅTGÄRD (${actionComments.length})</div>
+<div class="lbl">⚠ KRÄVER ÅTGÄRD (${materials.actionComments.length})</div>
 ${groups.length === 0
   ? `<div class="empty">Inga öppna åtgärder 🎉</div>`
   : groups.map(g => {
-    const matItems = materialItems[g.mat.id] || [];
+    const matItems = materials.items[g.mat.id] || [];
     return `<div class="card" style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div>
@@ -323,9 +323,9 @@ ${groups.length === 0
 // ---- ARTIKELDETALJVY (full sida) ----
 function rItemDetail(it: MaterialItem, m: Material): string {
   const stat = MAT_STATS[it.status] || MAT_STATS.tillgänglig;
-  const images = materialItemImages[it.id] || [];
-  const cmts = (materialComments[m.id] || []).filter(c => c.item_id === it.id);
-  const history = (materialHistory[m.id] || []).filter(h => h.article_id === it.article_id);
+  const images = materials.itemImages[it.id] || [];
+  const cmts = (materials.comments[m.id] || []).filter(c => c.item_id === it.id);
+  const history = (materials.history[m.id] || []).filter(h => h.article_id === it.article_id);
 
   return `
 <button class="btn-ghost mb" onclick="closeItem()">← Tillbaka till ${esc(m.name)}</button>
@@ -339,7 +339,7 @@ function rItemDetail(it: MaterialItem, m: Material): string {
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
       <span class="tag" style="background:${stat.color}22;color:${stat.color};font-size:12px;padding:4px 10px">${stat.emoji} ${stat.label.toUpperCase()}</span>
       <button class="btn-ghost" onclick="openChangeItemStatus(${it.id},${m.id})">✎ Ändra status</button>
-      ${isAdmin ? `<button class="btn-ghost" onclick="doDelItem(${it.id},${m.id})" style="color:var(--accent);border-color:var(--accent)">🗑 Radera</button>` : ""}
+      ${auth.isAdmin ? `<button class="btn-ghost" onclick="doDelItem(${it.id},${m.id})" style="color:var(--accent);border-color:var(--accent)">🗑 Radera</button>` : ""}
     </div>
   </div>
 </div>
@@ -350,7 +350,7 @@ function rItemDetail(it: MaterialItem, m: Material): string {
     ${images.map(img =>
       `<div class="info-img-wrap">
         <img src="${escAttr(img.image_url)}" loading="lazy" onclick="window.open('${escAttr(img.image_url)}','_blank')">
-        ${isAdmin ? `<button class="info-img-del" onclick="doDelItemImg(${img.id},${it.id})">×</button>` : ""}
+        ${auth.isAdmin ? `<button class="info-img-del" onclick="doDelItemImg(${img.id},${it.id})">×</button>` : ""}
       </div>`
     ).join("")}
     <label class="info-img-add">
@@ -380,7 +380,7 @@ function rItemDetail(it: MaterialItem, m: Material): string {
         📷 Bifoga bild
         <input type="file" accept="image/*" style="display:none" onchange="handleItemCommentImg(this)">
       </label>
-      ${(globalThis as any)._itemCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
+      ${ui.itemCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
       <button class="btn-ghost" style="margin-left:auto" onclick="submitMatComment(${m.id},${it.id})">Skicka</button>
     </div>
   </div>
@@ -403,18 +403,18 @@ ${history.length > 0 ? `<div class="card">
 // ---- MATERIAL STATUS-VYN ----
 function rMatStatus(): string {
   // Om ett material är öppet — visa detaljvyn
-  if (openMatId) {
-    const m = materials.find(m => m.id === openMatId);
+  if (materials.openId) {
+    const m = materials.list.find(m => m.id === materials.openId);
     if (m) return rMatDetail(m);
   }
 
   return `
-${isAdmin ? `<button class="btn mb" onclick="openAddMat()" style="width:100%">+ LÄGG TILL MATERIALTYP</button>` : ""}
-<div class="lbl">MATERIALREGISTER (${materials.length})</div>
+${auth.isAdmin ? `<button class="btn mb" onclick="openAddMat()" style="width:100%">+ LÄGG TILL MATERIALTYP</button>` : ""}
+<div class="lbl">MATERIALREGISTER (${materials.list.length})</div>
 <div class="mat-list">
-${materials.length === 0
+${materials.list.length === 0
   ? `<div class="empty">Inga material tillagda ännu</div>`
-  : materials.map(m => rMatCardSummary(m)).join("")
+  : materials.list.map(m => rMatCardSummary(m)).join("")
 }
 </div>`;
 }
@@ -422,7 +422,7 @@ ${materials.length === 0
 // ---- KORT FÖR MATERIAL-LISTAN ----
 function rMatCardSummary(m: Material): string {
   if (m.is_article_based) {
-    const items = materialItems[m.id] || [];
+    const items = materials.items[m.id] || [];
     const counts: Record<string, number> = {};
     Object.keys(MAT_STATS).forEach(s => counts[s] = 0);
     items.forEach(it => { if (counts[it.status] !== undefined) counts[it.status]++; });
@@ -443,8 +443,8 @@ function rMatCardSummary(m: Material): string {
 </div>`;
   } else {
     // Lagerräknande
-    const counts = materialCounts[m.id] || {};
-    const borrowed = (borrowedMaterial[m.id] || []).reduce((sum, b) => sum + (b.quantity || 0), 0);
+    const counts = materials.counts[m.id] || {};
+    const borrowed = (materials.borrowed[m.id] || []).reduce((sum, b) => sum + (b.quantity || 0), 0);
     const total = (m.total_count || 0) + borrowed;
     const tillgVal = counts.tillgänglig || 0;
     const pct = total > 0 ? Math.round(tillgVal / total * 100) : 0;
@@ -471,16 +471,16 @@ function rMatCardSummary(m: Material): string {
 // ---- DETALJVY FÖR ETT MATERIAL ----
 function rMatDetail(m: Material): string {
   // Om en artikel är öppen — visa full artikelvy
-  if (openItemId && m.is_article_based) {
-    const items = materialItems[m.id] || [];
-    const it = items.find(i => i.id === openItemId);
+  if (materials.openItemId && m.is_article_based) {
+    const items = materials.items[m.id] || [];
+    const it = items.find(i => i.id === materials.openItemId);
     if (it) return rItemDetail(it, m);
   }
 
-  const history = materialHistory[m.id] || [];
-  const borrowed = borrowedMaterial[m.id] || [];
-  const matImages = materialImages[m.id] || [];
-  const matLevelComments = (materialComments[m.id] || []).filter(c => !c.item_id);
+  const history = materials.history[m.id] || [];
+  const borrowed = materials.borrowed[m.id] || [];
+  const matImages = materials.images[m.id] || [];
+  const matLevelComments = (materials.comments[m.id] || []).filter(c => !c.item_id);
 
   let body = m.is_article_based ? rMatItemsView(m) : rMatCountsView(m);
 
@@ -493,7 +493,7 @@ function rMatDetail(m: Material): string {
       <div style="font-family:var(--display);font-size:24px;font-weight:900">${esc(m.name)}</div>
       <div style="font-size:11px;color:var(--muted);margin-top:4px">${m.is_article_based ? "Artikelbaserat" : "Lagerräknande"}</div>
     </div>
-    ${isAdmin ? `<div style="display:flex;gap:6px">
+    ${auth.isAdmin ? `<div style="display:flex;gap:6px">
       <button class="btn-ghost" onclick="openEditMat(${m.id})">✎ Redigera</button>
       <button class="btn-ghost" onclick="doDelMat(${m.id})" style="color:var(--accent);border-color:var(--accent)">🗑</button>
     </div>` : ""}
@@ -507,7 +507,7 @@ function rMatDetail(m: Material): string {
     ${matImages.map(img =>
       `<div class="info-img-wrap">
         <img src="${escAttr(img.image_url)}" loading="lazy" onclick="window.open('${escAttr(img.image_url)}','_blank')">
-        ${isAdmin ? `<button class="info-img-del" onclick="doDelMatImg(${img.id},${m.id})">×</button>` : ""}
+        ${auth.isAdmin ? `<button class="info-img-del" onclick="doDelMatImg(${img.id},${m.id})">×</button>` : ""}
       </div>`
     ).join("")}
     <label class="info-img-add">
@@ -524,7 +524,7 @@ ${!m.is_article_based ? `
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
     <div class="lbl" style="margin:0">INHYRT MATERIAL (${borrowed.length})</div>
-    ${isAdmin ? `<button class="btn-ghost" onclick="openAddBorrowed(${m.id})">+ LÄGG TILL</button>` : ""}
+    ${auth.isAdmin ? `<button class="btn-ghost" onclick="openAddBorrowed(${m.id})">+ LÄGG TILL</button>` : ""}
   </div>
   ${borrowed.length === 0
     ? `<div style="font-size:12px;color:var(--muted)">Inget inhyrt material för tillfället</div>`
@@ -533,7 +533,7 @@ ${!m.is_article_based ? `
         <div style="font-size:11px;color:var(--muted);margin-top:3px">${fmtDateOnly(b.start_date)}${b.end_date ? ` → ${fmtDateOnly(b.end_date)}` : " — pågående"}</div>
         ${b.reason ? `<div style="font-size:11px;margin-top:4px">${esc(b.reason)}</div>` : ""}
         ${b.comment ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(b.comment)}</div>` : ""}
-        ${isAdmin ? `<div style="margin-top:8px"><button class="btn-ghost" onclick="doDelBorrowed(${b.id},${m.id})" style="font-size:10px">🗑 Ta bort</button></div>` : ""}
+        ${auth.isAdmin ? `<div style="margin-top:8px"><button class="btn-ghost" onclick="doDelBorrowed(${b.id},${m.id})" style="font-size:10px">🗑 Ta bort</button></div>` : ""}
       </div>`).join("")
   }
 </div>` : ""}
@@ -565,7 +565,7 @@ ${m.info_text ? `<div class="card">
         📷 Bifoga bild
         <input type="file" accept="image/*" style="display:none" onchange="handleMatCommentImg(this)">
       </label>
-      ${(globalThis as any)._matCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
+      ${ui.matCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
       <button class="btn-ghost" style="margin-left:auto" onclick="submitMatComment(${m.id},null)">Skicka</button>
     </div>
   </div>
@@ -594,7 +594,7 @@ ${m.info_text ? `<div class="card">
 
 // ---- ARTIKELBASERAD VY (lista över artiklar) ----
 function rMatItemsView(m: Material): string {
-  const items = materialItems[m.id] || [];
+  const items = materials.items[m.id] || [];
   const sortedItems = [...items].sort((a, b) =>
     (a.article_id || "").localeCompare(b.article_id || "", "sv", { numeric: true })
   );
@@ -603,13 +603,13 @@ function rMatItemsView(m: Material): string {
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
     <div class="lbl" style="margin:0">ARTIKLAR (${items.length})</div>
-    ${isAdmin ? `<button class="btn-ghost" onclick="openAddItem(${m.id})">+ NY ARTIKEL</button>` : ""}
+    ${auth.isAdmin ? `<button class="btn-ghost" onclick="openAddItem(${m.id})">+ NY ARTIKEL</button>` : ""}
   </div>
   ${sortedItems.length === 0
     ? `<div style="font-size:12px;color:var(--muted)">Inga artiklar tillagda</div>`
     : sortedItems.map(it => {
         const stat = MAT_STATS[it.status] || MAT_STATS.tillgänglig;
-        const itComments = (materialComments[m.id] || []).filter(c => c.item_id === it.id);
+        const itComments = (materials.comments[m.id] || []).filter(c => c.item_id === it.id);
         const cmtCount = itComments.length;
         const actionCount = itComments.filter(c => c.status === "åtgärd_krävs").length;
         return `<div style="background:var(--bg);border:1px solid var(--border);border-left:3px solid ${stat.color};border-radius:8px;margin-bottom:8px;cursor:pointer" onclick="openItem(${it.id})">
@@ -625,7 +625,7 @@ function rMatItemsView(m: Material): string {
             <div style="display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
               <span class="tag" style="background:${stat.color}22;color:${stat.color}">${stat.emoji} ${stat.label.toUpperCase()}</span>
               <button class="btn-ghost" onclick="openChangeItemStatus(${it.id},${m.id})">Ändra</button>
-              ${isAdmin ? `<button class="btn-ghost" onclick="doDelItem(${it.id},${m.id})" style="color:var(--accent)">🗑</button>` : ""}
+              ${auth.isAdmin ? `<button class="btn-ghost" onclick="doDelItem(${it.id},${m.id})" style="color:var(--accent)">🗑</button>` : ""}
             </div>
           </div>
         </div>`;
@@ -636,8 +636,8 @@ function rMatItemsView(m: Material): string {
 
 // ---- LAGERRÄKNANDE VY (status-räkning) ----
 function rMatCountsView(m: Material): string {
-  const counts = materialCounts[m.id] || {};
-  const borrowed = (borrowedMaterial[m.id] || []).reduce((sum, b) => sum + (b.quantity || 0), 0);
+  const counts = materials.counts[m.id] || {};
+  const borrowed = (materials.borrowed[m.id] || []).reduce((sum, b) => sum + (b.quantity || 0), 0);
   const own = m.total_count || 0;
   const total = own + borrowed;
 
@@ -649,7 +649,7 @@ function rMatCountsView(m: Material): string {
       <div style="font-family:var(--display);font-size:30px;font-weight:900">${total} ${esc(m.unit || "st")}</div>
       ${borrowed > 0 ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${own} eget + <span style="color:var(--blue)">${borrowed} inhyrt</span></div>` : ""}
     </div>
-    ${isAdmin ? `<button class="btn-ghost" onclick="openSetTotal(${m.id})">✎ Ändra total</button>` : ""}
+    ${auth.isAdmin ? `<button class="btn-ghost" onclick="openSetTotal(${m.id})">✎ Ändra total</button>` : ""}
   </div>
 
   <div class="lbl">STATUS-FÖRDELNING</div>
@@ -675,14 +675,14 @@ function rMatCountsView(m: Material): string {
 function rReturer(): string {
   return `
 <button class="btn mb" onclick="openAddReturn()" style="width:100%">+ NY RETUR</button>
-<div class="lbl">AKTIVA RETURER (${returnsList.length})</div>
-${returnsList.length === 0
+<div class="lbl">AKTIVA RETURER (${returns.list.length})</div>
+${returns.list.length === 0
   ? `<div class="empty">Inga returer ännu</div>`
-  : returnsList.map(r => rReturCard(r)).join("")
+  : returns.list.map(r => rReturCard(r)).join("")
 }
-${isAdmin && archivedReturns.length ? `
-<div class="lbl mt">ARKIVERADE RETURER (${archivedReturns.length})</div>
-${archivedReturns.map(r => rReturCard(r, true)).join("")}
+${auth.isAdmin && returns.archived.length ? `
+<div class="lbl mt">ARKIVERADE RETURER (${returns.archived.length})</div>
+${returns.archived.map(r => rReturCard(r, true)).join("")}
 ` : ""}`;
 }
 
@@ -698,11 +698,11 @@ function rReturCard(r: Return, isArchived: boolean = false): string {
   ${r.comment ? `<div style="font-size:11px;color:var(--muted);margin-top:6px;font-style:italic">💬 ${esc(r.comment)}</div>` : ""}
   <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
     <button class="btn-ghost" onclick="openEditReturn(${r.id})">✎ Redigera</button>
-    ${isAdmin ? (isArchived
+    ${auth.isAdmin ? (isArchived
       ? `<button class="btn-ghost" onclick="toggleReturnArchive(${r.id},false)">↩ Aktivera</button>`
       : `<button class="btn-ghost" onclick="toggleReturnArchive(${r.id},true)">📁 Arkivera</button>`
     ) : ""}
-    ${isAdmin ? `<button class="btn-ghost" onclick="doDelReturn(${r.id})" style="margin-left:auto;color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
+    ${auth.isAdmin ? `<button class="btn-ghost" onclick="doDelReturn(${r.id})" style="margin-left:auto;color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
   </div>
 </div>`;
 }
@@ -712,36 +712,36 @@ function rReturCard(r: Return, isArchived: boolean = false): string {
 // ============================================================
 function rPlan(): string {
   // Detaljvy
-  if (openTaskId) {
-    const t = [...tasks, ...archivedTasks].find(t => t.id === openTaskId);
+  if (tasks.openId) {
+    const t = [...tasks.list, ...tasks.archived].find(t => t.id === tasks.openId);
     if (t) return rTaskDetail(t);
   }
 
   const subTabs = `
 <div class="filter-row mb" style="border-bottom:1px solid var(--border);padding-bottom:8px">
-  <button class="filter-btn ${planSubTab === "aktiva" ? "active" : ""}" onclick="setPlanSubTab('aktiva')">📋 AKTIVA (${tasks.length})</button>
-  ${isAdmin ? `<button class="filter-btn ${planSubTab === "arkiv" ? "active" : ""}" onclick="setPlanSubTab('arkiv')">📁 ARKIV (${archivedTasks.length})</button>` : ""}
+  <button class="filter-btn ${ui.planSubTab === "aktiva" ? "active" : ""}" onclick="setPlanSubTab('aktiva')">📋 AKTIVA (${tasks.list.length})</button>
+  ${auth.isAdmin ? `<button class="filter-btn ${ui.planSubTab === "arkiv" ? "active" : ""}" onclick="setPlanSubTab('arkiv')">📁 ARKIV (${tasks.archived.length})</button>` : ""}
 </div>`;
 
-  if (planSubTab === "arkiv" && isAdmin) return subTabs + rPlanArchive();
+  if (ui.planSubTab === "arkiv" && auth.isAdmin) return subTabs + rPlanArchive();
   return subTabs + rPlanActive();
 }
 
 function rPlanActive(): string {
   const allUsers = USERS.filter(u => u !== "Admin");
-  const filtered = tasks.filter(t => {
-    if (planPersonFilter === "alla") return true;
-    if (planPersonFilter === "ingen") return !t.responsible && !(t.assigned_to || []).length;
-    return t.responsible === planPersonFilter || (t.assigned_to || []).includes(planPersonFilter);
+  const filtered = tasks.list.filter(t => {
+    if (ui.planPersonFilter === "alla") return true;
+    if (ui.planPersonFilter === "ingen") return !t.responsible && !(t.assigned_to || []).length;
+    return t.responsible === ui.planPersonFilter || (t.assigned_to || []).includes(ui.planPersonFilter);
   });
 
   return `
-${isAdmin ? `<button class="btn mb" onclick="openAddTask()" style="width:100%">+ NY UPPGIFT</button>` : ""}
+${auth.isAdmin ? `<button class="btn mb" onclick="openAddTask()" style="width:100%">+ NY UPPGIFT</button>` : ""}
 <div class="lbl">FILTRERA PÅ PERSON</div>
 <div class="filter-row mb">
-  <button class="filter-btn ${planPersonFilter === "alla" ? "active" : ""}" onclick="setPlanPersonFilter('alla')">Alla</button>
-  <button class="filter-btn ${planPersonFilter === "ingen" ? "active" : ""}" onclick="setPlanPersonFilter('ingen')">Ej tilldelat</button>
-  ${allUsers.map(u => `<button class="filter-btn ${planPersonFilter === u ? "active" : ""}" onclick="setPlanPersonFilter('${esc(u)}')">${esc(u)}</button>`).join("")}
+  <button class="filter-btn ${ui.planPersonFilter === "alla" ? "active" : ""}" onclick="setPlanPersonFilter('alla')">Alla</button>
+  <button class="filter-btn ${ui.planPersonFilter === "ingen" ? "active" : ""}" onclick="setPlanPersonFilter('ingen')">Ej tilldelat</button>
+  ${allUsers.map(u => `<button class="filter-btn ${ui.planPersonFilter === u ? "active" : ""}" onclick="setPlanPersonFilter('${esc(u)}')">${esc(u)}</button>`).join("")}
 </div>
 <div class="lbl">${filtered.length} UPPGIFTER</div>
 ${filtered.length === 0
@@ -752,9 +752,9 @@ ${filtered.length === 0
 
 function rPlanArchive(): string {
   return `
-${archivedTasks.length === 0
+${tasks.archived.length === 0
   ? `<div class="empty">Inget arkiverat</div>`
-  : archivedTasks.map(t => rTaskListRow(t, true)).join("")
+  : tasks.archived.map(t => rTaskListRow(t, true)).join("")
 }`;
 }
 
@@ -765,12 +765,12 @@ function rTaskListRow(t: Task, isArchived: boolean = false): string {
   const dlStatus = t.deadline ? deadlineStatus(t.deadline) : null;
   const dlLabel  = t.deadline ? deadlineLabel(t.deadline) : "";
   const isDone = t.status === "klar";
-  const cmtCount = (taskComments[t.id] || []).length;
-  const checkItems = taskChecklists[t.id] || [];
+  const cmtCount = (tasks.comments[t.id] || []).length;
+  const checkItems = tasks.checklists[t.id] || [];
   const doneItems = checkItems.filter(i => i.done).length;
 
   const lastUpdate = cmtCount
-    ? fmtD((taskComments[t.id] || []).at(-1)?.created_at || "")
+    ? fmtD((tasks.comments[t.id] || []).at(-1)?.created_at || "")
     : fmtD(t.updated_at || t.created_at);
 
   return `<div class="task-row" onclick="openTaskDetail(${t.id})" style="border-left:3px solid ${prio.color};${isDone ? "opacity:.55;" : ""}${
@@ -809,10 +809,10 @@ function rTaskDetail(t: Task): string {
   const dlStatus = t.deadline ? deadlineStatus(t.deadline) : null;
   const dlLabel  = t.deadline ? deadlineLabel(t.deadline) : "";
   const isDone = t.status === "klar";
-  const log = taskStatusLogs[t.id] || [];
-  const cmts = taskComments[t.id] || [];
-  const checkItems = taskChecklists[t.id] || [];
-  const isArchived = archivedTasks.some(a => a.id === t.id);
+  const log = tasks.statusLogs[t.id] || [];
+  const cmts = tasks.comments[t.id] || [];
+  const checkItems = tasks.checklists[t.id] || [];
+  const isArchived = tasks.archived.some(a => a.id === t.id);
 
   return `
 <button class="btn-ghost mb" onclick="closeTaskDetail()">← Tillbaka till planering</button>
@@ -831,9 +831,9 @@ function rTaskDetail(t: Task): string {
         ${t.start_date ? `· start ${fmtDateOnly(t.start_date)}` : ""}
       </div>
     </div>
-    ${isAdmin || t.responsible === user ? `<div style="display:flex;flex-direction:column;gap:6px">
+    ${auth.isAdmin || t.responsible === auth.user ? `<div style="display:flex;flex-direction:column;gap:6px">
       <button class="btn-ghost" onclick="openEditTask(${t.id})">✎ Redigera</button>
-      ${isAdmin ? `<button class="btn-ghost" onclick="doDelTask(${t.id})" style="color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
+      ${auth.isAdmin ? `<button class="btn-ghost" onclick="doDelTask(${t.id})" style="color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
     </div>` : ""}
   </div>
 
@@ -850,8 +850,8 @@ function rTaskDetail(t: Task): string {
     ${Object.entries(TASK_STATS).map(([k, v]) =>
       `<button class="status-btn ${t.status === k ? "active" : ""}" onclick="setTaskStatus(${t.id},'${k}')">${v.label}</button>`
     ).join("")}
-    ${isAdmin && !isArchived && t.status === "klar" ? `<button class="btn-ghost" onclick="archiveTask(${t.id},true)">📁 Arkivera</button>` : ""}
-    ${isAdmin && isArchived ? `<button class="btn-ghost" onclick="archiveTask(${t.id},false)">↩ Aktivera</button>` : ""}
+    ${auth.isAdmin && !isArchived && t.status === "klar" ? `<button class="btn-ghost" onclick="archiveTask(${t.id},true)">📁 Arkivera</button>` : ""}
+    ${auth.isAdmin && isArchived ? `<button class="btn-ghost" onclick="archiveTask(${t.id},false)">↩ Aktivera</button>` : ""}
   </div>
 </div>
 
@@ -888,7 +888,7 @@ ${t.description ? `<div class="card">
 <div class="card">
   <div class="lbl">DAGLIGA UPPDATERINGAR (${cmts.length})</div>
   ${cmts.map(c => {
-    const canMod = isAdmin || c.created_by === user;
+    const canMod = auth.isAdmin || c.created_by === auth.user;
     return `<div class="comment-item">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
         <div class="comment-text" style="white-space:pre-wrap;flex:1">${esc(c.text)}</div>
@@ -923,14 +923,14 @@ ${log.length > 0 ? `<div class="card">
 // ============================================================
 function rTrash(): string {
   return `
-<div class="lbl">PAPPERSKORG (${trashedNotes.length})</div>
+<div class="lbl">PAPPERSKORG (${notes.trashed.length})</div>
 <p style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.6">
   Raderade anteckningar sparas här i ${TRASH_DAYS} dagar innan de försvinner permanent.
 </p>
-${trashedNotes.length === 0
+${notes.trashed.length === 0
   ? `<div class="empty">Papperskorgen är tom</div>`
   : `<div class="row mb"><button class="btn btn-red" onclick="emptyTrash()" style="flex:1">🗑 TÖM PAPPERSKORG</button></div>
-     <div class="note-list">${trashedNotes.map(n => rCard(n, true)).join("")}</div>`
+     <div class="note-list">${notes.trashed.map(n => rCard(n, true)).join("")}</div>`
 }`;
 }
 
@@ -938,7 +938,7 @@ ${trashedNotes.length === 0
 // CHATT-FLIKEN
 // ============================================================
 function rChat(): string {
-  const msgs = chat.map(m =>
+  const msgs = chat.list.map(m =>
     `<div class="chat-msg ${m.role}">
       <div class="chat-bubble ${m.role === "user" ? "user" : "ai"}">${esc(m.content)}</div>
     </div>`
@@ -946,14 +946,14 @@ function rChat(): string {
 
   return `
 <div class="chat-box" id="chat-box">
-  ${chat.length === 0
+  ${chat.list.length === 0
     ? `<div class="chat-empty">Ställ en fråga om lagret, materialet eller arbetet.<br><br><span style="color:var(--dim)">T.ex. "Vad ska jag prioritera idag?" eller "Tips för kravallstaket?"</span></div>`
-    : msgs + (loading ? `<div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>` : "")
+    : msgs + (ui.loading ? `<div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>` : "")
   }
 </div>
 <div class="chat-row">
   <input type="text" id="chat-input" placeholder="Skriv en fråga..." onkeydown="if(event.key==='Enter')sendChat()">
-  <button class="btn" onclick="sendChat()" ${loading ? "disabled" : ""}>→</button>
+  <button class="btn" onclick="sendChat()" ${ui.loading ? "disabled" : ""}>→</button>
 </div>
 <div class="quick-qs">
   <div class="lbl" style="margin-top:12px">SNABBFRÅGOR</div>
@@ -974,8 +974,8 @@ function rExport(): string {
   const now = new Date().toLocaleDateString("sv-SE", {
     weekday: "long", year: "numeric", month: "long", day: "numeric"
   });
-  const active = notes.filter(n => n.status !== "klar");
-  let out = `LAGERRAPPORT — ${now}\nInloggad: ${user}\n${"═".repeat(40)}\n\n`;
+  const active = notes.list.filter(n => n.status !== "klar");
+  let out = `LAGERRAPPORT — ${now}\nInloggad: ${auth.user}\n${"═".repeat(40)}\n\n`;
 
   const hp = active.filter(n => n.priority === "hög");
   if (hp.length) {
@@ -998,7 +998,7 @@ function rExport(): string {
     if (!cn.length) return;
     out += `${v.emoji} ${v.label.toUpperCase()} (${cn.length} st)\n`;
     cn.forEach(n => {
-      const linkedMat = n.material_id ? materials.find(m => m.id === n.material_id) : null;
+      const linkedMat = n.material_id ? materials.list.find(m => m.id === n.material_id) : null;
       out += `  ${n.status === "pågår" ? "⏳" : "○"} ${n.text} [${PRIOS[n.priority || "medel"]?.label}]${
         n.assigned_to ? ` → @${n.assigned_to}` : ""
       }${linkedMat ? ` (📦 ${linkedMat.name})` : ""} (${n.created_by}, ${fmtD(n.created_at)})${
@@ -1008,18 +1008,18 @@ function rExport(): string {
     out += "\n";
   });
 
-  if (materials.length) {
+  if (materials.list.length) {
     out += "📦 MATERIALSTATUS\n";
-    materials.forEach(m => {
+    materials.list.forEach(m => {
       if (m.is_article_based) {
-        const items = materialItems[m.id] || [];
+        const items = materials.items[m.id] || [];
         const counts: Record<string, number> = {};
         Object.keys(MAT_STATS).forEach(s => counts[s] = 0);
         items.forEach(it => { if (counts[it.status] !== undefined) counts[it.status]++; });
         out += `  ${m.emoji || "📦"} ${m.name} (${items.length} artiklar): ${Object.entries(counts).filter(([_, n]) => n > 0).map(([s, n]) => `${n} ${MAT_STATS[s as MaterialStatus]?.label || s}`).join(", ")}\n`;
       } else {
-        const counts = materialCounts[m.id] || {};
-        const borrowed = (borrowedMaterial[m.id] || []).reduce((s, b) => s + (b.quantity || 0), 0);
+        const counts = materials.counts[m.id] || {};
+        const borrowed = (materials.borrowed[m.id] || []).reduce((s, b) => s + (b.quantity || 0), 0);
         const total = (m.total_count || 0) + borrowed;
         out += `  ${m.emoji || "📦"} ${m.name}: ${total} ${m.unit || "st"} totalt — ${Object.entries(counts).filter(([_, n]) => (n as number) > 0).map(([s, n]) => `${n} ${MAT_STATS[s as MaterialStatus]?.label || s}`).join(", ")}\n`;
       }
@@ -1027,9 +1027,9 @@ function rExport(): string {
     out += "\n";
   }
 
-  if (tasks.length) {
+  if (tasks.list.length) {
     out += "📋 ARBETSPLANERING\n";
-    tasks.forEach(t => {
+    tasks.list.forEach(t => {
       out += `  ${t.status === "klar" ? "✓" : t.status === "pågår" ? "⏳" : "○"} ${t.title} [${PRIOS[t.priority || "medel"]?.label}]${t.responsible ? ` ⭐ ${t.responsible}` : ""}${(t.assigned_to || []).length ? ` (${(t.assigned_to || []).join(", ")})` : ""}${(t.extra_staff || 0) > 0 ? ` +${t.extra_staff} extra` : ""}${t.deadline ? ` [${deadlineLabel(t.deadline)}]` : ""}\n`;
     });
   }
@@ -1066,7 +1066,7 @@ function rInfo(): string {
 function rInfoList(): string {
   let html = `<button class="btn mb" onclick="startNewInfo()" style="width:100%">+ NYTT FÖRSLAG</button>`;
   Object.entries(INFO_CATS).forEach(([catName, catCfg]) => {
-    const articles = infoArticles.filter(a => a.category === catName);
+    const articles = info.articles.filter(a => a.category === catName);
     if (articles.length === 0) {
       html += `<div class="info-cat-section">
         <div class="info-cat-header" style="color:${catCfg.color}">${catCfg.emoji} ${esc(catName.toUpperCase())}</div>
@@ -1086,9 +1086,9 @@ function rInfoList(): string {
 }
 
 function rInfoListItem(a: InfoArticle, catCfg: { emoji: string; color: string }): string {
-  const active = openInfoId === a.id ? " active" : "";
-  const imgCount = (infoImages[a.id] || []).length;
-  const cmtCount = (infoComments[a.id] || []).length;
+  const active = info.openId === a.id ? " active" : "";
+  const imgCount = (info.images[a.id] || []).length;
+  const cmtCount = (info.comments[a.id] || []).length;
   return `<div class="info-list-item${active}" onclick="openInfo(${a.id})" style="border-left-color:${catCfg.color}">
     <div class="info-list-title">
       ${a.is_pinned ? `<span class="info-pin">📌</span>` : `<span class="info-suggest">💡 Förslag</span>`}
@@ -1101,8 +1101,8 @@ function rInfoListItem(a: InfoArticle, catCfg: { emoji: string; color: string })
 }
 
 function rInfoContent(): string {
-  if (infoEditMode === "new" || infoEditMode === "edit") return rInfoEditor();
-  if (openInfoId == null) {
+  if (info.editMode === "new" || info.editMode === "edit") return rInfoEditor();
+  if (info.openId == null) {
     return `<div class="info-empty-state">
       <div style="font-size:48px;margin-bottom:10px">📖</div>
       <div style="font-family:var(--display);font-size:18px;margin-bottom:6px">VÄLJ EN ARTIKEL</div>
@@ -1111,16 +1111,16 @@ function rInfoContent(): string {
       </div>
     </div>`;
   }
-  const a = infoArticles.find(x => x.id === openInfoId);
+  const a = info.articles.find(x => x.id === info.openId);
   if (!a) return `<div class="info-empty-state">Artikeln hittades inte</div>`;
   return rInfoArticle(a);
 }
 
 function rInfoArticle(a: InfoArticle): string {
   const catCfg = INFO_CATS[a.category] || INFO_CATS.Utrustning;
-  const images = infoImages[a.id] || [];
-  const comments = infoComments[a.id] || [];
-  const canEdit = isAdmin || (a.created_by === user && !a.is_pinned);
+  const images = info.images[a.id] || [];
+  const cmts = info.comments[a.id] || [];
+  const canEdit = auth.isAdmin || (a.created_by === auth.user && !a.is_pinned);
 
   return `
 <div class="info-article-head">
@@ -1130,10 +1130,10 @@ function rInfoArticle(a: InfoArticle): string {
     <div class="info-art-meta">av ${esc(a.created_by || "okänd")} · ${fmtD(a.created_at)}${a.updated_at && a.updated_at !== a.created_at ? ` · uppdaterad ${fmtD(a.updated_at)}` : ""}</div>
   </div>
   <div class="info-art-actions">
-    ${isAdmin && !a.is_pinned ? `<button class="btn" onclick="pinInfoArticle(${a.id})">📌 FÄST</button>` : ""}
-    ${isAdmin && a.is_pinned ? `<button class="btn-ghost" onclick="unpinInfoArticle(${a.id})">Avfäst</button>` : ""}
+    ${auth.isAdmin && !a.is_pinned ? `<button class="btn" onclick="pinInfoArticle(${a.id})">📌 FÄST</button>` : ""}
+    ${auth.isAdmin && a.is_pinned ? `<button class="btn-ghost" onclick="unpinInfoArticle(${a.id})">Avfäst</button>` : ""}
     ${canEdit ? `<button class="btn-ghost" onclick="startEditInfo(${a.id})">✎ Redigera</button>` : ""}
-    ${isAdmin ? `<button class="btn-ghost" onclick="doDelInfoArticle(${a.id})" style="color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
+    ${auth.isAdmin ? `<button class="btn-ghost" onclick="doDelInfoArticle(${a.id})" style="color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
   </div>
 </div>
 
@@ -1143,7 +1143,7 @@ ${a.body ? `<div class="info-art-body">${esc(a.body)}</div>` : ""}
   ${images.map(img =>
     `<div class="info-img-wrap">
       <img src="${escAttr(img.image_url)}" loading="lazy" onclick="window.open('${escAttr(img.image_url)}','_blank')">
-      ${isAdmin ? `<button class="info-img-del" onclick="doDelInfoImage(${img.id})">×</button>` : ""}
+      ${auth.isAdmin ? `<button class="info-img-del" onclick="doDelInfoImage(${img.id})">×</button>` : ""}
     </div>`
   ).join("")}
   <label class="info-img-add">
@@ -1153,10 +1153,10 @@ ${a.body ? `<div class="info-art-body">${esc(a.body)}</div>` : ""}
 </div>
 
 <div class="info-comments">
-  <div class="comment-lbl">KOMMENTARER & FRÅGOR (${comments.length})</div>
-  ${comments.map(c =>
+  <div class="comment-lbl">KOMMENTARER & FRÅGOR (${cmts.length})</div>
+  ${cmts.map(c =>
     `<div class="info-comment">
-      <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}${isAdmin ? ` <button class="info-cmt-del" onclick="doDelInfoComment(${c.id})">×</button>` : ""}</div>
+      <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}${auth.isAdmin ? ` <button class="info-cmt-del" onclick="doDelInfoComment(${c.id})">×</button>` : ""}</div>
       ${c.body ? `<div class="comment-text" style="white-space:pre-wrap">${esc(c.body)}</div>` : ""}
       ${c.image_url ? `<img class="info-cmt-img" src="${escAttr(c.image_url)}" loading="lazy" onclick="window.open('${escAttr(c.image_url)}','_blank')">` : ""}
     </div>`
@@ -1168,7 +1168,7 @@ ${a.body ? `<div class="info-art-body">${esc(a.body)}</div>` : ""}
         📷 Bifoga bild
         <input type="file" accept="image/*" style="display:none" onchange="handleInfoCommentImg(${a.id}, this)">
       </label>
-      ${(globalThis as any)._infoCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
+      ${ui.infoCommentImgUrl ? `<span style="font-size:11px;color:var(--blue)">✓ Bild redo</span>` : ""}
       <button class="btn" style="margin-left:auto" onclick="submitInfoComment(${a.id})">Skicka</button>
     </div>
   </div>
@@ -1176,10 +1176,10 @@ ${a.body ? `<div class="info-art-body">${esc(a.body)}</div>` : ""}
 }
 
 function rInfoEditor(): string {
-  const isNew = infoEditMode === "new";
-  const a = !isNew && openInfoId ? infoArticles.find(x => x.id === openInfoId) : null;
+  const isNew = info.editMode === "new";
+  const a = !isNew && info.openId ? info.articles.find(x => x.id === info.openId) : null;
   const presetCat = isNew ? ((window as any)._infoEditPreset || "Utrustning") : (a?.category || "Utrustning");
-  const existingImgs = !isNew && a ? (infoImages[a.id] || []) : [];
+  const existingImgs = !isNew && a ? (info.images[a.id] || []) : [];
 
   return `
 <div class="info-editor">
@@ -1200,14 +1200,14 @@ function rInfoEditor(): string {
     ${existingImgs.map(img =>
       `<div class="info-img-wrap">
         <img src="${escAttr(img.image_url)}" loading="lazy">
-        ${isAdmin ? `<button class="info-img-del" onclick="doDelInfoImage(${img.id})">×</button>` : ""}
+        ${auth.isAdmin ? `<button class="info-img-del" onclick="doDelInfoImage(${img.id})">×</button>` : ""}
       </div>`
     ).join("")}
   </div>` : ""}
 
-  <label class="field-label">LÄGG TILL BILDER (${infoEditImages.length} redo)</label>
+  <label class="field-label">LÄGG TILL BILDER (${info.editImages.length} redo)</label>
   <div class="info-images">
-    ${infoEditImages.map(url =>
+    ${info.editImages.map(url =>
       `<div class="info-img-wrap"><img src="${escAttr(url)}" loading="lazy"></div>`
     ).join("")}
     <label class="info-img-add">

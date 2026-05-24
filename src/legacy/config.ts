@@ -76,67 +76,9 @@ const TASK_STATS: Record<TaskStatus, { label: string; color: string }> = {
 };
 
 // ============================================================
-// STATE — appens aktiva data (ändras under körning)
+// STATE
+// Fas 4.1: All mutabel state lever nu i store.ts (appState + top-
+// level aliases auth/ui/notes/materials/returns/tasks/info/chat).
+// Konstanter ovan består. Dead state borttagen: pinSet, userPins
+// (gamla first-time-PIN-flow är borta).
 // ============================================================
-let user: string | null = null;
-let isAdmin: boolean = false;
-let tab: TabName = "hem";
-let notes: Note[] = [];
-let materials: Material[] = [];                                  // materials_v2 (alla material)
-let materialItems: Record<number, MaterialItem[]> = {};          // { materialId: [items] }
-let materialCounts: Record<number, Partial<Record<MaterialStatus, number>>> = {}; // { materialId: { tillgänglig: 5, ... } }
-let materialHistory: Record<number, MaterialHistory[]> = {};     // laddas vid behov
-let borrowedMaterial: Record<number, BorrowedMaterial[]> = {};   // { materialId: [inhyrt] }
-let returnsList: Return[] = [];                                  // Returer (ej arkiverade) — heter "returnsList" pga "returns" är reserved
-let archivedReturns: Return[] = [];                              // Arkiverade returer (admin)
-let tasks: Task[] = [];                                          // Aktiva uppgifter
-let archivedTasks: Task[] = [];                                  // Arkiverade uppgifter (admin)
-let taskStatusLogs: Record<number, TaskStatusLog[]> = {};
-let taskComments: Record<number, TaskComment[]> = {};
-let materialComments: Record<number, MaterialComment[]> = {};    // item_id null = materialkommentar, annars artikelkommentar
-let materialItemImages: Record<number, MaterialItemImage[]> = {};
-let materialImages: Record<number, MaterialImage[]> = {};
-let actionComments: MaterialComment[] = [];                      // Alla material_comments med status 'åtgärd_krävs'
-let openItemId: number | null = null;
-let infoArticles: InfoArticle[] = [];
-let infoImages: Record<number, InfoImage[]> = {};
-let infoComments: Record<number, InfoComment[]> = {};
-let openInfoId: number | null = null;
-let infoEditMode: null | "new" | "edit" = null;
-let infoEditImages: string[] = [];                               // bild-urls
-let trashedNotes: Note[] = [];
-let chat: ChatMessage[] = [];
-let openId: number | null = null;
-let comments: Record<number, NoteComment[]> = {};
-
-// FILTER & SÖK
-let fCat: string = "alla";
-let fStat: string = "alla";
-let fAssigned: string = "alla";
-let searchQuery: string = "";
-let loading: boolean = false;
-
-// MATERIAL-VY STATE
-let matSubTab: "status" | "returer" | "åtgärder" = "status";
-let openMatId: number | null = null;
-
-// PLAN-VY STATE
-let planSubTab: "aktiva" | "arkiv" = "aktiva";
-let openTaskId: number | null = null;
-let planPersonFilter: string = "alla";                           // "alla" | "ingen" | användarnamn
-let taskChecklists: Record<number, TaskChecklistItem[]> = {};
-
-// PIN-STATE
-let pinBuf: string = "";
-let selUser: string = USERS[0];
-let userPins: Record<string, string> = {};
-let pinSet: Record<string, boolean> = {};
-
-// BILD-STATE
-let imgData: string | null = null;
-let imgFile: File | null = null;
-
-// FÖRSTA INLOGGNING
-let firstPinStep: 1 | 2 = 1;
-let firstPinNew: string = "";
-let firstPinConfirm: string = "";
