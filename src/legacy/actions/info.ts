@@ -1,17 +1,18 @@
-// @ts-nocheck
 // ============================================================
 // actions/info.ts — Info/FAQ-artiklar + bilder + kommentarer
 // Beror på: services/info.ts, services/images.ts (uploadImg),
 //   ui.ts (toast, confirmModal), render.ts (render)
+//
+// Fas 4.10: @ts-nocheck borttaget. DOM-lookups typas explicit.
 // ============================================================
 
-function openInfo(id) {
+function openInfo(id: number): void {
   info.openId = id;
   info.editMode = null;
   render();
 }
 
-function closeInfo() {
+function closeInfo(): void {
   info.openId = null;
   info.editMode = null;
   info.editImages = [];
@@ -20,40 +21,41 @@ function closeInfo() {
   render();
 }
 
-function startNewInfo(presetCat) {
+function startNewInfo(presetCat?: InfoCategory | string): void {
   info.openId = null;
   info.editMode = "new";
   info.editImages = [];
-  window._infoEditPreset = presetCat || "Utrustning";
+  (window as any)._infoEditPreset = presetCat || "Utrustning";
   render();
 }
 
-function startEditInfo(id) {
+function startEditInfo(id: number): void {
   info.openId = id;
   info.editMode = "edit";
   info.editImages = [];
   render();
 }
 
-function cancelInfoEdit() {
+function cancelInfoEdit(): void {
   info.editMode = null;
   info.editImages = [];
   render();
 }
 
-async function saveInfoArticleForm() {
-  const title = document.getElementById("info-title")?.value?.trim();
+async function saveInfoArticleForm(): Promise<void> {
+  const title = (document.getElementById("info-title") as HTMLInputElement | null)?.value?.trim();
   if (!title) { toast("Ange en rubrik", 1); return; }
-  const body = document.getElementById("info-body")?.value?.trim() || null;
-  const category = document.getElementById("info-cat")?.value || "Utrustning";
+  const body = (document.getElementById("info-body") as HTMLTextAreaElement | null)?.value?.trim() || null;
+  const category = ((document.getElementById("info-cat") as HTMLSelectElement | null)?.value || "Utrustning") as InfoCategory;
 
   try {
     if (info.editMode === "new") {
       const newId = await saveInfoArticle({
         title, body, category,
         is_pinned: false,
-        created_by: auth.user
+        created_by: auth.user || ""
       });
+      if (newId == null) throw new Error("Kunde inte skapa förslag");
       // Koppla på uppladdade bilder
       for (const url of info.editImages) {
         await addInfoImage(newId, url);
@@ -75,11 +77,11 @@ async function saveInfoArticleForm() {
     }
     render();
   } catch (e) {
-    toast("Kunde inte spara: " + e.message, 1);
+    toast("Kunde inte spara: " + (e as Error).message, 1);
   }
 }
 
-async function pinInfoArticle(id) {
+async function pinInfoArticle(id: number): Promise<void> {
   if (!auth.isAdmin) return;
   try {
     await saveInfoArticle({ id, is_pinned: true });
@@ -91,7 +93,7 @@ async function pinInfoArticle(id) {
   }
 }
 
-async function unpinInfoArticle(id) {
+async function unpinInfoArticle(id: number): Promise<void> {
   if (!auth.isAdmin) return;
   try {
     await saveInfoArticle({ id, is_pinned: false });
@@ -103,7 +105,7 @@ async function unpinInfoArticle(id) {
   }
 }
 
-async function doDelInfoArticle(id) {
+async function doDelInfoArticle(id: number): Promise<void> {
   if (!auth.isAdmin) return;
   if (!await confirmModal("Ta bort artikeln? Den arkiveras (soft-delete).", { confirmLabel: "Arkivera" })) return;
   try {
@@ -118,19 +120,19 @@ async function doDelInfoArticle(id) {
 }
 
 // Bilder vid skapande/redigering
-async function handleInfoEditImg(inputEl) {
+async function handleInfoEditImg(inputEl: HTMLInputElement): Promise<void> {
   await handleImgInput(inputEl, (url) => { info.editImages.push(url); });
 }
 
 // Bilder direkt på en befintlig artikel (alla användare)
-async function handleInfoAddImg(articleId, inputEl) {
+async function handleInfoAddImg(articleId: number, inputEl: HTMLInputElement): Promise<void> {
   await handleImgInput(inputEl, async (url) => {
     await addInfoImage(articleId, url);
     await loadInfoArticles();
   });
 }
 
-async function doDelInfoImage(imgId) {
+async function doDelInfoImage(imgId: number): Promise<void> {
   if (!auth.isAdmin) return;
   if (!await confirmModal("Ta bort bilden?", { confirmLabel: "Ta bort", danger: true })) return;
   try {
@@ -144,13 +146,13 @@ async function doDelInfoImage(imgId) {
 }
 
 // Kommentarer
-async function handleInfoCommentImg(articleId, inputEl) {
+async function handleInfoCommentImg(_articleId: number, inputEl: HTMLInputElement): Promise<void> {
   await handleImgInput(inputEl, (url) => { ui.infoCommentImgUrl = url; },
     { successLabel: "✓ Bild redo att skickas" });
 }
 
-async function submitInfoComment(articleId) {
-  const inp = document.getElementById("info-comment-input-" + articleId);
+async function submitInfoComment(articleId: number): Promise<void> {
+  const inp = document.getElementById("info-comment-input-" + articleId) as HTMLTextAreaElement | null;
   const body = inp?.value?.trim();
   if (!body && !ui.infoCommentImgUrl) { toast("Skriv en kommentar eller bifoga en bild", 1); return; }
   try {
@@ -164,7 +166,7 @@ async function submitInfoComment(articleId) {
   }
 }
 
-async function doDelInfoComment(commentId) {
+async function doDelInfoComment(commentId: number): Promise<void> {
   if (!auth.isAdmin) return;
   await delCommentFlow(commentId, {
     del: delInfoComment,

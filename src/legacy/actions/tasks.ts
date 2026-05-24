@@ -1,14 +1,16 @@
-// @ts-nocheck
 // ============================================================
 // actions/tasks.ts — Arbetsuppgifter + statusövergångar +
 //   kommentarer + checklista
 // Beror på: services/tasks.ts, ui.ts (toast, openModal, confirmModal,
 //   updMeta, esc, escAttr), render.ts (render)
+//
+// Fas 4.10: @ts-nocheck borttaget. DOM-lookups typas explicit.
+// Fas 4.5/4.6: setTaskStatus använder patchTaskRow + optimistic().
 // ============================================================
 
-async function openTaskDetail(id) {
+async function openTaskDetail(id: number): Promise<void> {
   tasks.openId = id;
-  const loads = [];
+  const loads: Promise<void>[] = [];
   if (!tasks.statusLogs[id]) loads.push(loadTaskStatusLog(id));
   if (!tasks.comments[id]) loads.push(loadTaskComments(id));
   if (!tasks.checklists[id]) loads.push(loadTaskChecklist(id));
@@ -16,13 +18,13 @@ async function openTaskDetail(id) {
   render();
 }
 
-function closeTaskDetail() {
+function closeTaskDetail(): void {
   tasks.openId = null;
   render();
 }
 
-async function submitTaskComment(taskId) {
-  const inp = document.getElementById("task-comment-input-" + taskId);
+async function submitTaskComment(taskId: number): Promise<void> {
+  const inp = document.getElementById("task-comment-input-" + taskId) as HTMLTextAreaElement | null;
   const text = inp?.value?.trim();
   if (!text) return;
   try {
@@ -35,14 +37,14 @@ async function submitTaskComment(taskId) {
   }
 }
 
-async function delTaskCommentAction(taskId, commentId) {
+async function delTaskCommentAction(taskId: number, commentId: number): Promise<void> {
   await delCommentFlow(commentId, {
     del: delTaskComment,
     reload: () => loadTaskComments(taskId)
   });
 }
 
-function editTaskCommentAction(taskId, commentId, currentText) {
+function editTaskCommentAction(taskId: number, commentId: number, currentText: string): void {
   openEditCommentModal({
     currentText,
     modalTitle: "Redigera uppdatering",
@@ -52,7 +54,7 @@ function editTaskCommentAction(taskId, commentId, currentText) {
   });
 }
 
-async function saveTaskCommentEdit(taskId, commentId) {
+async function saveTaskCommentEdit(taskId: number, commentId: number): Promise<void> {
   await editCommentFlow(commentId, {
     textareaId: "edit-task-cmt",
     edit: editTaskComment,
@@ -61,7 +63,7 @@ async function saveTaskCommentEdit(taskId, commentId) {
 }
 
 // ---- CHECKLISTA ----
-async function toggleChecklist(taskId, itemId, done) {
+async function toggleChecklist(taskId: number, itemId: number, done: boolean): Promise<void> {
   try {
     await toggleChecklistItem(itemId, done);
     await loadTaskChecklist(taskId);
@@ -71,8 +73,8 @@ async function toggleChecklist(taskId, itemId, done) {
   }
 }
 
-async function addChecklistAction(taskId) {
-  const inp = document.getElementById("checklist-new-" + taskId);
+async function addChecklistAction(taskId: number): Promise<void> {
+  const inp = document.getElementById("checklist-new-" + taskId) as HTMLInputElement | null;
   const text = inp?.value?.trim();
   if (!text) return;
   try {
@@ -84,7 +86,7 @@ async function addChecklistAction(taskId) {
   }
 }
 
-async function delChecklistAction(taskId, itemId) {
+async function delChecklistAction(taskId: number, itemId: number): Promise<void> {
   try {
     await delChecklistItem(itemId);
     await loadTaskChecklist(taskId);
@@ -140,31 +142,32 @@ function openAddTask() {
   `);
 }
 
-async function addTask() {
-  const title = document.getElementById("task-title")?.value?.trim();
+async function addTask(): Promise<void> {
+  const title = (document.getElementById("task-title") as HTMLInputElement | null)?.value?.trim();
   if (!title) { toast("Ange en titel", 1); return; }
-  const description = document.getElementById("task-desc")?.value?.trim() || null;
-  const priority = document.getElementById("task-prio")?.value || "medel";
-  const start_date = document.getElementById("task-start")?.value || null;
-  const dlRaw = document.getElementById("task-deadline")?.value;
+  const description = (document.getElementById("task-desc") as HTMLTextAreaElement | null)?.value?.trim() || null;
+  const priority = ((document.getElementById("task-prio") as HTMLSelectElement | null)?.value || "medel") as Priority;
+  const start_date = (document.getElementById("task-start") as HTMLInputElement | null)?.value || null;
+  const dlRaw = (document.getElementById("task-deadline") as HTMLInputElement | null)?.value;
   const deadline = dlRaw ? new Date(dlRaw).toISOString() : null;
-  const responsible = document.getElementById("task-resp")?.value || null;
-  const assigned_to = Array.from(document.querySelectorAll(".task-assign-check:checked")).map(c => c.value);
+  const responsible = (document.getElementById("task-resp") as HTMLSelectElement | null)?.value || null;
+  const assigned_to = Array.from(document.querySelectorAll<HTMLInputElement>(".task-assign-check:checked")).map(c => c.value);
   // Lägg till huvudansvarig i assigned_to om ej redan med
   if (responsible && !assigned_to.includes(responsible)) assigned_to.push(responsible);
-  const extra_staff = parseInt(document.getElementById("task-extra")?.value) || 0;
+  const extra_staff = parseInt((document.getElementById("task-extra") as HTMLInputElement | null)?.value || "0") || 0;
 
   try {
     const newId = await saveTask({
       title, description, priority, status: "ny",
       start_date, deadline, responsible, assigned_to, extra_staff,
-      created_by: auth.user
+      created_by: auth.user || ""
     });
+    if (newId == null) throw new Error("Kunde inte skapa uppgift");
     await logTaskStatus({
       task_id: newId,
       old_status: null,
       new_status: "ny",
-      changed_by: auth.user
+      changed_by: auth.user || ""
     });
     await loadTasks();
     updMeta();
@@ -172,11 +175,11 @@ async function addTask() {
     toast("✓ Uppgift skapad");
     render();
   } catch (e) {
-    toast("Kunde inte spara: " + e.message, 1);
+    toast("Kunde inte spara: " + (e as Error).message, 1);
   }
 }
 
-function openEditTask(id) {
+function openEditTask(id: number): void {
   const t = [...tasks.list, ...tasks.archived].find(t => t.id === id);
   if (!t) return;
   const userOpts = USERS.filter(u => u !== "Admin");
@@ -224,18 +227,18 @@ function openEditTask(id) {
   `);
 }
 
-async function saveEditTask(id) {
-  const title = document.getElementById("task-edit-title")?.value?.trim();
+async function saveEditTask(id: number): Promise<void> {
+  const title = (document.getElementById("task-edit-title") as HTMLInputElement | null)?.value?.trim();
   if (!title) { toast("Ange en titel", 1); return; }
-  const description = document.getElementById("task-edit-desc")?.value?.trim() || null;
-  const priority = document.getElementById("task-edit-prio")?.value || "medel";
-  const start_date = document.getElementById("task-edit-start")?.value || null;
-  const dlRaw = document.getElementById("task-edit-deadline")?.value;
+  const description = (document.getElementById("task-edit-desc") as HTMLTextAreaElement | null)?.value?.trim() || null;
+  const priority = ((document.getElementById("task-edit-prio") as HTMLSelectElement | null)?.value || "medel") as Priority;
+  const start_date = (document.getElementById("task-edit-start") as HTMLInputElement | null)?.value || null;
+  const dlRaw = (document.getElementById("task-edit-deadline") as HTMLInputElement | null)?.value;
   const deadline = dlRaw ? new Date(dlRaw).toISOString() : null;
-  const responsible = document.getElementById("task-edit-resp")?.value || null;
-  const assigned_to = Array.from(document.querySelectorAll(".task-assign-check-edit:checked")).map(c => c.value);
+  const responsible = (document.getElementById("task-edit-resp") as HTMLSelectElement | null)?.value || null;
+  const assigned_to = Array.from(document.querySelectorAll<HTMLInputElement>(".task-assign-check-edit:checked")).map(c => c.value);
   if (responsible && !assigned_to.includes(responsible)) assigned_to.push(responsible);
-  const extra_staff = parseInt(document.getElementById("task-edit-extra")?.value) || 0;
+  const extra_staff = parseInt((document.getElementById("task-edit-extra") as HTMLInputElement | null)?.value || "0") || 0;
 
   try {
     await saveTask({
@@ -251,29 +254,48 @@ async function saveEditTask(id) {
   }
 }
 
-async function setTaskStatus(id, status) {
+async function setTaskStatus(id: number, status: TaskStatus): Promise<void> {
   const t = [...tasks.list, ...tasks.archived].find(t => t.id === id);
   if (!t) return;
   if (t.status === status) return;
+  // Fas 4.6: optimistisk update för status-byte i list-vy.
+  // Status-log laddas EFTER server-bekräftelse (kan inte gissas lokalt).
+  // I detail-vy: behåll full render efter loadTaskStatusLog så loggens
+  // nya rad syns.
+  const oldStatus = t.status;
   try {
-    await saveTask({ id, status });
-    await logTaskStatus({
-      task_id: id,
-      old_status: t.status,
-      new_status: status,
-      changed_by: auth.user
+    await optimistic({
+      apply: () => {
+        const prev = tasks.list;
+        tasks.list = tasks.list.map(x => x.id === id ? { ...x, status } : x);
+        if (tasks.openId !== id) patchTaskRow(id);
+        return prev;
+      },
+      rollback: (prev) => {
+        tasks.list = prev;
+        if (tasks.openId !== id) patchTaskRow(id);
+      },
+      api: async () => {
+        await saveTask({ id, status });
+        await logTaskStatus({
+          task_id: id,
+          old_status: oldStatus,
+          new_status: status,
+          changed_by: auth.user || ""
+        });
+        await loadTasks();
+        await loadTaskStatusLog(id);
+      },
+      storeKey: "tasks",
+      errorToast: "Kunde inte uppdatera — ångrat",
     });
-    await loadTasks();
-    await loadTaskStatusLog(id);
-    updMeta();
     toast(status === "klar" ? "✓ Markerad som klar" : "✓ Status uppdaterad");
-    render();
-  } catch (e) {
-    toast("Kunde inte uppdatera", 1);
-  }
+    // Detail-vyn behöver full render efter att loggen laddats.
+    if (tasks.openId === id) render();
+  } catch (e) { /* toast redan visad */ }
 }
 
-async function archiveTask(id, archive) {
+async function archiveTask(id: number, archive: boolean): Promise<void> {
   try {
     await saveTask({ id, archived: archive });
     await loadTasks();
@@ -285,7 +307,7 @@ async function archiveTask(id, archive) {
   }
 }
 
-async function doDelTask(id) {
+async function doDelTask(id: number): Promise<void> {
   if (!await confirmModal("Radera uppgiften permanent? Kan inte ångras.", { confirmLabel: "Radera", danger: true })) return;
   try {
     await delTaskPerm(id);

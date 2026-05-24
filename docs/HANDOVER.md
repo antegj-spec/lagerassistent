@@ -12,7 +12,9 @@ Lagerassistent är en webapp (svenska) för en eventlagerverksamhet, deployad p�
 **Status:**
 - **Fas 1 (säkerhet)** — KLAR och deployad. RLS aktiverat på 20 tabeller, bcrypt-PIN via Edge Functions, JWT-auth, härdad backend.
 - **Fas 2 (Vite + TypeScript)** — KLAR och deployad. Hela kodbasen migrerad till TS, byggs via Vite/Netlify-pipeline.
-- **Fas 3-6** återstår enligt detaljerad plan nedan.
+- **Fas 3 (data-integritet + realtime + UX-fix)** — KLAR och deployad. move_count RPC, CHECK constraints, batch-DELETE, paginering, Realtime, confirmModal.
+- **Fas 4 (arkitektur)** — KLAR. Block A: appState + reactive store. Block B: services + actions per aggregate + generic CommentSystem/ImageUpload. Block C: granular render (patchCard) + optimistic UI + type-cleanup (kvar @ts-nocheck endast i actions/materials.ts). **Skjutna till Fas 5/6:** ES modules-migration (4.9), Service Worker (4.7), foto-först-flöde (4.8).
+- **Fas 5-6** återstår enligt detaljerad plan nedan.
 
 **Arbetsmodell mellan användare och dig (Claude):**
 - Användaren är Admin på Supabase + Netlify, kan köra SQL och deploya Edge Functions
@@ -242,20 +244,35 @@ is_intern_or_admin() → boolean
 3.9 Fix editComment: ta bort updated_at från body ELLER lägga till kolumnen
 ```
 
-### FAS 4 — Arkitektur (~4-5 dagar)
+### FAS 4 — Arkitektur (KLAR utom 4.7/4.8/4.9)
 
 ```
-4.1 Reactive store (nanostores) — aggregate per store
-4.2 Services per aggregate (CRUD + load + subscribe)
-4.3 Generic CommentSystem — ersätter 4 duplikat
-4.4 Generic ImageUpload-komponent
-4.5 Granular render: patchNoteCard(id) istället för full innerHTML
-4.6 Optimistic UI överallt med rollback vid fel
-4.7 Service Worker för offline-stöd
-4.8 Foto-först-flöde (5.6 — tidigareläggs hit)
-4.9 Eliminera klassisk script-modell — flytta till ES modules
-4.10 Ta bort @ts-nocheck från actions.ts, full typing
-4.11 Flytta state från globala vars till delat store-objekt
+4.1  ✅ Reactive store — appState + subscribe/notify i store.ts
+     (Block A merged till main).
+4.11 ✅ Flytta state från globala vars till delat store-objekt
+     (Block A — gjordes ihop med 4.1).
+4.2  ✅ Services per aggregate — services/{notes,materials,returns,
+     tasks,info,pins,images}.ts (Block B).
+4.3  ✅ Generic CommentSystem — components/commentSystem.ts ersätter
+     dupliceringen av kommentar-edit/del-flows (Block B).
+4.4  ✅ Generic ImageUpload — components/imageUpload.ts (Block B).
+4.5  ✅ Granular render — render/patches.ts (patchNoteCard,
+     patchMaterialCard, patchTaskRow, patchHeaderMeta) + render/
+     subscribers.ts. Hot-paths (toggleNote, setStatus,
+     submitComment, setTaskStatus) använder dem (Block C).
+4.6  ✅ Optimistic UI — store.ts:optimistic({apply, rollback, api}).
+     Wrap:ad runt setStatus + setTaskStatus (Block C).
+4.10 ✅ @ts-nocheck borttaget från actions/{notes,returns,info,tasks}.ts
+     (Block C). Endast actions/materials.ts (559 rader) kvar —
+     plockas i egen PR vid tillfälle.
+4.7  ⏭ SKJUTEN till Fas 6 — Service Worker hör hemma där (daglig
+     backup-feature behöver service worker för cron).
+4.8  ⏭ SKJUTEN till Fas 5 — foto-först-flöde hör hemma där (UX för
+     lagermiljö) per ursprungs-roadmappen.
+4.9  ⏭ SKJUTEN till egen senare session — ES modules-migration är
+     högrisk, ingen direkt user-value, och bryter Fas 2-paradigmet.
+     Gör när en framtida feature kräver tree-shaking / dynamic
+     import (t.ex. lazy-load av AI-tab eller foto-modul).
 ```
 
 ### FAS 5 — UX för lagermiljö (~4-5 dagar)
@@ -268,6 +285,7 @@ Användarens prio: **5.6 (foto-först), 5.10 (vibration — KLAR i Fas 1)**.
 5.3 Flytande FAB-knapp
 5.4 Status-cykel istället för modal
 5.5 Voice input för anteckningar
+5.6 Foto-först-flöde ★ (skjuten från 4.8)
 5.7 Mall-anteckningar
 5.8 Återanvänd senaste värden
 5.9 "Stora knappar"-läge i settings
@@ -295,6 +313,7 @@ Användarens prio: **6.2 (auto-task), 6.14 (daglig backup)**.
 6.13 Aktivitetslogg per användare
 6.14 Daglig backup till bucket ★ (pg_cron + Edge Function)
 6.15 Återaktivera send-weekly cron
+6.16 Service Worker — offline-stöd (skjuten från 4.7)
 ```
 
 ---

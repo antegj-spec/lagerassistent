@@ -1,30 +1,32 @@
-// @ts-nocheck
 // ============================================================
 // actions/notes.ts — Anteckningar + papperskorg + kommentarer
 // Beror på: services/notes.ts (loadNotes, saveNote, delNotePerm, ...),
 //   services/images.ts (uploadImg), ui.ts (toast, openModal, confirmModal,
 //   updMeta, classifyCat, classifyPrio, esc, escAttr), render.ts (render)
+//
+// Fas 4.10: @ts-nocheck borttaget. DOM-lookups typas explicit.
+// Fas 4.5/4.6: hot paths använder patchNoteCard + optimistic().
 // ============================================================
 
-async function addNote() {
-  const inp  = document.getElementById("note-input");
+async function addNote(): Promise<void> {
+  const inp  = document.getElementById("note-input") as HTMLTextAreaElement | HTMLInputElement | null;
   const text = inp?.value?.trim();
   if (!text) { toast("Skriv en anteckning först", 1); return; }
 
-  const cat      = document.getElementById("note-cat")?.value || classifyCat(text);
-  const prio     = document.getElementById("note-prio")?.value || classifyPrio(text);
-  const assigned = document.getElementById("note-assign")?.value || null;
-  const matIdRaw = document.getElementById("note-material")?.value;
+  const cat      = ((document.getElementById("note-cat") as HTMLSelectElement | null)?.value || classifyCat(text)) as Category;
+  const prio     = ((document.getElementById("note-prio") as HTMLSelectElement | null)?.value || classifyPrio(text)) as Priority;
+  const assigned = (document.getElementById("note-assign") as HTMLSelectElement | null)?.value || null;
+  const matIdRaw = (document.getElementById("note-material") as HTMLSelectElement | null)?.value;
   const material_id = matIdRaw ? parseInt(matIdRaw) : null;
-  const deadlineRaw = document.getElementById("note-deadline")?.value;
+  const deadlineRaw = (document.getElementById("note-deadline") as HTMLInputElement | null)?.value;
   const deadline = deadlineRaw ? new Date(deadlineRaw).toISOString() : null;
 
-  const btn = document.getElementById("add-btn");
+  const btn = document.getElementById("add-btn") as HTMLButtonElement | null;
   if (btn) btn.disabled = true;
   try {
-    let image_url = null;
+    let image_url: string | null = null;
     if (ui.imgFile) { toast("Laddar upp bild..."); image_url = await uploadImg(ui.imgFile); }
-    await saveNote({ text, category: cat, priority: prio, status: "ny", created_by: auth.user, image_url, assigned_to: assigned, material_id, deadline });
+    await saveNote({ text, category: cat, priority: prio, status: "ny", created_by: auth.user || "", image_url, assigned_to: assigned, material_id, deadline });
     await loadNotes();
     updMeta();
     ui.imgData = null;
@@ -37,48 +39,63 @@ async function addNote() {
   if (btn) btn.disabled = false;
 }
 
-async function toggleNote(id) {
-  notes.openId = notes.openId === id ? null : id;
+async function toggleNote(id: number): Promise<void> {
+  const prevOpen = notes.openId;
+  notes.openId = prevOpen === id ? null : id;
   if (notes.openId && !notes.comments[id]) {
     await loadComments(id);
   }
-  render();
+  // Fas 4.5: patcha bara de två berörda korten (gamla öppnade + nya)
+  // istället för full render(). Vid första-toggle är prevOpen null.
+  if (prevOpen != null && prevOpen !== id) patchNoteCard(prevOpen);
+  patchNoteCard(id);
 }
 
-async function setStatus(id, status) {
+async function setStatus(id: number, status: NoteStatus): Promise<void> {
+  // Fas 4.6: optimistisk update — DOM patchas direkt, API i bakgrunden.
+  // Rollback via optimistic() vid fel.
   try {
-    await saveNote({ id, status });
-    notes.list = notes.list.map(n => n.id === id ? { ...n, status } : n);
-    updMeta();
+    await optimistic({
+      apply: () => {
+        const prev = notes.list;
+        notes.list = notes.list.map(n => n.id === id ? { ...n, status } : n);
+        patchNoteCard(id);   // ögonblicklig visuell feedback
+        return prev;
+      },
+      rollback: (prev) => {
+        notes.list = prev;
+        patchNoteCard(id);
+      },
+      api: () => saveNote({ id, status }),
+      storeKey: "notes",     // patchHeaderMeta-subscriber triggas
+      errorToast: "Kunde inte uppdatera — ångrat",
+    });
     toast(status === "klar" ? "✓ Markerad som klar" : "✓ Uppdaterad");
-    render();
-  } catch (e) {
-    toast("Kunde inte uppdatera", 1);
-  }
+  } catch (e) { /* toast redan visad av optimistic() */ }
 }
 
-async function submitComment(noteId) {
-  const inp  = document.getElementById("comment-input-" + noteId);
+async function submitComment(noteId: number): Promise<void> {
+  const inp  = document.getElementById("comment-input-" + noteId) as HTMLInputElement | null;
   const text = inp?.value?.trim();
   if (!text) return;
   try {
     await addComment(noteId, text);
     await loadComments(noteId);
-    render();
+    patchNoteCard(noteId);
     toast("✓ Kommentar sparad");
   } catch (e) {
     toast("Kunde inte spara kommentar", 1);
   }
 }
 
-async function delNoteCommentAction(noteId, commentId) {
+async function delNoteCommentAction(noteId: number, commentId: number): Promise<void> {
   await delCommentFlow(commentId, {
     del: delComment,
     reload: () => loadComments(noteId)
   });
 }
 
-function editNoteCommentAction(noteId, commentId, currentText) {
+function editNoteCommentAction(noteId: number, commentId: number, currentText: string): void {
   openEditCommentModal({
     currentText,
     textareaId: "edit-note-cmt",
@@ -87,7 +104,7 @@ function editNoteCommentAction(noteId, commentId, currentText) {
   });
 }
 
-async function saveNoteCommentEdit(noteId, commentId) {
+async function saveNoteCommentEdit(noteId: number, commentId: number): Promise<void> {
   await editCommentFlow(commentId, {
     textareaId: "edit-note-cmt",
     edit: editComment,
@@ -95,7 +112,7 @@ async function saveNoteCommentEdit(noteId, commentId) {
   });
 }
 
-async function doDelete(id) {
+async function doDelete(id: number): Promise<void> {
   const note = notes.list.find(n => n.id === id);
   if (!note) return;
   try {
@@ -122,7 +139,7 @@ async function doDelete(id) {
   }
 }
 
-async function restoreNote(id) {
+async function restoreNote(id: number): Promise<void> {
   try {
     await saveNote({ id, deleted_at: null });
     await loadNotes();
@@ -134,7 +151,7 @@ async function restoreNote(id) {
   }
 }
 
-async function permDelete(id) {
+async function permDelete(id: number): Promise<void> {
   if (!await confirmModal("Radera permanent? Detta kan inte ångras.", { confirmLabel: "Radera", danger: true })) return;
   try {
     await delNotePerm(id);
@@ -146,7 +163,7 @@ async function permDelete(id) {
   }
 }
 
-async function emptyTrash() {
+async function emptyTrash(): Promise<void> {
   if (!await confirmModal(`Radera alla ${notes.trashed.length} anteckningar i papperskorgen permanent? Kan inte ångras.`, { confirmLabel: "Töm papperskorg", danger: true })) return;
   try {
     // Fas 3.3: ett batch-DELETE istället för N separata. Snabbare + atomiskt
@@ -161,7 +178,7 @@ async function emptyTrash() {
 }
 
 // REDIGERA ANTECKNING
-function openEdit(id) {
+function openEdit(id: number): void {
   const note = notes.list.find(n => n.id === id);
   if (!note) return;
   const matOpts  = materials.list.map(m =>
@@ -177,7 +194,7 @@ function openEdit(id) {
     <label class="field-label">TEXT</label>
     <textarea id="edit-text" rows="4">${esc(note.text)}</textarea>
     <label class="field-label">KATEGORI</label>
-    <select id="edit-cat">${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(auth.user)).map(([k, v]) =>
+    <select id="edit-cat">${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(auth.user || "")).map(([k, v]) =>
       `<option value="${k}" ${note.category === k ? "selected" : ""}>${v.emoji} ${v.label}</option>`
     ).join("")}</select>
     <label class="field-label">PRIORITET</label>
@@ -197,15 +214,15 @@ function openEdit(id) {
   `);
 }
 
-async function saveEdit(id) {
-  const text = document.getElementById("edit-text")?.value?.trim();
+async function saveEdit(id: number): Promise<void> {
+  const text = (document.getElementById("edit-text") as HTMLTextAreaElement | null)?.value?.trim();
   if (!text) { toast("Text får inte vara tom", 1); return; }
-  const cat      = document.getElementById("edit-cat")?.value;
-  const prio     = document.getElementById("edit-prio")?.value;
-  const assigned = document.getElementById("edit-assign")?.value || null;
-  const matRaw   = document.getElementById("edit-mat")?.value;
+  const cat      = (document.getElementById("edit-cat") as HTMLSelectElement | null)?.value as Category;
+  const prio     = (document.getElementById("edit-prio") as HTMLSelectElement | null)?.value as Priority;
+  const assigned = (document.getElementById("edit-assign") as HTMLSelectElement | null)?.value || null;
+  const matRaw   = (document.getElementById("edit-mat") as HTMLSelectElement | null)?.value;
   const material_id = matRaw ? parseInt(matRaw) : null;
-  const dlRaw    = document.getElementById("edit-deadline")?.value;
+  const dlRaw    = (document.getElementById("edit-deadline") as HTMLInputElement | null)?.value;
   const deadline = dlRaw ? new Date(dlRaw).toISOString() : null;
   try {
     await saveNote({ id, text, category: cat, priority: prio, assigned_to: assigned, material_id, deadline });

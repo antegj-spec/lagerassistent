@@ -188,6 +188,7 @@ export interface Return extends BaseRow, SoftDeletable {
   received_by?: UserName | string | null;
   content?: string | null;
   comment?: string | null;
+  created_by?: UserName | string | null;
 }
 
 // ---------- Tasks ----------
@@ -234,7 +235,7 @@ export interface TaskChecklistItem {
 
 export interface InfoArticle extends BaseRow, SoftDeletable {
   title: string;
-  body: string;
+  body: string | null;
   category: InfoCategory;
   is_pinned: boolean;
   created_by: UserName | string;

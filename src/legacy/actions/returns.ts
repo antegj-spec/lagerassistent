@@ -1,11 +1,13 @@
-// @ts-nocheck
 // ============================================================
 // actions/returns.ts — Returer (uthyrt material som kommit tillbaka)
 // Beror på: services/returns.ts, ui.ts (toast, openModal, confirmModal,
 //   esc, escAttr), render.ts (render)
+//
+// Fas 4.10: @ts-nocheck borttaget. Alla DOM-element typas explicit
+// där .value används (input/textarea/select).
 // ============================================================
 
-function openAddReturn() {
+function openAddReturn(): void {
   const today = new Date().toISOString().split("T")[0];
   const userOpts = USERS.filter(u => u !== "Admin").map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join("");
   openModal(`
@@ -30,28 +32,28 @@ function openAddReturn() {
   `);
 }
 
-async function addReturn() {
-  const name = document.getElementById("ret-name")?.value?.trim();
+async function addReturn(): Promise<void> {
+  const name = (document.getElementById("ret-name") as HTMLInputElement | null)?.value?.trim();
   if (!name) { toast("Ange ett namn", 1); return; }
-  const return_date = document.getElementById("ret-date")?.value;
-  const received_by = document.getElementById("ret-received")?.value;
-  const content = document.getElementById("ret-content")?.value?.trim() || null;
-  const comment = document.getElementById("ret-comment")?.value?.trim() || null;
+  const return_date = (document.getElementById("ret-date") as HTMLInputElement | null)?.value || "";
+  const received_by = (document.getElementById("ret-received") as HTMLSelectElement | null)?.value || "";
+  const content = (document.getElementById("ret-content") as HTMLTextAreaElement | null)?.value?.trim() || null;
+  const comment = (document.getElementById("ret-comment") as HTMLTextAreaElement | null)?.value?.trim() || null;
   try {
     await saveReturn({
       name, return_date, received_by, content, comment,
-      created_by: auth.user
+      created_by: auth.user || ""
     });
     await loadReturns();
     closeModal();
     toast("✓ Retur sparad");
     render();
   } catch (e) {
-    toast("Kunde inte spara: " + e.message, 1);
+    toast("Kunde inte spara: " + (e as Error).message, 1);
   }
 }
 
-function openEditReturn(id) {
+function openEditReturn(id: number): void {
   const r = [...returns.list, ...returns.archived].find(r => r.id === id);
   if (!r) return;
   const userOpts = USERS.filter(u => u !== "Admin").map(u =>
@@ -76,13 +78,13 @@ function openEditReturn(id) {
   `);
 }
 
-async function saveEditReturn(id) {
-  const name = document.getElementById("ret-edit-name")?.value?.trim();
+async function saveEditReturn(id: number): Promise<void> {
+  const name = (document.getElementById("ret-edit-name") as HTMLInputElement | null)?.value?.trim();
   if (!name) { toast("Ange ett namn", 1); return; }
-  const return_date = document.getElementById("ret-edit-date")?.value;
-  const received_by = document.getElementById("ret-edit-received")?.value;
-  const content = document.getElementById("ret-edit-content")?.value?.trim() || null;
-  const comment = document.getElementById("ret-edit-comment")?.value?.trim() || null;
+  const return_date = (document.getElementById("ret-edit-date") as HTMLInputElement | null)?.value || "";
+  const received_by = (document.getElementById("ret-edit-received") as HTMLSelectElement | null)?.value || "";
+  const content = (document.getElementById("ret-edit-content") as HTMLTextAreaElement | null)?.value?.trim() || null;
+  const comment = (document.getElementById("ret-edit-comment") as HTMLTextAreaElement | null)?.value?.trim() || null;
   try {
     await saveReturn({ id, name, return_date, received_by, content, comment });
     await loadReturns();
@@ -94,7 +96,7 @@ async function saveEditReturn(id) {
   }
 }
 
-async function toggleReturnArchive(id, archived) {
+async function toggleReturnArchive(id: number, archived: boolean): Promise<void> {
   try {
     await saveReturn({ id, archived });
     await loadReturns();
@@ -105,7 +107,7 @@ async function toggleReturnArchive(id, archived) {
   }
 }
 
-async function doDelReturn(id) {
+async function doDelReturn(id: number): Promise<void> {
   if (!await confirmModal("Radera returen permanent?", { confirmLabel: "Radera", danger: true })) return;
   try {
     await delReturn(id);

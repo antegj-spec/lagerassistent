@@ -179,7 +179,7 @@ function rCard(n: Note, inTrash: boolean = false): string {
   const noteComments = notes.comments[n.id] || [];
   const commentCount = noteComments.length;
 
-  return `<div class="note-card" onclick="toggleNote(${n.id})" style="border-left:3px solid ${cat?.color}${
+  return `<div class="note-card" data-note-id="${n.id}" onclick="toggleNote(${n.id})" style="border-left:3px solid ${cat?.color}${
     dlStatus === "overdue" ? ";border-top:2px solid #ff6b6b" :
     dlStatus === "urgent"  ? ";border-top:2px solid var(--accent)" : ""
   }">
@@ -427,7 +427,7 @@ function rMatCardSummary(m: Material): string {
     Object.keys(MAT_STATS).forEach(s => counts[s] = 0);
     items.forEach(it => { if (counts[it.status] !== undefined) counts[it.status]++; });
 
-    return `<div class="mat-card" onclick="openMat(${m.id})" style="cursor:pointer">
+    return `<div class="mat-card" data-material-id="${m.id}" onclick="openMat(${m.id})" style="cursor:pointer">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
     <div>
       <div style="font-size:20px">${esc(m.emoji || "📦")}</div>
@@ -450,7 +450,7 @@ function rMatCardSummary(m: Material): string {
     const pct = total > 0 ? Math.round(tillgVal / total * 100) : 0;
     const col = pct > 75 ? "#4CAF7D" : pct > 40 ? "#E8A81A" : "#E8521A";
 
-    return `<div class="mat-card" onclick="openMat(${m.id})" style="cursor:pointer">
+    return `<div class="mat-card" data-material-id="${m.id}" onclick="openMat(${m.id})" style="cursor:pointer">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
     <div>
       <div style="font-size:20px">${esc(m.emoji || "📦")}</div>
@@ -773,7 +773,7 @@ function rTaskListRow(t: Task, isArchived: boolean = false): string {
     ? fmtD((tasks.comments[t.id] || []).at(-1)?.created_at || "")
     : fmtD(t.updated_at || t.created_at);
 
-  return `<div class="task-row" onclick="openTaskDetail(${t.id})" style="border-left:3px solid ${prio.color};${isDone ? "opacity:.55;" : ""}${
+  return `<div class="task-row" data-task-id="${t.id}" onclick="openTaskDetail(${t.id})" style="border-left:3px solid ${prio.color};${isDone ? "opacity:.55;" : ""}${
     dlStatus === "overdue" ? "border-top:2px solid #ff6b6b;" :
     dlStatus === "urgent"  ? "border-top:2px solid var(--accent);" : ""
   }">
