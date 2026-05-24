@@ -209,9 +209,9 @@ async function initApp(): Promise<void> {
 }
 
 function showTab(t: TabName): void {
-  // Blockera AI-fliken för icke-admin
-  if (t === "chat" && !auth.isAdmin) {
-    toast("AI-fliken är endast tillgänglig för Admin", 1);
+  // Blockera admin-only-flikar för icke-admin
+  if ((t === "chat" || t === "dashboard") && !auth.isAdmin) {
+    toast("Den här fliken är endast tillgänglig för Admin", 1);
     return;
   }
   ui.tab = t;
@@ -233,8 +233,13 @@ function showTab(t: TabName): void {
   ui.itemCommentImgUrl = null;
   ui.infoCommentImgUrl = null;
   document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
-  const tabs: TabName[] = ["hem", "anteckningar", "material", "plan", "info", "chat", "export", "trash"];
+  const tabs: TabName[] = ["hem", "anteckningar", "material", "plan", "info", "chat", "export", "trash", "dashboard"];
   document.querySelectorAll("nav button")[tabs.indexOf(t)]?.classList.add("active");
+  // Fas 6.9: Dashboard laddar feed-data on-demand via openDashboard.
+  if (t === "dashboard" && typeof openDashboard === "function") {
+    void openDashboard();
+    return;
+  }
   render();
 }
 
