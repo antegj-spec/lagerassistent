@@ -5,7 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Lagerassistent</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <script>(function(){var t=localStorage.getItem('lager-theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+  <script>(function(){
+    // Fas 5.12: följ OS-tema via prefers-color-scheme när användaren
+    // inte aktivt valt. Manuell toggle (toggleTheme) sparar i localStorage
+    // och tar då över. Reagera på OS-byten i realtid om ingen override.
+    var apply = function(t){ document.documentElement.setAttribute('data-theme', t); };
+    var saved = localStorage.getItem('lager-theme');
+    var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    apply(saved || (mq && mq.matches ? 'dark' : 'light'));
+    if (mq && mq.addEventListener) {
+      mq.addEventListener('change', function(e){
+        if (!localStorage.getItem('lager-theme')) apply(e.matches ? 'dark' : 'light');
+      });
+    }
+  })();</script>
 </head>
 <body>
 <div id="app">

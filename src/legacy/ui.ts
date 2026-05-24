@@ -281,6 +281,10 @@ function clearSearch(): void {
 function bindEvents(): void {
   const ni = document.getElementById("note-input") as HTMLInputElement | HTMLTextAreaElement | null;
   if (ni) {
+    // Fas 5.8: pre-fill formulär-defaults från senaste anteckning (per användare).
+    // Måste köras FÖRE input-listenern registreras så att första input override:ar
+    // korrekt via classifyCat/classifyPrio när användaren börjar skriva.
+    if (typeof applyNoteFormDefaults === "function") applyNoteFormDefaults();
     ni.addEventListener("input", () => {
       const c = document.getElementById("note-cat") as HTMLInputElement | HTMLSelectElement | null;
       const p = document.getElementById("note-prio") as HTMLInputElement | HTMLSelectElement | null;
@@ -288,6 +292,10 @@ function bindEvents(): void {
       if (p) p.value = classifyPrio(ni.value);
     });
   }
+  // Fas 5.7: rendera mall-rad ovanför formuläret (om note-input finns på sidan)
+  if (ni && typeof renderNoteTemplatesUI === "function") renderNoteTemplatesUI();
+  // Fas 5.5: lägg till mic-knapp för voice input (om note-input finns)
+  if (ni && typeof attachVoiceInput === "function") attachVoiceInput();
 }
 
 // ---- BILDHANTERING ----

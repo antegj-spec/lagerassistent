@@ -254,6 +254,18 @@ async function saveEditTask(id: number): Promise<void> {
   }
 }
 
+// Fas 5.4: cykla genom statusar (ny → pågår → klar → ny) vid tap
+// på status-badge i task-raden. Använder befintlig setTaskStatus
+// med optimistic + patchTaskRow.
+async function cycleTaskStatus(id: number): Promise<void> {
+  const task = tasks.list.find(t => t.id === id) || tasks.archived.find(t => t.id === id);
+  if (!task) return;
+  const order: TaskStatus[] = ["ny", "pågår", "klar"];
+  const idx = order.indexOf(task.status);
+  const next = order[(idx + 1) % order.length];
+  await setTaskStatus(id, next);
+}
+
 async function setTaskStatus(id: number, status: TaskStatus): Promise<void> {
   const t = [...tasks.list, ...tasks.archived].find(t => t.id === id);
   if (!t) return;

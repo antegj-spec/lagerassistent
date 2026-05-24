@@ -186,7 +186,7 @@ function rCard(n: Note, inTrash: boolean = false): string {
   <div class="note-tags">
     <span class="tag" style="background:${cat?.color}22;color:${cat?.color}">${cat?.emoji} ${cat?.label?.toUpperCase()}</span>
     <span style="font-size:9px;color:${prio?.color};font-family:var(--display);font-weight:700">● ${prio?.label}</span>
-    <span style="font-size:9px;color:${n.status === "klar" ? "#4CAF7D" : "var(--muted)"}">${STATS[n.status] || esc(n.status)}</span>
+    <button onclick="event.stopPropagation();cycleNoteStatus(${n.id})" title="Tryck för att cykla status" style="font-size:9px;color:${n.status === "klar" ? "#4CAF7D" : "var(--muted)"};font-family:var(--display);font-weight:700;background:transparent;border:1px solid currentColor;border-radius:10px;padding:1px 8px;cursor:pointer">${(STATS[n.status] || esc(n.status)).toUpperCase()}</button>
     ${n.assigned_to ? `<span class="note-assign">@${esc(n.assigned_to)}</span>` : ""}
     ${linkedMat ? `<span class="note-link">📦 ${esc(linkedMat.name)}</span>` : ""}
     ${dlStatus ? `<span class="${deadlineBadgeClass(dlStatus)}">${esc(dlLabel)}</span>` : ""}
@@ -782,7 +782,7 @@ function rTaskListRow(t: Task, isArchived: boolean = false): string {
       <div style="font-family:var(--display);font-weight:700;font-size:15px;${isDone ? "text-decoration:line-through;color:var(--muted);" : ""}">${esc(t.title)}</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;align-items:center">
         <span style="font-size:9px;color:${prio.color};font-family:var(--display);font-weight:700">● ${prio.label}</span>
-        <span style="font-size:9px;color:${stat.color};font-family:var(--display);font-weight:700">${stat.label.toUpperCase()}</span>
+        <button onclick="event.stopPropagation();cycleTaskStatus(${t.id})" title="Tryck för att cykla status" style="font-size:9px;color:${stat.color};font-family:var(--display);font-weight:700;background:transparent;border:1px solid currentColor;border-radius:10px;padding:1px 8px;cursor:pointer">${stat.label.toUpperCase()}</button>
         ${t.responsible ? `<span class="note-assign">⭐ ${esc(t.responsible)}</span>` : ""}
         ${(t.assigned_to || []).filter(u => u !== t.responsible).map(u => `<span class="note-assign">@${esc(u)}</span>`).join("")}
         ${dlStatus ? `<span class="${deadlineBadgeClass(dlStatus)}">${esc(dlLabel)}</span>` : ""}
