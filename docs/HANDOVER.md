@@ -228,21 +228,11 @@ is_intern_or_admin() → boolean
 
 ---
 
-## 5. Återstående plan (Fas 3-6)
+## 5. Återstående plan (Fas 5-6 + Fas 4-rester)
 
-### FAS 3 — Data-integritet och alla B-buggar (~3-4 dagar)
-
-```
-3.1 Postgres-funktion move_count() — atomic flytt + log (B2, B3)
-3.2 CHECK constraints på status-kolumner (B1)
-3.3 Batch-DELETE för emptyTrash via DELETE ?id=in.(...) (B8)
-3.4 Paginering i loadMats med Range-headers (B9)
-3.5 Subscribe-pattern: invalidera cache när annan användare ändrar (B19)
-3.6 Fixa småbuggar: B4, B5, B6, B10, B11, B12, B14, B15, B18
-3.7 Custom modal-system ersätter alla confirm() (B20)
-3.8 Härda branch-tabeller (cars, drive_logs, info_pdfs) om mergeats
-3.9 Fix editComment: ta bort updated_at från body ELLER lägga till kolumnen
-```
+### FAS 3 — KLAR (deployad i prod)
+- 3.1-3.7 + 3.9 levererade i merge `f936edf` + `d0db01c`.
+- 3.8 skippad — branch-tabeller (cars/drive_logs/info_pdfs) mergades aldrig till main.
 
 ### FAS 4 — Arkitektur (KLAR utom 4.7/4.8/4.9)
 
@@ -354,13 +344,33 @@ Användarens prio: **6.2 (auto-task), 6.14 (daglig backup)**.
 6. **`Comment` är en built-in DOM-typ** — vår domän-typ måste döpas om för att inte kollidera
 7. **Many Note/Material/Task-fält saknades på interfaces** initialt — upptäcktes under render.ts-konvertering
 
+### Fas 4 — Arkitektur
+- **Per-block-merge överlägset draft-PR-strategi** i den här kodbasen. Block A mergades först, smoketestades i prod, sen byggde vi Block B+C ovanpå. Hade vi haft ALLT som en draft-PR genom 4-5 sessioner hade rebases mot main blivit krångliga. Block A+B+C var dock OK att slå ihop i samma draft eftersom de byggdes i samma session.
+- **`appState` med top-level domän-aliases** (`const notes = appState.notes;`) är den bästa kompromissen mellan "explicit struktur" och "kort call-site". `notes.list.filter()` istället för `appState.notes.list.filter()`. Aliases är `const` så domain-objekt-referensen kan inte muteras, bara properties.
+- **Granular render via `data-{aggregate}-id`-attribut** + `outerHTML`-replace på en enskild nod är 80/20-lösningen — slipper React/Vue, behåller inline `onclick=""` (overlever DOM-replace), uppfattat svar <50ms. Använd för hot paths (status-byte, toggle, kommentar-submit). Full `render()` för tab-byte och detail-vy där många element ändras.
+- **`optimistic({ apply, rollback, api })` med snapshot-mönster** ger ren rollback-semantik. Race med realtime accepteras (annan användares ändring kan komma mellan apply och api-success — vid nästa load-cycle synkar vi om). Bara wrap:ad runt setStatus + setTaskStatus så länge. Utöka när nya hot paths upptäcks.
+- **`@ts-nocheck` borttogs PER FIL** istället för en stor smäll — det fungerade smidigt. Varje fil tog 5-15 min, störst friktion var DOM-element-typer (HTMLInputElement | null) och `auth.user || ""` för server-shape som kräver non-null string. Endast `actions/materials.ts` (559 rader) kvar — separat PR vid tillfälle.
+- **PowerShell-script för mass-replace** (Block A's state-migration) sparade ~6 timmar manuell Edit-tool-arbete. Worth-it pattern: skriv script som dokumentation, commit:a det till `scripts/`, kör en gång, lämna kvar som mall för framtida liknande migrations.
+
+### Fallgropar från Fas 4
+1. **Edit-tool path-bug på Windows + OneDrive + worktrees:** absolut path UTAN `.claude\worktrees\<id>\`-prefix skrev till PARENT-projektet istället för worktreen. Lurigt eftersom det kompilerade fint där också. Symptom: `git status` clean i worktree men ändringar märkbara i parent. **Lösning:** ALLTID använd full worktree-path. När det händer: `cp $PARENT/src/path src/path` i worktreen, sen `git checkout HEAD -- file` i parent.
+2. **`returns` är inte ett reserved word** i ES2022 — kan användas som top-level identifier. Spelade roll när vi flyttade `returnsList` → `returns.list`.
+3. **DOM-replace-strategi:** när man byter ut en card via `outerHTML`, försvinner element från querySelectorAll-cachen men inline `onclick=""` följer med innehållet. Non-inline event listeners (`addEventListener`) FÖRSVINNER och måste re-attachas. Vi använder bara inline-handlers så det fungerar — men om Fas 5 introducerar non-inline listeners måste bind:as om efter varje patch.
+4. **`store.notify('notes')` vs `loadNotes()`:** services uppdaterar `appState` direkt utan att kalla notify. Action måste explicit kalla `notify(storeKey)` om subscribers ska triggas. Realtime.ts kallar notify automatiskt. Manuella actions har 50/50 chans att glömma. **Workaround:** efter Block C trigggar subscribers bara header-meta — så miss är inte fatal. Steg 6+7 fokuserar på explicit `patchX(id)`-anrop som ENDA pålitliga visuell-feedback-källa.
+5. **Service-funktioner returnerar undefined vid POST utan ID i response.** TS-strict klagar när vi använder `newId` utan null-check. Använd `if (newId == null) throw new Error("...")` direkt efter POST. Vi gjorde detta i `addTask`, `saveInfoArticleForm`.
+6. **InfoArticle.body måste vara `string | null`** — server skickar `body` som `null` om tom, type sa `string`. Bug-prone. Synkar vid varje typing-pass.
+7. **Tre @ts-nocheck-rester innebar dolda runtime-buggar.** Vi hittade `auth.user` (nullable) skickas till logTaskStatus som vill ha non-null. Wrappa med `|| ""` eller normalisera i service.
+
 ### Saker att INTE göra
 - Inte ändra script load-order utan att förstå konsekvenserna
 - Inte köra `DROP TABLE` utan backup
 - Inte hårdkoda `isAdmin = user === "Admin"` — använd JWT-rollen
-- Inte använda `confirm()` för destruktiva åtgärder (UX) — använd "Undo"-toast istället
+- Inte använda `confirm()` för destruktiva åtgärder (UX) — använd `confirmModal()` istället (eller "Undo"-toast)
 - Inte committa `.claude/`, `backups/`, `node_modules/`, `dist/`, eller `public/js/` (alla i .gitignore)
 - Inte återinföra `module: "esnext"` i tsconfig.legacy.json — bryter shared global scope-paradigmet
+- Inte använda full `render()` där `patchX(id)` räcker — börjar märkas vid 100+ noter
+- Inte glömma `notify(storeKey)` i actions som muterar state utan att gå via realtime
+- Inte använda Edit-tool i parent-pathen — alltid `.claude\worktrees\<id>\` prefix på Windows/OneDrive
 
 ---
 
@@ -403,27 +413,50 @@ Efter varje deploy ska minimum testas:
 
 ## 8. Föreslagna första-prompts för nästa session
 
-### För Fas 3 (data-fix)
+### För Fas 5 (UX för lagermiljö) — rekommenderad nästa fas
 
 ```
 Läs docs/HANDOVER.md först.
 
-Vi är klara med Fas 1 (säkerhet) och Fas 2 (Vite + TS). Nu Fas 3 —
-alla B-buggar (B2, B3, B8, B9, B19, m.fl.) + atomic move_count via
-Postgres-funktion + fix på editComment (i project_todo.md).
+Fas 1-4 är klara och deployade. Nu Fas 5 — UX för lagermiljö
+(handskar, stress, mobil-användning på lagergolvet).
 
-Börja med detaljerad plan, börja sen med move_count som första leverabel.
+Användarens högsta prio: 5.6 foto-först-flöde (kameran direkt från
+FAB istället för via formulär). Sedan: 5.2 QR-scanning på artiklar,
+5.4 status-cykel istället för modal, 5.1 swipe-actions.
+
+Skissa plan för 5.6 först — minsta möjliga implementation som
+integrerar med befintlig store + patches-arkitektur. Inga nya
+beroenden om möjligt.
 ```
 
-### För Fas 4 (arkitektur)
+### För Fas 6 (smart logik + backup)
 
 ```
 Läs docs/HANDOVER.md först.
 
-Fas 4 — refaktorera till aggregate-services + reactive store.
-Eliminerar shared `window.*`-state, byter till ES modules, typar actions.ts.
+Fas 1-4 är klara och deployade. Nu Fas 6 — smart logik och
+operations-features.
 
-Börja med detaljerad plan + arkitekturskiss innan vi börjar koda.
+Användarens högsta prio: 6.14 daglig backup (pg_cron + Edge Function
+som dumpar till storage-bucket). Sedan: 6.2 auto-skapa task från
+material-åtgärds-kommentar.
+
+Skissa pg_cron + Edge Function-arkitektur för 6.14 först. Verifiera
+att Supabase-projektet kan installera pg_cron-extensionen.
+```
+
+### För actions/materials.ts type-cleanup (kvar från Fas 4.10)
+
+```
+Läs docs/HANDOVER.md först.
+
+Sista @ts-nocheck-resten i Fas 4: src/legacy/actions/materials.ts
+(559 rader). Plocka bort @ts-nocheck och typ alla DOM-lookups +
+parametrar. Använd notes.ts/tasks.ts/info.ts/returns.ts som mall
+(samma struktur — moveCount/addItem/saveItemStatus/submitMatComment).
+
+Inget annat ändras. Liten PR.
 ```
 
 ### För akut bug-fix
@@ -442,23 +475,36 @@ Git-status:
 Hjälp mig debugga och fixa.
 ```
 
-### För feature från Fas 5/6
+### För ad-hoc feature
 
 ```
 Läs docs/HANDOVER.md först.
 
-Jag vill implementera <feature från Fas 5/6 — t.ex. QR-scanning>.
+Jag vill implementera <feature>.
 
-Detta är fristående feature. Skissa minsta möjliga implementation som
-integrerar med befintlig arkitektur (ingen Fas 4-refactor).
+Detta är fristående. Skissa minsta möjliga implementation som
+integrerar med befintlig arkitektur: appState (store.ts), services
+(services/<aggregate>.ts), actions (actions/<aggregate>.ts), och
+patches (render/patches.ts).
 ```
 
 ---
 
 ## 9. Sista raden
 
-Detta dokument speglar tillståndet efter Fas 2-merge. Sista commit som ingår: `56eadce` (Fas 2.11 actions → TS) + slutstädning.
+Detta dokument speglar tillståndet efter Fas 4 Block A+B+C. Sista commits som ingår:
+- `370e113` (Block A merge till main)
+- `899e95b` (Block B på `claude/fas4-block-b`)
+- `885fc9e` (Block C på `claude/fas4-block-b`)
 
-Om något i koden inte stämmer med vad som står här — koden vinner. Uppdatera detta dokument när arkitekturen förändras i Fas 3+.
+**Status vid pauspunkt:** Block A i main. Block B+C i draft-PR — väntar på user att konvertera draft → ready → merge. Sen är hela trimmade-Fas-4-scopet i main.
+
+**Vad som logiskt SKJUTITS från Fas 4:**
+- 4.7 Service Worker → Fas 6 (logiskt med daglig backup)
+- 4.8 Foto-först → Fas 5 (det stod i original-roadmappen där)
+- 4.9 ES modules-migration → egen senare session (hög risk, ingen direkt user-value)
+- `actions/materials.ts` typing → egen liten PR vid tillfälle
+
+Om något i koden inte stämmer med vad som står här — koden vinner. Uppdatera detta dokument när arkitekturen förändras i Fas 5+.
 
 **Lycka till. Hen är en bra kollega.**
