@@ -98,7 +98,7 @@ function deadlineBadgeClass(status: DeadlineSeverity | null): string {
 }
 
 function updDeadlineWarnings(): void {
-  const urgent = notes.filter(n =>
+  const urgent = notes.list.filter(n =>
     n.status !== "klar" && (n as any).deadline &&
     (deadlineStatus((n as any).deadline) === "urgent" || deadlineStatus((n as any).deadline) === "overdue")
   );
@@ -110,12 +110,12 @@ function updDeadlineWarnings(): void {
 
 // ---- HEADER-META ----
 function updMeta(): void {
-  const a = notes.filter(n => n.status !== "klar").length;
-  const at = tasks.filter(t => t.status !== "klar").length;
+  const a = notes.list.filter(n => n.status !== "klar").length;
+  const at = tasks.list.filter(t => t.status !== "klar").length;
   const meta = document.getElementById("header-meta");
   if (meta) {
     meta.textContent =
-      `${notes.length} anteckningar · ${a} aktiva · ${materials.length} material · ${at} uppgifter`;
+      `${notes.list.length} anteckningar · ${a} aktiva · ${materials.list.length} material · ${at} uppgifter`;
   }
   updDeadlineWarnings();
 }
@@ -210,28 +210,28 @@ async function initApp(): Promise<void> {
 
 function showTab(t: TabName): void {
   // Blockera AI-fliken för icke-admin
-  if (t === "chat" && !isAdmin) {
+  if (t === "chat" && !auth.isAdmin) {
     toast("AI-fliken är endast tillgänglig för Admin", 1);
     return;
   }
-  tab = t;
-  openId = null;
-  openMatId = null;
-  openTaskId = null;
-  imgData = null;
-  imgFile = null;
-  searchQuery = "";
-  // Fas 3.6 (B6): nollställ filter ihop med searchQuery — annars hänger
+  ui.tab = t;
+  notes.openId = null;
+  materials.openId = null;
+  tasks.openId = null;
+  ui.imgData = null;
+  ui.imgFile = null;
+  ui.searchQuery = "";
+  // Fas 3.6 (B6): nollställ filter ihop med ui.searchQuery — annars hänger
   // en "Reparation"-status med från material-fliken in i anteckningar
   // (där status-domänen är en annan).
-  fCat = "alla";
-  fStat = "alla";
-  fAssigned = "alla";
-  planPersonFilter = "alla";
+  ui.fCat = "alla";
+  ui.fStat = "alla";
+  ui.fAssigned = "alla";
+  ui.planPersonFilter = "alla";
   // Fas 3.6 (B14): rensa även kommentar-bild-globals vid tab-byte
-  _matCommentImgUrl = null;
-  _itemCommentImgUrl = null;
-  _infoCommentImgUrl = null;
+  ui.matCommentImgUrl = null;
+  ui.itemCommentImgUrl = null;
+  ui.infoCommentImgUrl = null;
   document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
   const tabs: TabName[] = ["hem", "anteckningar", "material", "plan", "info", "chat", "export", "trash"];
   document.querySelectorAll("nav button")[tabs.indexOf(t)]?.classList.add("active");
@@ -240,24 +240,24 @@ function showTab(t: TabName): void {
 
 // ---- SUB-TABS för Material ----
 async function setMatSubTab(t: "status" | "returer" | "åtgärder"): Promise<void> {
-  matSubTab = t;
-  openMatId = null;
-  openItemId = null;
+  ui.matSubTab = t;
+  materials.openId = null;
+  materials.openItemId = null;
   if (t === "åtgärder") await loadActionComments();
   render();
 }
 
 // ---- SUB-TABS för Plan ----
 function setPlanSubTab(t: "aktiva" | "arkiv"): void {
-  planSubTab = t;
-  openTaskId = null;
-  planPersonFilter = "alla";
+  ui.planSubTab = t;
+  tasks.openId = null;
+  ui.planPersonFilter = "alla";
   render();
 }
 
 // ---- SÖK ----
 function setSearch(v: string): void {
-  searchQuery = v;
+  ui.searchQuery = v;
   const m = document.getElementById("main");
   if (!m) return;
   const searchInp = document.getElementById("search-input") as HTMLInputElement | null;
@@ -273,7 +273,7 @@ function setSearch(v: string): void {
 }
 
 function clearSearch(): void {
-  searchQuery = "";
+  ui.searchQuery = "";
   render();
 }
 
@@ -294,12 +294,12 @@ function bindEvents(): void {
 function handleImg(inp: HTMLInputElement): void {
   const f = inp.files?.[0];
   if (!f) return;
-  imgFile = f;
+  ui.imgFile = f;
   const fr = new FileReader();
   fr.onload = e => {
-    imgData = e.target!.result as string;
+    ui.imgData = e.target!.result as string;
     const area = document.querySelector(".img-upload-area");
-    if (area) area.innerHTML = `<img class="img-preview" src="${imgData}">`;
+    if (area) area.innerHTML = `<img class="img-preview" src="${ui.imgData}">`;
   };
   fr.readAsDataURL(f);
 }
@@ -341,10 +341,10 @@ function closeGearMenu(): void {
 }
 
 // ---- FILTER ----
-function setFC(c: string): void { fCat = c; render(); }
-function setFS(s: string): void { fStat = s; render(); }
-function setFA(a: string): void { fAssigned = a; render(); }
-function setPlanPersonFilter(v: string): void { planPersonFilter = v; render(); }
+function setFC(c: string): void { ui.fCat = c; render(); }
+function setFS(s: string): void { ui.fStat = s; render(); }
+function setFA(a: string): void { ui.fAssigned = a; render(); }
+function setPlanPersonFilter(v: string): void { ui.planPersonFilter = v; render(); }
 
 // ---- VECKOSAMANFATTNING VIA MAIL ----
 async function sendWeeklyNow(): Promise<void> {
@@ -373,12 +373,12 @@ async function sendWeeklyNow(): Promise<void> {
 // Hjälpfunktion — bygger material-rad för AI-prompt baserat på faktiskt schema (B16/B17)
 function materialSummaryLine(m: Material): string {
   if (m.is_article_based) {
-    const items = materialItems[m.id] || [];
+    const items = materials.items[m.id] || [];
     const tillg = items.filter(i => i.status === "tillgänglig").length;
     const issues = items.filter(i => i.status === "reparation" || i.status === "tvätt").length;
     return `- ${m.name}: ${tillg}/${items.length} tillgängliga${issues ? `, ${issues} i åtgärd` : ""}`;
   }
-  const c = materialCounts[m.id] || {};
+  const c = materials.counts[m.id] || {};
   const total = (m as any).total_count || 0;
   return `- ${m.name}: ${c.tillgänglig || 0}/${total} ${(m as any).unit || "st"} tillgängliga` +
          `${c.uthyrd ? `, ${c.uthyrd} uthyrt` : ""}` +
@@ -390,13 +390,13 @@ async function aiSum(): Promise<void> {
   if (btn) btn.disabled = true;
   const box = document.getElementById("ai-box");
   if (box) box.innerHTML = `<div class="card"><div class="spinner"></div> Genererar...</div>`;
-  const active = notes.filter(n => n.status !== "klar");
+  const active = notes.list.filter(n => n.status !== "klar");
   const prompt = `Du är assistent för en lagerchef på ett eventlager. Skapa en strukturerad sammanfattning på svenska per kategori av dessa anteckningar och materialstatus, redo att klistra in i OneNote. Avsluta med 3 konkreta åtgärdsförslag.\n\nAnteckningar:\n${
     active.map(n =>
       `- [${CATS[n.category]?.label}][${PRIOS[n.priority!]?.label}] ${n.text}${(n as any).assigned_to ? ` → @${(n as any).assigned_to}` : ""} (${n.created_by})${(n as any).deadline ? ` [Deadline: ${deadlineLabel((n as any).deadline)}]` : ""}`
     ).join("\n")
   }\n\nMaterial:\n${
-    materials.map(materialSummaryLine).join("\n")
+    materials.list.map(materialSummaryLine).join("\n")
   }`;
   try {
     const r = await fetch("/.netlify/functions/claude", {
@@ -432,22 +432,22 @@ function setQ(q: string): void {
 async function sendChat(): Promise<void> {
   const inp = document.getElementById("chat-input") as HTMLInputElement | HTMLTextAreaElement | null;
   const text = inp?.value?.trim();
-  if (!text || loading) return;
+  if (!text || ui.loading) return;
   if (inp) inp.value = "";
-  chat.push({ role: "user", content: text });
-  loading = true;
+  chat.list.push({ role: "user", content: text });
+  ui.loading = true;
   render();
   setTimeout(() => {
     const b = document.getElementById("chat-box");
     if (b) b.scrollTop = b.scrollHeight;
   }, 50);
-  const active = notes.filter(n => n.status !== "klar");
+  const active = notes.list.filter(n => n.status !== "klar");
   const sys = `Du är AI-assistent för en lagerchef på ett eventlager i Sverige. Lagret hyr ut golvplattor, kravallstaket och kabelskydd. Teamet är ${USERS.length - 1} personer (${USERS.filter(u => u !== "Admin").join(", ")}).\n\nAktiva anteckningar:\n${
     active.map(n =>
       `- [${CATS[n.category]?.label}][${PRIOS[n.priority!]?.label}] ${n.text}${(n as any).assigned_to ? ` → @${(n as any).assigned_to}` : ""} (av ${n.created_by})${(n as any).deadline ? ` [Deadline: ${deadlineLabel((n as any).deadline)}]` : ""}`
     ).join("\n") || "Inga"
   }\n\nMaterial:\n${
-    materials.map(materialSummaryLine).join("\n") || "Inget register"
+    materials.list.map(materialSummaryLine).join("\n") || "Inget register"
   }\n\nSvara på svenska. Var konkret och praktisk.`;
   try {
     const r = await fetch("/.netlify/functions/claude", {
@@ -460,15 +460,15 @@ async function sendChat(): Promise<void> {
         model: "claude-sonnet-4-5",
         max_tokens: 1000,
         system: sys,
-        messages: chat.map(m => ({ role: m.role, content: m.content }))
+        messages: chat.list.map(m => ({ role: m.role, content: m.content }))
       })
     });
     const d = await r.json();
-    chat.push({ role: "assistant", content: d.content?.[0]?.text || "Kunde inte svara." });
+    chat.list.push({ role: "assistant", content: d.content?.[0]?.text || "Kunde inte svara." });
   } catch (e) {
-    chat.push({ role: "assistant", content: "Något gick fel. Kontrollera anslutning." });
+    chat.list.push({ role: "assistant", content: "Något gick fel. Kontrollera anslutning." });
   }
-  loading = false;
+  ui.loading = false;
   render();
   setTimeout(() => {
     const b = document.getElementById("chat-box");

@@ -4,7 +4,7 @@
 //
 // Rå WebSocket mot Supabase Realtime Phoenix-protokoll. När en annan
 // användare ändrar något i en prenumererad tabell laddas motsvarande
-// store om (debounced) och nuvarande tab re-rendereras. Inga nya
+// store om (debounced) och nuvarande ui.tab re-rendereras. Inga nya
 // beroenden — passar classic-script-paradigmet.
 //
 // Protokoll-referens:
@@ -15,19 +15,24 @@
 // ============================================================
 
 // ---- KONFIG ----
-// Per tabell: vilken load*()-funktion som ska köras vid ändring.
-// Flera tabeller kan mappa mot samma load (loadMats laddar
-// materials_v2 + material_counts + material_items + borrowed_material
-// i ett svep — debouncen säkerställer att vi inte gör fyra omladdningar
-// i rad vid en burst).
-const RT_TABLE_RELOADERS: Record<string, () => Promise<void>> = {
-  notes:             async () => { await loadNotes(); },
-  materials_v2:      async () => { await loadMats(); },
-  material_counts:   async () => { await loadMats(); },
-  material_items:    async () => { await loadMats(); },
-  borrowed_material: async () => { await loadMats(); },
-  tasks:             async () => { await loadTasks(); },
-  returns:           async () => { await loadReturns(); }
+// Per tabell: vilken load*()-funktion som ska köras vid ändring,
+// och vilken store-key som ska notifieras efteråt (Fas 4.1 Steg 2).
+// Flera tabeller mappar mot samma store-key (loadMats laddar fyra
+// tabeller i ett svep — debouncen säkerställer att vi inte gör
+// fyra omladdningar i rad vid en burst).
+interface RtTableEntry {
+  reload: () => Promise<void>;
+  storeKey: StoreKey;
+}
+
+const RT_TABLE_RELOADERS: Record<string, RtTableEntry> = {
+  notes:             { reload: async () => { await loadNotes(); },   storeKey: "notes" },
+  materials_v2:      { reload: async () => { await loadMats(); },    storeKey: "materials" },
+  material_counts:   { reload: async () => { await loadMats(); },    storeKey: "materials" },
+  material_items:    { reload: async () => { await loadMats(); },    storeKey: "materials" },
+  borrowed_material: { reload: async () => { await loadMats(); },    storeKey: "materials" },
+  tasks:             { reload: async () => { await loadTasks(); },   storeKey: "tasks" },
+  returns:           { reload: async () => { await loadReturns(); }, storeKey: "returns" }
 };
 
 // ---- STATE (modul-globalt) ----
@@ -41,13 +46,17 @@ const rtDebounce: Record<string, number | null> = {};
 
 // ---- DEBOUNCED RELOAD ----
 function scheduleReload(table: string): void {
-  const reload = RT_TABLE_RELOADERS[table];
-  if (!reload) return;
+  const entry = RT_TABLE_RELOADERS[table];
+  if (!entry) return;
   if (rtDebounce[table] != null) clearTimeout(rtDebounce[table]!);
   rtDebounce[table] = window.setTimeout(async () => {
     rtDebounce[table] = null;
     try {
-      await reload();
+      await entry.reload();
+      // Fas 4.1 Steg 2: notifiera store-prenumeranter. render() står
+      // kvar som "global subscriber" tills Block C ersätter manuella
+      // render()-anrop med store.subscribe().
+      notify(entry.storeKey);
       if (typeof render === "function") render();
     } catch (e) {
       console.warn("Realtime reload failed for " + table + ":", e);

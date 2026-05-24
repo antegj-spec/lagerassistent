@@ -9,34 +9,34 @@ function initUsers(): void {
   if (dl) dl.innerHTML = USERS.map(u => `<option value="${escAttr(u)}">`).join("");
   const input = document.getElementById("username-input") as HTMLInputElement | null;
   if (input) { input.value = ""; input.focus(); }
-  pinBuf = "";
+  ui.pinBuf = "";
   updDots();
 }
 
 function pickUser(u: string): void {
-  selUser = u;
-  pinBuf = "";
+  ui.selUser = u;
+  ui.pinBuf = "";
   updDots();
 }
 
 // ---- PIN-KNAPPAR ----
 function pinPress(d: string): void {
-  if (pinBuf.length >= 4) return;
-  pinBuf += d;
+  if (ui.pinBuf.length >= 4) return;
+  ui.pinBuf += d;
   updDots();
   // Haptic feedback för handskar/stress (Fas 1, prio 5.10)
   if (navigator.vibrate) navigator.vibrate(20);
-  if (pinBuf.length === 4) setTimeout(checkPin, 120);
+  if (ui.pinBuf.length === 4) setTimeout(checkPin, 120);
 }
 
 function pinDel(): void {
-  pinBuf = pinBuf.slice(0, -1);
+  ui.pinBuf = ui.pinBuf.slice(0, -1);
   updDots();
 }
 
 function updDots(): void {
   document.querySelectorAll("#pin-dots .pin-dot")
-    .forEach((d, i) => d.classList.toggle("filled", i < pinBuf.length));
+    .forEach((d, i) => d.classList.toggle("filled", i < ui.pinBuf.length));
 }
 
 // ---- KONTROLLERA PIN (Fas 1: server-side verifiering via verify-pin Edge Function) ----
@@ -49,7 +49,7 @@ function showPinError(msg: string): void {
     void dotsEl.offsetHeight;
     dotsEl.style.animation = "pinShake .35s ease";
   }
-  pinBuf = "";
+  ui.pinBuf = "";
   updDots();
   setTimeout(() => {
     if (errEl) errEl.textContent = "";
@@ -75,7 +75,7 @@ async function checkPin(): Promise<void> {
     showPinError("Okänt användarnamn — försök igen");
     return;
   }
-  selUser = matchedUser;
+  ui.selUser = matchedUser;
 
   // POSTa till verify-pin Edge Function — bcrypt-jämför server-side
   try {
@@ -85,7 +85,7 @@ async function checkPin(): Promise<void> {
         "Content-Type": "application/json",
         "apikey": SB_KEY,
       },
-      body: JSON.stringify({ user_name: matchedUser, pin: pinBuf }),
+      body: JSON.stringify({ user_name: matchedUser, pin: ui.pinBuf }),
     });
     const data: VerifyPinResponse = await r.json().catch(() => ({}));
 
@@ -96,10 +96,8 @@ async function checkPin(): Promise<void> {
       sessionStorage.setItem("lager-user", data.user_name || "");
       sessionStorage.setItem("lager-role", data.role || "user");
       sessionStorage.setItem("lager-expires", String(data.expires_at || 0));
-      user = data.user_name || null;
-      isAdmin = data.role === "admin";
-      // Ladda pinSet i bakgrunden så "Byt PIN"-flöden ser första-gången-läget
-      loadPins().catch(() => {});
+      auth.user = data.user_name || null;
+      auth.isAdmin = data.role === "admin";
       completeLogin();
     } else if (r.status === 429) {
       const sec = data.retry_after_seconds || 300;
@@ -120,10 +118,10 @@ function showFirstPinScreen(): void {
   const s = document.getElementById("first-pin-screen");
   if (s) s.style.display = "flex";
   const nameEl = document.getElementById("first-pin-name");
-  if (nameEl) nameEl.textContent = "Hej, " + user + "!";
-  firstPinStep = 1;
-  firstPinNew = "";
-  firstPinConfirm = "";
+  if (nameEl) nameEl.textContent = "Hej, " + auth.user + "!";
+  ui.firstPinStep = 1;
+  ui.firstPinNew = "";
+  ui.firstPinConfirm = "";
   updFirstPinDots();
   const lblEl = document.getElementById("first-pin-step-lbl");
   if (lblEl) lblEl.textContent = "NY PIN";
@@ -132,46 +130,46 @@ function showFirstPinScreen(): void {
 }
 
 function firstPinPress(d: string): void {
-  if (firstPinStep === 1) {
-    if (firstPinNew.length >= 4) return;
-    firstPinNew += d;
+  if (ui.firstPinStep === 1) {
+    if (ui.firstPinNew.length >= 4) return;
+    ui.firstPinNew += d;
     updFirstPinDots();
-    if (firstPinNew.length === 4) {
+    if (ui.firstPinNew.length === 4) {
       setTimeout(() => {
-        firstPinStep = 2;
-        firstPinConfirm = "";
+        ui.firstPinStep = 2;
+        ui.firstPinConfirm = "";
         updFirstPinDots();
         const lblEl = document.getElementById("first-pin-step-lbl");
         if (lblEl) lblEl.textContent = "BEKRÄFTA PIN";
       }, 200);
     }
   } else {
-    if (firstPinConfirm.length >= 4) return;
-    firstPinConfirm += d;
+    if (ui.firstPinConfirm.length >= 4) return;
+    ui.firstPinConfirm += d;
     updFirstPinDots();
-    if (firstPinConfirm.length === 4) setTimeout(confirmFirstPin, 120);
+    if (ui.firstPinConfirm.length === 4) setTimeout(confirmFirstPin, 120);
   }
 }
 
 function firstPinDel(): void {
-  if (firstPinStep === 1) firstPinNew = firstPinNew.slice(0, -1);
-  else firstPinConfirm = firstPinConfirm.slice(0, -1);
+  if (ui.firstPinStep === 1) ui.firstPinNew = ui.firstPinNew.slice(0, -1);
+  else ui.firstPinConfirm = ui.firstPinConfirm.slice(0, -1);
   updFirstPinDots();
 }
 
 function updFirstPinDots(): void {
-  const len = firstPinStep === 1 ? firstPinNew.length : firstPinConfirm.length;
+  const len = ui.firstPinStep === 1 ? ui.firstPinNew.length : ui.firstPinConfirm.length;
   document.querySelectorAll("#first-pin-dots .pin-dot")
     .forEach((d, i) => d.classList.toggle("filled", i < len));
 }
 
 async function confirmFirstPin(): Promise<void> {
-  if (firstPinNew !== firstPinConfirm) {
+  if (ui.firstPinNew !== ui.firstPinConfirm) {
     const errEl = document.getElementById("first-pin-error");
     if (errEl) errEl.textContent = "PIN-koderna matchar inte — försök igen";
-    firstPinStep = 1;
-    firstPinNew = "";
-    firstPinConfirm = "";
+    ui.firstPinStep = 1;
+    ui.firstPinNew = "";
+    ui.firstPinConfirm = "";
     updFirstPinDots();
     const lblEl = document.getElementById("first-pin-step-lbl");
     if (lblEl) lblEl.textContent = "NY PIN";
@@ -182,11 +180,11 @@ async function confirmFirstPin(): Promise<void> {
     return;
   }
   try {
-    await savePin(user || "", firstPinNew, true);
+    await savePin(auth.user || "", ui.firstPinNew, true);
     const scr = document.getElementById("first-pin-screen");
     if (scr) scr.style.display = "none";
     completeLogin();
-    toast("✓ PIN satt! Välkommen, " + user);
+    toast("✓ PIN satt! Välkommen, " + auth.user);
   } catch (e) {
     const errEl = document.getElementById("first-pin-error");
     if (errEl) errEl.textContent = "Kunde inte spara PIN — försöker ändå";
@@ -200,8 +198,8 @@ async function confirmFirstPin(): Promise<void> {
 
 // ---- SLUTFÖR INLOGGNING ----
 function completeLogin(): void {
-  // OBS: isAdmin sätts redan av checkPin/restoreSession från JWT-role,
-  // INTE från user === "Admin". Behåll värdet.
+  // OBS: auth.isAdmin sätts redan av checkPin/restoreSession från JWT-role,
+  // INTE från auth.user === "Admin". Behåll värdet.
   const pinScr = document.getElementById("pin-screen");
   if (pinScr) pinScr.style.display = "none";
   const fpScr = document.getElementById("first-pin-screen");
@@ -213,27 +211,27 @@ function completeLogin(): void {
   const main = document.getElementById("main");
   if (main) main.style.display = "block";
   const userDisp = document.getElementById("user-display");
-  if (userDisp) userDisp.textContent = user;
+  if (userDisp) userDisp.textContent = auth.user;
 
   // Admin-only nav-knappar
   const exportBtn = document.getElementById("export-btn") as HTMLElement | null;
   const trashBtn = document.getElementById("trash-btn") as HTMLElement | null;
   const aiBtn = document.getElementById("ai-btn") as HTMLElement | null;
-  if (exportBtn) exportBtn.style.display = isAdmin ? "flex" : "none";
-  if (trashBtn)  trashBtn.style.display  = isAdmin ? "flex" : "none";
-  if (aiBtn)     aiBtn.style.display     = isAdmin ? "flex" : "none";
+  if (exportBtn) exportBtn.style.display = auth.isAdmin ? "flex" : "none";
+  if (trashBtn)  trashBtn.style.display  = auth.isAdmin ? "flex" : "none";
+  if (aiBtn)     aiBtn.style.display     = auth.isAdmin ? "flex" : "none";
 
-  // SÄKERHET: om current tab är admin-only och user inte är admin → fallback hem.
+  // SÄKERHET: om current ui.tab är admin-only och auth.user inte är admin → fallback hem.
   // Förhindrar att t.ex. Andreas hamnar på AI-fliken om Admin var där sist.
   const ADMIN_ONLY_TABS: TabName[] = ["chat", "export", "trash"];
-  if (!isAdmin && ADMIN_ONLY_TABS.includes(tab)) {
-    tab = "hem";
+  if (!auth.isAdmin && ADMIN_ONLY_TABS.includes(ui.tab)) {
+    ui.tab = "hem";
   }
 
   initApp();
 
   // Fas 3.5: starta realtime-subscriptions — när annan användare ändrar
-  // notes/material/tasks/returns laddas berörd store om och tab re-rendereras.
+  // notes/material/tasks/returns laddas berörd store om och ui.tab re-rendereras.
   if (typeof initRealtime === "function") initRealtime();
 }
 
@@ -247,61 +245,59 @@ function logout(): void {
     .forEach(k => sessionStorage.removeItem(k));
 
   // 2) Rensa identity + roll
-  user = null;
-  isAdmin = false;
+  auth.user = null;
+  auth.isAdmin = false;
 
   // 3) Rensa ALL applikations-state så ingen data läcker mellan användare
-  notes = [];
-  materials = [];
-  materialItems = {};
-  materialCounts = {};
-  materialHistory = {};
-  borrowedMaterial = {};
-  returnsList = [];
-  archivedReturns = [];
-  tasks = [];
-  archivedTasks = [];
-  taskStatusLogs = {};
-  taskComments = {};
-  taskChecklists = {};
-  materialComments = {};
-  materialItemImages = {};
-  materialImages = {};
-  actionComments = [];
-  infoArticles = [];
-  infoImages = {};
-  infoComments = {};
-  trashedNotes = [];
-  chat = [];
-  comments = {};
-  userPins = {};
-  pinSet = {};
+  notes.list = [];
+  materials.list = [];
+  materials.items = {};
+  materials.counts = {};
+  materials.history = {};
+  materials.borrowed = {};
+  returns.list = [];
+  returns.archived = [];
+  tasks.list = [];
+  tasks.archived = [];
+  tasks.statusLogs = {};
+  tasks.comments = {};
+  tasks.checklists = {};
+  materials.comments = {};
+  materials.itemImages = {};
+  materials.images = {};
+  materials.actionComments = [];
+  info.articles = [];
+  info.images = {};
+  info.comments = {};
+  notes.trashed = [];
+  chat.list = [];
+  notes.comments = {};
 
   // 4) Återställ NAVIGATIONS-state (kritiskt — annars hamnar nästa
   //    inloggning på admin-flik om Admin var där sist).
-  tab = "hem";
-  openId = null;
-  openMatId = null;
-  openItemId = null;
-  openTaskId = null;
-  openInfoId = null;
-  matSubTab = "status";
-  planSubTab = "aktiva";
-  planPersonFilter = "alla";
-  infoEditMode = null;
-  infoEditImages = [];
-  searchQuery = "";
-  fCat = "alla";
-  fStat = "alla";
-  fAssigned = "alla";
-  imgData = null;
-  imgFile = null;
+  ui.tab = "hem";
+  notes.openId = null;
+  materials.openId = null;
+  materials.openItemId = null;
+  tasks.openId = null;
+  info.openId = null;
+  ui.matSubTab = "status";
+  ui.planSubTab = "aktiva";
+  ui.planPersonFilter = "alla";
+  info.editMode = null;
+  info.editImages = [];
+  ui.searchQuery = "";
+  ui.fCat = "alla";
+  ui.fStat = "alla";
+  ui.fAssigned = "alla";
+  ui.imgData = null;
+  ui.imgFile = null;
 
   // 5) Pin-state
-  pinBuf = "";
-  firstPinStep = 1;
-  firstPinNew = "";
-  firstPinConfirm = "";
+  ui.pinBuf = "";
+  ui.firstPinStep = 1;
+  ui.firstPinNew = "";
+  ui.firstPinConfirm = "";
   updDots();
 
   // 6) DOM — göm appen, visa PIN-skärm
@@ -321,7 +317,7 @@ function logout(): void {
 
   const pinScr = document.getElementById("pin-screen") as HTMLElement | null;
   if (pinScr) pinScr.style.display = "flex";
-  selUser = USERS[0];
+  ui.selUser = USERS[0];
   initUsers();
   const input = document.getElementById("username-input") as HTMLInputElement | null;
   if (input) { input.value = ""; input.focus(); }
@@ -358,7 +354,6 @@ async function doChangePin(): Promise<void> {
   if (np === cur)                   { msg.textContent = "Ny PIN måste skilja från nuvarande"; return; }
   try {
     await changePinViaEdge(cur, np);
-    if (user) pinSet[user] = true;
     closeModal();
     toast("✓ PIN ändrad");
   } catch (e) {
@@ -415,13 +410,11 @@ async function restoreSession(): Promise<void> {
       return;
     }
 
-    user = claimUser;
-    isAdmin = claimRole === "admin";
+    auth.user = claimUser;
+    auth.isAdmin = claimRole === "admin";
     // Uppdatera sessionStorage så den matchar JWT-claims
     sessionStorage.setItem("lager-user", claimUser);
     sessionStorage.setItem("lager-role", claimRole || "user");
-
-    loadPins().catch(() => {});
     completeLogin();
   } catch (e) {
     // Nätverksfel vid restore — visa PIN-skärm tyst, användaren får logga in på nytt

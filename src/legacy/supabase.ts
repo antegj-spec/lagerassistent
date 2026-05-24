@@ -96,10 +96,10 @@ async function loadNotes(): Promise<void> {
     // RLS filtrerar intern-noter server-side (löser B7).
     // Klienten filtrerar fortfarande deleted_at för aktiv-vy vs papperskorg.
     const all = await sb<Note[]>("/rest/v1/notes?order=created_at.desc") || [];
-    notes = all.filter(n => !n.deleted_at);
-    if (isAdmin) {
+    notes.list = all.filter(n => !n.deleted_at);
+    if (auth.isAdmin) {
       const cutoff = new Date(Date.now() - TRASH_DAYS * 86400000).toISOString();
-      trashedNotes = all.filter(n => n.deleted_at && n.deleted_at > cutoff);
+      notes.trashed = all.filter(n => n.deleted_at && n.deleted_at > cutoff);
     }
   } catch (e) {
     toast("Kunde inte ladda anteckningar", 1);
@@ -144,30 +144,30 @@ async function loadMats(): Promise<void> {
   try {
     // Fas 3.4: paginerad fetch — undviker tyst trunkering vid >1000 rader.
     const all = await sbPaged<Material>("/rest/v1/materials_v2?order=name.asc");
-    materials = all.filter(m => !m.deleted_at);
+    materials.list = all.filter(m => !m.deleted_at);
 
     // Ladda counts för alla lagerräknande material
     const counts = await sbPaged<MaterialCount>("/rest/v1/material_counts");
-    materialCounts = {};
+    materials.counts = {};
     counts.forEach(c => {
-      if (!materialCounts[c.material_id]) materialCounts[c.material_id] = {};
-      materialCounts[c.material_id][c.status] = c.count;
+      if (!materials.counts[c.material_id]) materials.counts[c.material_id] = {};
+      materials.counts[c.material_id][c.status] = c.count;
     });
 
     // Ladda items för alla artikelbaserade material
     const items = await sbPaged<MaterialItem>("/rest/v1/material_items?order=article_id.asc");
-    materialItems = {};
+    materials.items = {};
     items.forEach(it => {
-      if (!materialItems[it.material_id]) materialItems[it.material_id] = [];
-      materialItems[it.material_id].push(it);
+      if (!materials.items[it.material_id]) materials.items[it.material_id] = [];
+      materials.items[it.material_id].push(it);
     });
 
     // Ladda inhyrt material (icke-raderat)
     const borrowed = await sb<BorrowedMaterial[]>("/rest/v1/borrowed_material?order=start_date.desc") || [];
-    borrowedMaterial = {};
+    materials.borrowed = {};
     borrowed.filter(b => !b.deleted_at).forEach(b => {
-      if (!borrowedMaterial[b.material_id]) borrowedMaterial[b.material_id] = [];
-      borrowedMaterial[b.material_id].push(b);
+      if (!materials.borrowed[b.material_id]) materials.borrowed[b.material_id] = [];
+      materials.borrowed[b.material_id].push(b);
     });
   } catch (e) {
     console.error("loadMats failed:", e);
@@ -287,9 +287,9 @@ async function moveCount(
 async function loadMatHistory(material_id: number): Promise<void> {
   try {
     const data = await sb<MaterialHistory[]>("/rest/v1/material_history?material_id=eq." + material_id + "&order=created_at.desc&limit=50") || [];
-    materialHistory[material_id] = data;
+    materials.history[material_id] = data;
   } catch (e) {
-    materialHistory[material_id] = [];
+    materials.history[material_id] = [];
   }
 }
 
@@ -328,8 +328,8 @@ async function loadReturns(): Promise<void> {
   try {
     const all = await sb<Return[]>("/rest/v1/returns?order=return_date.desc") || [];
     const active = all.filter(r => !r.deleted_at);
-    returnsList = active.filter(r => !r.archived);
-    archivedReturns = active.filter(r => r.archived);
+    returns.list = active.filter(r => !r.archived);
+    returns.archived = active.filter(r => r.archived);
   } catch (e) {
     console.error("loadReturns failed:", e);
   }
@@ -369,9 +369,9 @@ async function loadTasks(): Promise<void> {
   try {
     const all = await sb<Task[]>("/rest/v1/tasks?order=created_at.desc") || [];
     const active = all.filter(t => !t.deleted_at);
-    tasks = active.filter(t => !t.archived);
-    if (isAdmin) {
-      archivedTasks = active.filter(t => t.archived);
+    tasks.list = active.filter(t => !t.archived);
+    if (auth.isAdmin) {
+      tasks.archived = active.filter(t => t.archived);
     }
   } catch (e) {
     console.error("loadTasks failed:", e);
@@ -413,34 +413,15 @@ async function logTaskStatus(entry: Partial<TaskStatusLog>): Promise<void> {
 async function loadTaskStatusLog(task_id: number): Promise<void> {
   try {
     const data = await sb<TaskStatusLog[]>("/rest/v1/task_status_log?task_id=eq." + task_id + "&order=created_at.desc&limit=30") || [];
-    taskStatusLogs[task_id] = data;
+    tasks.statusLogs[task_id] = data;
   } catch (e) {
-    taskStatusLogs[task_id] = [];
+    tasks.statusLogs[task_id] = [];
   }
 }
 
 // ============================================================
 // PINS
 // ============================================================
-async function loadPins(): Promise<void> {
-  // Fas 1: PIN-verifiering sker server-side via verify-pin Edge Function.
-  // Denna funktion behövs bara för att fylla pinSet[] efter login (för UI-flaggor).
-  // Vid 401 (pre-login) sväljs felet tyst.
-  try {
-    const data = await sb<UserPin[]>("/rest/v1/user_pins") || [];
-    userPins = {};
-    pinSet = {};
-    data.forEach(p => {
-      // pin-kolumnen finns inte längre (droppad i Fas 1) — bara pin_set behövs här
-      pinSet[p.user_name] = p.pin_set || false;
-    });
-  } catch (e) {
-    // Tyst: pre-login eller user saknar SELECT-rätt
-    userPins = {};
-    pinSet = {};
-  }
-}
-
 interface ChangePinResponse {
   ok?: boolean;
   error?: string;
@@ -479,8 +460,6 @@ async function savePin(userName: string, pin: string, isSet: boolean = true): Pr
       prefer: "return=minimal,resolution=merge-duplicates"
     });
   } catch (e) {}
-  userPins[userName] = pin;
-  pinSet[userName] = isSet;
 }
 
 // ============================================================
@@ -489,9 +468,9 @@ async function savePin(userName: string, pin: string, isSet: boolean = true): Pr
 async function loadComments(noteId: number): Promise<void> {
   try {
     const data = await sb<NoteComment[]>("/rest/v1/comments?note_id=eq." + noteId + "&order=created_at.asc") || [];
-    comments[noteId] = data;
+    notes.comments[noteId] = data;
   } catch (e) {
-    comments[noteId] = [];
+    notes.comments[noteId] = [];
   }
 }
 
@@ -501,7 +480,7 @@ async function addComment(noteId: number, text: string): Promise<void> {
     body: JSON.stringify({
       note_id: noteId,
       text,
-      created_by: user,
+      created_by: auth.user,
       created_at: new Date().toISOString()
     }),
     prefer: "return=minimal"
@@ -526,16 +505,16 @@ async function editComment(id: number, text: string): Promise<void> {
 async function loadTaskComments(task_id: number): Promise<void> {
   try {
     const data = await sb<TaskComment[]>("/rest/v1/task_comments?task_id=eq." + task_id + "&order=created_at.asc") || [];
-    taskComments[task_id] = data;
+    tasks.comments[task_id] = data;
   } catch (e) {
-    taskComments[task_id] = [];
+    tasks.comments[task_id] = [];
   }
 }
 
 async function addTaskComment(task_id: number, text: string): Promise<void> {
   await sb("/rest/v1/task_comments", {
     method: "POST",
-    body: JSON.stringify({ task_id, text, created_by: user, created_at: new Date().toISOString() }),
+    body: JSON.stringify({ task_id, text, created_by: auth.user, created_at: new Date().toISOString() }),
     prefer: "return=minimal"
   });
 }
@@ -558,16 +537,16 @@ async function editTaskComment(id: number, text: string): Promise<void> {
 async function loadTaskChecklist(task_id: number): Promise<void> {
   try {
     const data = await sb<TaskChecklistItem[]>("/rest/v1/task_checklist?task_id=eq." + task_id + "&order=created_at.asc") || [];
-    taskChecklists[task_id] = data;
+    tasks.checklists[task_id] = data;
   } catch (e) {
-    taskChecklists[task_id] = [];
+    tasks.checklists[task_id] = [];
   }
 }
 
 async function addChecklistItem(task_id: number, text: string): Promise<number | undefined> {
   const r = await sb<{ id: number }[]>("/rest/v1/task_checklist", {
     method: "POST",
-    body: JSON.stringify({ task_id, text, done: false, created_by: user }),
+    body: JSON.stringify({ task_id, text, done: false, created_by: auth.user }),
     headers: { "Prefer": "return=representation" }
   });
   return r?.[0]?.id;
@@ -591,9 +570,9 @@ async function delChecklistItem(id: number): Promise<void> {
 async function loadMatComments(material_id: number): Promise<void> {
   try {
     const data = await sb<MaterialComment[]>("/rest/v1/material_comments?material_id=eq." + material_id + "&order=created_at.asc") || [];
-    materialComments[material_id] = data;
+    materials.comments[material_id] = data;
   } catch (e) {
-    materialComments[material_id] = [];
+    materials.comments[material_id] = [];
   }
 }
 
@@ -605,7 +584,7 @@ async function addMatComment(
   status: MaterialCommentStatus | null
 ): Promise<void> {
   const body: Record<string, unknown> = {
-    material_id, text, created_by: user,
+    material_id, text, created_by: auth.user,
     created_at: new Date().toISOString(),
     status: status || "klart"
   };
@@ -629,9 +608,9 @@ async function setMatCommentStatus(commentId: number, status: MaterialCommentSta
 async function loadActionComments(): Promise<void> {
   try {
     const data = await sb<MaterialComment[]>("/rest/v1/material_comments?status=in.(åtgärd_krävs,åtgärd_behövs)&order=created_at.desc") || [];
-    actionComments = data;
+    materials.actionComments = data;
   } catch (e) {
-    actionComments = [];
+    materials.actionComments = [];
   }
 }
 
@@ -651,16 +630,16 @@ async function editMatComment(id: number, text: string): Promise<void> {
 async function loadMatItemImages(item_id: number): Promise<void> {
   try {
     const data = await sb<MaterialItemImage[]>("/rest/v1/material_item_images?item_id=eq." + item_id + "&order=created_at.asc") || [];
-    materialItemImages[item_id] = data;
+    materials.itemImages[item_id] = data;
   } catch (e) {
-    materialItemImages[item_id] = [];
+    materials.itemImages[item_id] = [];
   }
 }
 
 async function addMatItemImage(item_id: number, material_id: number, image_url: string): Promise<void> {
   await sb("/rest/v1/material_item_images", {
     method: "POST",
-    body: JSON.stringify({ item_id, material_id, image_url, uploaded_by: user }),
+    body: JSON.stringify({ item_id, material_id, image_url, uploaded_by: auth.user }),
     prefer: "return=minimal"
   });
 }
@@ -673,16 +652,16 @@ async function delMatItemImage(id: number): Promise<void> {
 async function loadMatImages(material_id: number): Promise<void> {
   try {
     const data = await sb<MaterialImage[]>("/rest/v1/material_images?material_id=eq." + material_id + "&order=created_at.asc") || [];
-    materialImages[material_id] = data;
+    materials.images[material_id] = data;
   } catch (e) {
-    materialImages[material_id] = [];
+    materials.images[material_id] = [];
   }
 }
 
 async function addMatImage(material_id: number, image_url: string): Promise<void> {
   await sb("/rest/v1/material_images", {
     method: "POST",
-    body: JSON.stringify({ material_id, image_url, uploaded_by: user }),
+    body: JSON.stringify({ material_id, image_url, uploaded_by: auth.user }),
     prefer: "return=minimal"
   });
 }
@@ -697,19 +676,19 @@ async function delMatImage(id: number): Promise<void> {
 async function loadInfoArticles(): Promise<void> {
   try {
     const all = await sb<InfoArticle[]>("/rest/v1/info_articles?order=is_pinned.desc,created_at.desc") || [];
-    infoArticles = all.filter(a => !a.deleted_at);
+    info.articles = all.filter(a => !a.deleted_at);
     // Ladda alla bilder och kommentarer i en svep
     const imgs = await sb<InfoImage[]>("/rest/v1/info_images?order=created_at.asc") || [];
-    infoImages = {};
+    info.images = {};
     imgs.forEach(img => {
-      if (!infoImages[img.article_id]) infoImages[img.article_id] = [];
-      infoImages[img.article_id].push(img);
+      if (!info.images[img.article_id]) info.images[img.article_id] = [];
+      info.images[img.article_id].push(img);
     });
     const cmts = await sb<InfoComment[]>("/rest/v1/info_comments?order=created_at.asc") || [];
-    infoComments = {};
+    info.comments = {};
     cmts.forEach(c => {
-      if (!infoComments[c.article_id]) infoComments[c.article_id] = [];
-      infoComments[c.article_id].push(c);
+      if (!info.comments[c.article_id]) info.comments[c.article_id] = [];
+      info.comments[c.article_id].push(c);
     });
   } catch (e) {
     console.error("loadInfoArticles failed:", e);
@@ -746,7 +725,7 @@ async function delInfoArticle(id: number): Promise<void> {
 async function addInfoImage(article_id: number, image_url: string): Promise<void> {
   await sb("/rest/v1/info_images", {
     method: "POST",
-    body: JSON.stringify({ article_id, image_url, uploaded_by: user }),
+    body: JSON.stringify({ article_id, image_url, uploaded_by: auth.user }),
     prefer: "return=minimal"
   });
 }
@@ -758,7 +737,7 @@ async function delInfoImage(id: number): Promise<void> {
 async function addInfoComment(article_id: number, body: string, image_url?: string | null): Promise<void> {
   await sb("/rest/v1/info_comments", {
     method: "POST",
-    body: JSON.stringify({ article_id, body, image_url: image_url || null, created_by: user }),
+    body: JSON.stringify({ article_id, body, image_url: image_url || null, created_by: auth.user }),
     prefer: "return=minimal"
   });
 }

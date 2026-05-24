@@ -32,12 +32,12 @@ async function addNote() {
   if (btn) btn.disabled = true;
   try {
     let image_url = null;
-    if (imgFile) { toast("Laddar upp bild..."); image_url = await uploadImg(imgFile); }
-    await saveNote({ text, category: cat, priority: prio, status: "ny", created_by: user, image_url, assigned_to: assigned, material_id, deadline });
+    if (ui.imgFile) { toast("Laddar upp bild..."); image_url = await uploadImg(ui.imgFile); }
+    await saveNote({ text, category: cat, priority: prio, status: "ny", created_by: auth.user, image_url, assigned_to: assigned, material_id, deadline });
     await loadNotes();
     updMeta();
-    imgData = null;
-    imgFile = null;
+    ui.imgData = null;
+    ui.imgFile = null;
     toast("✓ Anteckning sparad");
     render();
   } catch (e) {
@@ -47,8 +47,8 @@ async function addNote() {
 }
 
 async function toggleNote(id) {
-  openId = openId === id ? null : id;
-  if (openId && !comments[id]) {
+  notes.openId = notes.openId === id ? null : id;
+  if (notes.openId && !notes.comments[id]) {
     await loadComments(id);
   }
   render();
@@ -57,7 +57,7 @@ async function toggleNote(id) {
 async function setStatus(id, status) {
   try {
     await saveNote({ id, status });
-    notes = notes.map(n => n.id === id ? { ...n, status } : n);
+    notes.list = notes.list.map(n => n.id === id ? { ...n, status } : n);
     updMeta();
     toast(status === "klar" ? "✓ Markerad som klar" : "✓ Uppdaterad");
     render();
@@ -118,14 +118,14 @@ async function saveNoteCommentEdit(noteId, commentId) {
 }
 
 async function doDelete(id) {
-  const note = notes.find(n => n.id === id);
+  const note = notes.list.find(n => n.id === id);
   if (!note) return;
   try {
     const deletedAt = new Date().toISOString();
     await saveNote({ id, deleted_at: deletedAt });
-    notes = notes.filter(n => n.id !== id);
-    if (isAdmin) trashedNotes = [{ ...note, deleted_at: deletedAt }, ...trashedNotes];
-    openId = null;
+    notes.list = notes.list.filter(n => n.id !== id);
+    if (auth.isAdmin) notes.trashed = [{ ...note, deleted_at: deletedAt }, ...trashedNotes];
+    notes.openId = null;
     updMeta();
     render();
     toast("Anteckning raderad", 0, "ÅNGRA", async () => {
@@ -160,7 +160,7 @@ async function permDelete(id) {
   if (!await confirmModal("Radera permanent? Detta kan inte ångras.", { confirmLabel: "Radera", danger: true })) return;
   try {
     await delNotePerm(id);
-    trashedNotes = trashedNotes.filter(n => n.id !== id);
+    notes.trashed = notes.trashed.filter(n => n.id !== id);
     render();
     toast("🗑 Raderad permanent");
   } catch (e) {
@@ -169,12 +169,12 @@ async function permDelete(id) {
 }
 
 async function emptyTrash() {
-  if (!await confirmModal(`Radera alla ${trashedNotes.length} anteckningar i papperskorgen permanent? Kan inte ångras.`, { confirmLabel: "Töm papperskorg", danger: true })) return;
+  if (!await confirmModal(`Radera alla ${notes.trashed.length} anteckningar i papperskorgen permanent? Kan inte ångras.`, { confirmLabel: "Töm papperskorg", danger: true })) return;
   try {
     // Fas 3.3: ett batch-DELETE istället för N separata. Snabbare + atomiskt
     // (alla raderas eller ingen — undviker halv-tömd papperskorg vid fel).
-    await delNotesPermBatch(trashedNotes.map(n => n.id));
-    trashedNotes = [];
+    await delNotesPermBatch(notes.trashed.map(n => n.id));
+    notes.trashed = [];
     render();
     toast("🗑 Papperskorgen tömd");
   } catch (e) {
@@ -184,9 +184,9 @@ async function emptyTrash() {
 
 // REDIGERA ANTECKNING
 function openEdit(id) {
-  const note = notes.find(n => n.id === id);
+  const note = notes.list.find(n => n.id === id);
   if (!note) return;
-  const matOpts  = materials.map(m =>
+  const matOpts  = materials.list.map(m =>
     `<option value="${m.id}" ${note.material_id === m.id ? "selected" : ""}>${esc(m.emoji || "📦")} ${esc(m.name)}</option>`
   ).join("");
   const userOpts = USERS.filter(u => u !== "Admin").map(u =>
@@ -199,7 +199,7 @@ function openEdit(id) {
     <label class="field-label">TEXT</label>
     <textarea id="edit-text" rows="4">${esc(note.text)}</textarea>
     <label class="field-label">KATEGORI</label>
-    <select id="edit-cat">${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(user)).map(([k, v]) =>
+    <select id="edit-cat">${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(auth.user)).map(([k, v]) =>
       `<option value="${k}" ${note.category === k ? "selected" : ""}>${v.emoji} ${v.label}</option>`
     ).join("")}</select>
     <label class="field-label">PRIORITET</label>
@@ -208,7 +208,7 @@ function openEdit(id) {
     ).join("")}</select>
     <label class="field-label">TILLDELA TILL</label>
     <select id="edit-assign"><option value="">— Ingen —</option>${userOpts}</select>
-    ${materials.length ? `<label class="field-label">KOPPLA TILL MATERIAL</label>
+    ${materials.list.length ? `<label class="field-label">KOPPLA TILL MATERIAL</label>
     <select id="edit-mat"><option value="">— Inget —</option>${matOpts}</select>` : ""}
     <label class="field-label">DEADLINE</label>
     <input type="datetime-local" id="edit-deadline" value="${escAttr(dlVal)}">
@@ -231,7 +231,7 @@ async function saveEdit(id) {
   const deadline = dlRaw ? new Date(dlRaw).toISOString() : null;
   try {
     await saveNote({ id, text, category: cat, priority: prio, assigned_to: assigned, material_id, deadline });
-    notes = notes.map(n => n.id === id ? { ...n, text, category: cat, priority: prio, assigned_to: assigned, material_id, deadline } : n);
+    notes.list = notes.list.map(n => n.id === id ? { ...n, text, category: cat, priority: prio, assigned_to: assigned, material_id, deadline } : n);
     closeModal();
     toast("✓ Sparad");
     render();
@@ -246,40 +246,40 @@ async function saveEdit(id) {
 
 // ---- ÖPPNA/STÄNG DETALJVY ----
 async function openMat(id) {
-  openMatId = id;
-  openItemId = null;
+  materials.openId = id;
+  materials.openItemId = null;
   const loads = [];
-  if (!materialHistory[id]) loads.push(loadMatHistory(id));
-  if (!materialComments[id]) loads.push(loadMatComments(id));
-  if (!materialImages[id]) loads.push(loadMatImages(id));
+  if (!materials.history[id]) loads.push(loadMatHistory(id));
+  if (!materials.comments[id]) loads.push(loadMatComments(id));
+  if (!materials.images[id]) loads.push(loadMatImages(id));
   await Promise.all(loads);
   render();
 }
 
 function closeMat() {
-  openMatId = null;
-  openItemId = null;
+  materials.openId = null;
+  materials.openItemId = null;
   // Fas 3.6 (B14): rensa bifogad kommentar-bild — annars hänger den med
   // till nästa material och fästs på fel objekt.
-  _matCommentImgUrl = null;
-  _itemCommentImgUrl = null;
+  ui.matCommentImgUrl = null;
+  ui.itemCommentImgUrl = null;
   render();
 }
 
 // ---- ÖPPNA/STÄNG ARTIKELDETALJVY ----
 async function openItem(itemId) {
-  openItemId = itemId;
+  materials.openItemId = itemId;
   const loads = [];
-  if (!materialItemImages[itemId]) loads.push(loadMatItemImages(itemId));
-  if (openMatId && !materialComments[openMatId]) loads.push(loadMatComments(openMatId));
-  if (openMatId && !materialHistory[openMatId]) loads.push(loadMatHistory(openMatId));
+  if (!materials.itemImages[itemId]) loads.push(loadMatItemImages(itemId));
+  if (materials.openId && !materials.comments[materials.openId]) loads.push(loadMatComments(materials.openId));
+  if (materials.openId && !materials.history[materials.openId]) loads.push(loadMatHistory(materials.openId));
   await Promise.all(loads);
   render();
 }
 
 function closeItem() {
-  openItemId = null;
-  _itemCommentImgUrl = null;
+  materials.openItemId = null;
+  ui.itemCommentImgUrl = null;
   render();
 }
 
@@ -300,7 +300,7 @@ async function handleMatImg(matId, inputEl) {
 }
 
 async function doDelMatImg(imgId, matId) {
-  if (!isAdmin) return;
+  if (!auth.isAdmin) return;
   if (!await confirmModal("Ta bort bilden?", { confirmLabel: "Ta bort", danger: true })) return;
   try {
     await delMatImage(imgId);
@@ -343,7 +343,7 @@ async function delMatCommentAction(commentId, matId) {
 }
 
 function editMatCommentAction(commentId, matId, itemId) {
-  const allCmts = materialComments[matId] || [];
+  const allCmts = materials.comments[matId] || [];
   const c = allCmts.find(c => c.id === commentId);
   if (!c) return;
   openModal(`
@@ -371,14 +371,14 @@ async function saveMatCommentEdit(commentId, matId) {
 }
 
 // ---- BILD PÅ MATERIAL-KOMMENTAR (material-nivå) ----
-let _matCommentImgUrl = null;
+// (Fas 4.1: state ligger i appState.ui.matCommentImgUrl)
 
 async function handleMatCommentImg(inputEl) {
   const file = inputEl.files?.[0];
   if (!file) return;
   try {
     toast("Laddar upp bild...");
-    _matCommentImgUrl = await uploadImg(file);
+    ui.matCommentImgUrl = await uploadImg(file);
     toast("✓ Bild redo att skickas");
     render();
   } catch (e) {
@@ -449,7 +449,7 @@ async function addMat() {
 
 // ---- REDIGERA MATERIALTYP ----
 function openEditMat(id) {
-  const m = materials.find(m => m.id === id);
+  const m = materials.list.find(m => m.id === id);
   if (!m) return;
   openModal(`
     <div class="modal-title">Redigera ${esc(m.name)}</div>
@@ -494,11 +494,11 @@ async function doDelMat(id) {
   if (!await confirmModal("Radera material och alla dess artiklar/historik? Kan inte ångras.", { confirmLabel: "Radera material", danger: true })) return;
   try {
     await delMatPerm(id);
-    materials = materials.filter(m => m.id !== id);
-    delete materialItems[id];
-    delete materialCounts[id];
-    delete borrowedMaterial[id];
-    openMatId = null;
+    materials.list = materials.list.filter(m => m.id !== id);
+    delete materials.items[id];
+    delete materials.counts[id];
+    delete materials.borrowed[id];
+    materials.openId = null;
     await loadNotes();
     toast("🗑 Raderad");
     render();
@@ -509,7 +509,7 @@ async function doDelMat(id) {
 
 // ---- TOTALT ANTAL (lagerräknande) ----
 function openSetTotal(matId) {
-  const m = materials.find(m => m.id === matId);
+  const m = materials.list.find(m => m.id === matId);
   if (!m) return;
   openModal(`
     <div class="modal-title">Ändra totalt antal</div>
@@ -540,9 +540,9 @@ async function saveTotal(matId) {
 
 // ---- FLYTTA ANTAL MELLAN STATUSAR (lagerräknande) ----
 function openMoveCount(matId) {
-  const m = materials.find(m => m.id === matId);
+  const m = materials.list.find(m => m.id === matId);
   if (!m) return;
-  const counts = materialCounts[m.id] || {};
+  const counts = materials.counts[m.id] || {};
   openModal(`
     <div class="modal-title">Flytta antal</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
@@ -576,7 +576,7 @@ async function doMoveCount(matId) {
   if (from === to) { toast("Från och till kan inte vara samma", 1); return; }
   if (qty <= 0) { toast("Ange ett antal större än 0", 1); return; }
 
-  const counts = materialCounts[matId] || {};
+  const counts = materials.counts[matId] || {};
   const fromCount = counts[from] || 0;
   if (qty > fromCount) { toast(`Du kan flytta max ${fromCount}`, 1); return; }
 
@@ -598,7 +598,7 @@ async function doMoveCount(matId) {
 
 // ---- ARTIKLAR (artikelbaserat) ----
 function openAddItem(matId) {
-  const m = materials.find(m => m.id === matId);
+  const m = materials.list.find(m => m.id === matId);
   if (!m) return;
   openModal(`
     <div class="modal-title">Ny artikel — ${esc(m.name)}</div>
@@ -627,7 +627,7 @@ async function addItem(matId) {
       article_id,
       old_status: null,
       new_status: status,
-      changed_by: user,
+      changed_by: auth.user,
       comment: "Ny artikel skapad"
     });
     await loadMats();
@@ -641,7 +641,7 @@ async function addItem(matId) {
 }
 
 function openChangeItemStatus(itemId, matId) {
-  const items = materialItems[matId] || [];
+  const items = materials.items[matId] || [];
   const it = items.find(i => i.id === itemId);
   if (!it) return;
   openModal(`
@@ -663,7 +663,7 @@ function openChangeItemStatus(itemId, matId) {
 }
 
 async function saveItemStatus(itemId, matId) {
-  const items = materialItems[matId] || [];
+  const items = materials.items[matId] || [];
   const it = items.find(i => i.id === itemId);
   if (!it) return;
   const newStatus = document.getElementById("item-new-status")?.value;
@@ -671,7 +671,7 @@ async function saveItemStatus(itemId, matId) {
   if (newStatus === it.status) { closeModal(); return; }
 
   // Bara Admin kan sätta "tillgänglig"
-  if (newStatus === "tillgänglig" && !isAdmin && it.status !== "tillgänglig") {
+  if (newStatus === "tillgänglig" && !auth.isAdmin && it.status !== "tillgänglig") {
     toast("Endast Admin kan sätta 'Tillgänglig'", 1);
     return;
   }
@@ -689,7 +689,7 @@ async function saveItemStatus(itemId, matId) {
       article_id: it.article_id,
       old_status: it.status,
       new_status: newStatus,
-      changed_by: user,
+      changed_by: auth.user,
       comment
     });
     await loadMats();
@@ -716,7 +716,7 @@ async function doDelItem(itemId, matId) {
 
 // ---- INHYRT MATERIAL ----
 function openAddBorrowed(matId) {
-  const m = materials.find(m => m.id === matId);
+  const m = materials.list.find(m => m.id === matId);
   if (!m) return;
   const today = new Date().toISOString().split("T")[0];
   openModal(`
@@ -754,7 +754,7 @@ async function addBorrowed(matId) {
     await saveBorrowed({
       material_id: matId,
       quantity, supplier, start_date, end_date, reason, comment,
-      created_by: user
+      created_by: auth.user
     });
     await loadMats();
     closeModal();
@@ -791,7 +791,7 @@ function openAddReturn() {
     <input type="date" id="ret-date" value="${today}">
     <label class="field-label">MOTTAGARE</label>
     <select id="ret-received">
-      <option value="${esc(user)}">${esc(user)}</option>
+      <option value="${esc(auth.user)}">${esc(auth.user)}</option>
       ${userOpts}
     </select>
     <label class="field-label">INNEHÅLL (vad kom tillbaka)</label>
@@ -815,7 +815,7 @@ async function addReturn() {
   try {
     await saveReturn({
       name, return_date, received_by, content, comment,
-      created_by: user
+      created_by: auth.user
     });
     await loadReturns();
     closeModal();
@@ -827,7 +827,7 @@ async function addReturn() {
 }
 
 function openEditReturn(id) {
-  const r = [...returnsList, ...archivedReturns].find(r => r.id === id);
+  const r = [...returns.list, ...returns.archived].find(r => r.id === id);
   if (!r) return;
   const userOpts = USERS.filter(u => u !== "Admin").map(u =>
     `<option value="${esc(u)}" ${r.received_by === u ? "selected" : ""}>${esc(u)}</option>`
@@ -896,17 +896,17 @@ async function doDelReturn(id) {
 // ARBETSPLANERING (TASKS)
 // ============================================================
 async function openTaskDetail(id) {
-  openTaskId = id;
+  tasks.openId = id;
   const loads = [];
-  if (!taskStatusLogs[id]) loads.push(loadTaskStatusLog(id));
-  if (!taskComments[id]) loads.push(loadTaskComments(id));
-  if (!taskChecklists[id]) loads.push(loadTaskChecklist(id));
+  if (!tasks.statusLogs[id]) loads.push(loadTaskStatusLog(id));
+  if (!tasks.comments[id]) loads.push(loadTaskComments(id));
+  if (!tasks.checklists[id]) loads.push(loadTaskChecklist(id));
   if (loads.length) await Promise.all(loads);
   render();
 }
 
 function closeTaskDetail() {
-  openTaskId = null;
+  tasks.openId = null;
   render();
 }
 
@@ -996,7 +996,7 @@ async function delChecklistAction(taskId, itemId) {
   }
 }
 
-let _itemCommentImgUrl = null;
+// (Fas 4.1: state ligger i appState.ui.itemCommentImgUrl)
 
 async function handleItemImg(itemId, matId, inputEl) {
   const file = inputEl.files?.[0];
@@ -1014,7 +1014,7 @@ async function handleItemImg(itemId, matId, inputEl) {
 }
 
 async function doDelItemImg(imgId, itemId) {
-  if (!isAdmin) return;
+  if (!auth.isAdmin) return;
   if (!await confirmModal("Ta bort bilden?", { confirmLabel: "Ta bort", danger: true })) return;
   try {
     await delMatItemImage(imgId);
@@ -1031,7 +1031,7 @@ async function handleItemCommentImg(inputEl) {
   if (!file) return;
   try {
     toast("Laddar upp bild...");
-    _itemCommentImgUrl = await uploadImg(file);
+    ui.itemCommentImgUrl = await uploadImg(file);
     toast("✓ Bild redo att skickas");
     render();
   } catch (e) {
@@ -1044,7 +1044,7 @@ async function submitMatComment(matId, itemId) {
   const key = isItem ? "item-comment-input-" + itemId : "mat-comment-input-" + matId;
   const inp = document.getElementById(key);
   const text = inp?.value?.trim();
-  const imgUrl = isItem ? _itemCommentImgUrl : _matCommentImgUrl;
+  const imgUrl = isItem ? ui.itemCommentImgUrl : ui.matCommentImgUrl;
   if (!text && !imgUrl) return;
 
   const statusEl = document.getElementById(isItem ? "item-comment-status-" + itemId : "mat-comment-status-" + matId);
@@ -1052,8 +1052,8 @@ async function submitMatComment(matId, itemId) {
 
   try {
     await addMatComment(matId, itemId, text || "", imgUrl, commentStatus);
-    if (isItem) _itemCommentImgUrl = null;
-    else _matCommentImgUrl = null;
+    if (isItem) ui.itemCommentImgUrl = null;
+    else ui.matCommentImgUrl = null;
     await loadMatComments(matId);
     if (commentStatus === "åtgärd_krävs") await loadActionComments();
     render();
@@ -1126,13 +1126,13 @@ async function addTask() {
     const newId = await saveTask({
       title, description, priority, status: "ny",
       start_date, deadline, responsible, assigned_to, extra_staff,
-      created_by: user
+      created_by: auth.user
     });
     await logTaskStatus({
       task_id: newId,
       old_status: null,
       new_status: "ny",
-      changed_by: user
+      changed_by: auth.user
     });
     await loadTasks();
     updMeta();
@@ -1145,7 +1145,7 @@ async function addTask() {
 }
 
 function openEditTask(id) {
-  const t = [...tasks, ...archivedTasks].find(t => t.id === id);
+  const t = [...tasks.list, ...tasks.archived].find(t => t.id === id);
   if (!t) return;
   const userOpts = USERS.filter(u => u !== "Admin");
   const assignedSet = new Set(t.assigned_to || []);
@@ -1220,7 +1220,7 @@ async function saveEditTask(id) {
 }
 
 async function setTaskStatus(id, status) {
-  const t = [...tasks, ...archivedTasks].find(t => t.id === id);
+  const t = [...tasks.list, ...tasks.archived].find(t => t.id === id);
   if (!t) return;
   if (t.status === status) return;
   try {
@@ -1229,7 +1229,7 @@ async function setTaskStatus(id, status) {
       task_id: id,
       old_status: t.status,
       new_status: status,
-      changed_by: user
+      changed_by: auth.user
     });
     await loadTasks();
     await loadTaskStatusLog(id);
@@ -1245,7 +1245,7 @@ async function archiveTask(id, archive) {
   try {
     await saveTask({ id, archived: archive });
     await loadTasks();
-    openTaskId = null;
+    tasks.openId = null;
     toast(archive ? "📁 Arkiverad" : "↩ Aktiverad");
     render();
   } catch (e) {
@@ -1258,7 +1258,7 @@ async function doDelTask(id) {
   try {
     await delTaskPerm(id);
     await loadTasks();
-    openTaskId = null;
+    tasks.openId = null;
     updMeta();
     toast("🗑 Raderad");
     render();
@@ -1271,38 +1271,38 @@ async function doDelTask(id) {
 // INFO/FAQ
 // ============================================================
 function openInfo(id) {
-  openInfoId = id;
-  infoEditMode = null;
+  info.openId = id;
+  info.editMode = null;
   render();
 }
 
 function closeInfo() {
-  openInfoId = null;
-  infoEditMode = null;
-  infoEditImages = [];
+  info.openId = null;
+  info.editMode = null;
+  info.editImages = [];
   // Fas 3.6 (B14): rensa bifogad kommentar-bild
-  _infoCommentImgUrl = null;
+  ui.infoCommentImgUrl = null;
   render();
 }
 
 function startNewInfo(presetCat) {
-  openInfoId = null;
-  infoEditMode = "new";
-  infoEditImages = [];
+  info.openId = null;
+  info.editMode = "new";
+  info.editImages = [];
   window._infoEditPreset = presetCat || "Utrustning";
   render();
 }
 
 function startEditInfo(id) {
-  openInfoId = id;
-  infoEditMode = "edit";
-  infoEditImages = [];
+  info.openId = id;
+  info.editMode = "edit";
+  info.editImages = [];
   render();
 }
 
 function cancelInfoEdit() {
-  infoEditMode = null;
-  infoEditImages = [];
+  info.editMode = null;
+  info.editImages = [];
   render();
 }
 
@@ -1313,29 +1313,29 @@ async function saveInfoArticleForm() {
   const category = document.getElementById("info-cat")?.value || "Utrustning";
 
   try {
-    if (infoEditMode === "new") {
+    if (info.editMode === "new") {
       const newId = await saveInfoArticle({
         title, body, category,
         is_pinned: false,
-        created_by: user
+        created_by: auth.user
       });
       // Koppla på uppladdade bilder
-      for (const url of infoEditImages) {
+      for (const url of info.editImages) {
         await addInfoImage(newId, url);
       }
       await loadInfoArticles();
-      infoEditMode = null;
-      infoEditImages = [];
-      openInfoId = newId;
+      info.editMode = null;
+      info.editImages = [];
+      info.openId = newId;
       toast("✓ Förslag skapat");
-    } else if (infoEditMode === "edit" && openInfoId) {
-      await saveInfoArticle({ id: openInfoId, title, body, category });
-      for (const url of infoEditImages) {
-        await addInfoImage(openInfoId, url);
+    } else if (info.editMode === "edit" && info.openId) {
+      await saveInfoArticle({ id: info.openId, title, body, category });
+      for (const url of info.editImages) {
+        await addInfoImage(info.openId, url);
       }
       await loadInfoArticles();
-      infoEditMode = null;
-      infoEditImages = [];
+      info.editMode = null;
+      info.editImages = [];
       toast("✓ Sparat");
     }
     render();
@@ -1345,7 +1345,7 @@ async function saveInfoArticleForm() {
 }
 
 async function pinInfoArticle(id) {
-  if (!isAdmin) return;
+  if (!auth.isAdmin) return;
   try {
     await saveInfoArticle({ id, is_pinned: true });
     await loadInfoArticles();
@@ -1357,7 +1357,7 @@ async function pinInfoArticle(id) {
 }
 
 async function unpinInfoArticle(id) {
-  if (!isAdmin) return;
+  if (!auth.isAdmin) return;
   try {
     await saveInfoArticle({ id, is_pinned: false });
     await loadInfoArticles();
@@ -1369,12 +1369,12 @@ async function unpinInfoArticle(id) {
 }
 
 async function doDelInfoArticle(id) {
-  if (!isAdmin) return;
+  if (!auth.isAdmin) return;
   if (!await confirmModal("Ta bort artikeln? Den arkiveras (soft-delete).", { confirmLabel: "Arkivera" })) return;
   try {
     await delInfoArticle(id);
     await loadInfoArticles();
-    if (openInfoId === id) openInfoId = null;
+    if (info.openId === id) info.openId = null;
     toast("🗑 Borttagen");
     render();
   } catch (e) {
@@ -1389,7 +1389,7 @@ async function handleInfoEditImg(inputEl) {
   try {
     toast("Laddar upp bild...");
     const url = await uploadImg(file);
-    infoEditImages.push(url);
+    info.editImages.push(url);
     toast("✓ Bild tillagd");
     render();
   } catch (e) {
@@ -1414,7 +1414,7 @@ async function handleInfoAddImg(articleId, inputEl) {
 }
 
 async function doDelInfoImage(imgId) {
-  if (!isAdmin) return;
+  if (!auth.isAdmin) return;
   if (!await confirmModal("Ta bort bilden?", { confirmLabel: "Ta bort", danger: true })) return;
   try {
     await delInfoImage(imgId);
@@ -1427,13 +1427,13 @@ async function doDelInfoImage(imgId) {
 }
 
 // Kommentarer
-let _infoCommentImgUrl = null;
+// (Fas 4.1: state ligger i appState.ui.infoCommentImgUrl)
 async function handleInfoCommentImg(articleId, inputEl) {
   const file = inputEl.files?.[0];
   if (!file) return;
   try {
     toast("Laddar upp bild...");
-    _infoCommentImgUrl = await uploadImg(file);
+    ui.infoCommentImgUrl = await uploadImg(file);
     toast("✓ Bild redo att skickas");
     render();
   } catch (e) {
@@ -1444,10 +1444,10 @@ async function handleInfoCommentImg(articleId, inputEl) {
 async function submitInfoComment(articleId) {
   const inp = document.getElementById("info-comment-input-" + articleId);
   const body = inp?.value?.trim();
-  if (!body && !_infoCommentImgUrl) { toast("Skriv en kommentar eller bifoga en bild", 1); return; }
+  if (!body && !ui.infoCommentImgUrl) { toast("Skriv en kommentar eller bifoga en bild", 1); return; }
   try {
-    await addInfoComment(articleId, body || "", _infoCommentImgUrl);
-    _infoCommentImgUrl = null;
+    await addInfoComment(articleId, body || "", ui.infoCommentImgUrl);
+    ui.infoCommentImgUrl = null;
     await loadInfoArticles();
     render();
     toast("✓ Kommentar sparad");
@@ -1457,7 +1457,7 @@ async function submitInfoComment(articleId) {
 }
 
 async function doDelInfoComment(commentId) {
-  if (!isAdmin) return;
+  if (!auth.isAdmin) return;
   if (!await confirmModal("Ta bort kommentaren?", { confirmLabel: "Ta bort", danger: true })) return;
   try {
     await delInfoComment(commentId);
