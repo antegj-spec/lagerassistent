@@ -334,6 +334,14 @@ function rItemDetail(it: MaterialItem, m: Material): string {
   const cmts = (materials.comments[m.id] || []).filter(c => c.item_id === it.id);
   const history = (materials.history[m.id] || []).filter(h => h.article_id === it.article_id);
 
+  // Fas 6.8: räkna ut om service är överskriden
+  const serviceOverdue = it.service_interval_days != null && it.last_washed
+    ? (Date.now() - new Date(it.last_washed).getTime()) / 86400000 > it.service_interval_days
+    : false;
+  const daysSinceWash = it.last_washed
+    ? Math.floor((Date.now() - new Date(it.last_washed).getTime()) / 86400000)
+    : null;
+
   return `
 <button class="btn-ghost mb" onclick="closeItem()">← Tillbaka till ${esc(m.name)}</button>
 <div class="card">
@@ -341,7 +349,12 @@ function rItemDetail(it: MaterialItem, m: Material): string {
     <div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${esc(m.emoji || "📦")} ${esc(m.name)}</div>
       <div style="font-family:var(--display);font-size:26px;font-weight:900">${esc(it.article_id)}</div>
-      ${it.last_washed ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">🧼 Senast tvättat: ${fmtDateOnly(it.last_washed)}</div>` : ""}
+      ${it.last_washed ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">🧼 Senast tvättat: ${fmtDateOnly(it.last_washed)}${daysSinceWash != null ? ` (${daysSinceWash}d sedan)` : ""}</div>` : ""}
+      ${it.status === "reserverad" && it.reserved_for ? `<div style="font-size:12px;color:#9B59B6;margin-top:6px;font-family:var(--display);font-weight:700">📌 Reserverad till: ${esc(it.reserved_for)}</div>` : ""}
+      <div style="font-size:11px;color:${serviceOverdue ? "#E8521A" : "var(--muted)"};margin-top:6px">
+        🔧 Service-intervall: ${it.service_interval_days != null ? `${it.service_interval_days} dagar${serviceOverdue ? " — ÖVERSKRIDEN" : ""}` : "ej satt"}
+        <button class="btn-ghost" onclick="openServiceIntervalModal(${it.id},${m.id})" style="font-size:10px;padding:2px 8px;margin-left:6px">✎</button>
+      </div>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
       <span class="tag" style="background:${stat.color}22;color:${stat.color};font-size:12px;padding:4px 10px">${stat.emoji} ${stat.label.toUpperCase()}</span>
@@ -415,7 +428,38 @@ function rMatStatus(): string {
     if (m) return rMatDetail(m);
   }
 
+  // Fas 6.6: lagernivå-varningar (count-based, available < min_threshold)
+  const lowStock = materials.list.filter(m =>
+    !m.is_article_based && m.min_threshold != null &&
+    ((materials.counts[m.id]?.tillgänglig || 0) < m.min_threshold)
+  );
+
+  // Fas 6.8: service-överskridna items
+  const overdueService: { mat: Material; item: MaterialItem; daysOver: number }[] = [];
+  materials.list.forEach(m => {
+    if (!m.is_article_based) return;
+    (materials.items[m.id] || []).forEach(it => {
+      if (it.service_interval_days == null || !it.last_washed) return;
+      const daysSince = (Date.now() - new Date(it.last_washed).getTime()) / 86400000;
+      const daysOver = Math.floor(daysSince - it.service_interval_days);
+      if (daysOver > 0) overdueService.push({ mat: m, item: it, daysOver });
+    });
+  });
+
+  const warningsBlock = (lowStock.length > 0 || overdueService.length > 0) ? `
+<div class="alert" style="margin-bottom:14px">
+  ${lowStock.length > 0 ? `<div class="alert-title">⚠ LÅGT LAGER (${lowStock.length})</div>
+    ${lowStock.map(m => {
+      const avail = materials.counts[m.id]?.tillgänglig || 0;
+      return `<div class="alert-item" onclick="openMat(${m.id})" style="cursor:pointer">${esc(m.emoji || "📦")} ${esc(m.name)}: ${avail} ${esc(m.unit || "st")} tillgängliga (tröskel ${m.min_threshold})</div>`;
+    }).join("")}` : ""}
+  ${overdueService.length > 0 ? `<div class="alert-title" style="margin-top:${lowStock.length > 0 ? "10px" : "0"}">🔧 SERVICE ÖVERSKRIDEN (${overdueService.length})</div>
+    ${overdueService.slice(0, 8).map(o => `<div class="alert-item" onclick="openMat(${o.mat.id})" style="cursor:pointer">${esc(o.mat.emoji || "📦")} ${esc(o.mat.name)} ${esc(o.item.article_id)} — ${o.daysOver}d försenad</div>`).join("")}
+    ${overdueService.length > 8 ? `<div class="alert-item" style="color:var(--muted)">+ ${overdueService.length - 8} fler...</div>` : ""}` : ""}
+</div>` : "";
+
   return `
+${warningsBlock}
 ${auth.isAdmin ? `<button class="btn mb" onclick="openAddMat()" style="width:100%">+ LÄGG TILL MATERIALTYP</button>` : ""}
 <div class="lbl">MATERIALREGISTER (${materials.list.length})</div>
 <div class="mat-list">

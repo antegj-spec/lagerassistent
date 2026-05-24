@@ -58,7 +58,9 @@ const MAT_STATS: Record<MaterialStatus, { label: string; emoji: string; color: s
   tillgänglig: { label: "Tillgänglig",  emoji: "✅", color: "#4CAF7D" },
   uthyrd:      { label: "Uthyrd",       emoji: "📤", color: "#2E7DC4" },
   tvätt:       { label: "Tvätt behövs", emoji: "🧼", color: "#E8A81A" },
-  reparation:  { label: "Reparation",   emoji: "🔧", color: "#E8521A" }
+  reparation:  { label: "Reparation",   emoji: "🔧", color: "#E8521A" },
+  // Fas 6.5: Reserverad till framtida event/kund. reserved_for fångar målet.
+  reserverad:  { label: "Reserverad",   emoji: "📌", color: "#9B59B6" }
 };
 
 // INFO-KATEGORIER (FAQ/info-flik)

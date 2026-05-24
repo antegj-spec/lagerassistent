@@ -146,6 +146,9 @@ function openAddMat() {
       <label class="field-label">TOTALT ANTAL (endast lagerräknande)</label>
       <input type="number" id="mat-total" placeholder="0" min="0" value="0">
     </div>
+    <!-- Fas 6.6: lagernivå-tröskel, NULL = av -->
+    <label class="field-label">LAGERNIVÅ-VARNING (under N tillgängliga = varning, valfritt)</label>
+    <input type="number" id="mat-min-threshold" placeholder="t.ex. 10" min="0">
     <label class="field-label">INFO (valfritt)</label>
     <textarea id="mat-info" rows="3" placeholder="Vikt, packning, moduldelar, artikelnummer..."></textarea>
     <div class="modal-actions">
@@ -163,8 +166,10 @@ async function addMat() {
   const unit = document.getElementById("mat-unit")?.value || "st";
   const total_count = is_article_based ? 0 : (parseInt(document.getElementById("mat-total")?.value) || 0);
   const info_text = document.getElementById("mat-info")?.value?.trim() || null;
+  const thresholdRaw = document.getElementById("mat-min-threshold")?.value;
+  const min_threshold = thresholdRaw ? parseInt(thresholdRaw) : null;
   try {
-    const newId = await saveMat({ name, emoji, is_article_based, total_count, unit, info_text });
+    const newId = await saveMat({ name, emoji, is_article_based, total_count, unit, info_text, min_threshold });
     // Initiera räkning för lagerräknande
     if (!is_article_based && total_count > 0) {
       await setMatCount(newId, "tillgänglig", total_count);
@@ -195,6 +200,9 @@ function openEditMat(id) {
       <option value="meter" ${m.unit === "meter" ? "selected" : ""}>meter</option>
       <option value="kg" ${m.unit === "kg" ? "selected" : ""}>kg</option>
     </select>
+    <!-- Fas 6.6: lagernivå-tröskel -->
+    <label class="field-label">LAGERNIVÅ-VARNING (under N tillgängliga = varning, tomt = av)</label>
+    <input type="number" id="edit-mat-min-threshold" placeholder="t.ex. 10" min="0" value="${m.min_threshold != null ? m.min_threshold : ""}">
     <label class="field-label">INFO</label>
     <textarea id="edit-mat-info" rows="6" placeholder="Vikt, packning, moduldelar, artikelnummer...">${esc(m.info_text || "")}</textarea>
     <div class="modal-actions">
@@ -210,8 +218,10 @@ async function saveEditMat(id) {
   const emoji = document.getElementById("edit-mat-emoji")?.value?.trim() || "📦";
   const unit = document.getElementById("edit-mat-unit")?.value || "st";
   const info_text = document.getElementById("edit-mat-info")?.value?.trim() || null;
+  const thresholdRaw = document.getElementById("edit-mat-min-threshold")?.value;
+  const min_threshold = thresholdRaw ? parseInt(thresholdRaw) : null;
   try {
-    await saveMat({ id, name, emoji, unit, info_text });
+    await saveMat({ id, name, emoji, unit, info_text, min_threshold });
     await loadMats();
     closeModal();
     toast("✓ Sparat");
@@ -375,15 +385,21 @@ function openChangeItemStatus(itemId, matId) {
   const items = materials.items[matId] || [];
   const it = items.find(i => i.id === itemId);
   if (!it) return;
+  const reservedForVal = it.status === "reserverad" ? (it.reserved_for || "") : "";
   openModal(`
     <div class="modal-title">Ändra status — ${esc(it.article_id)}</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
       Nuvarande status: <b>${esc(MAT_STATS[it.status]?.label || it.status)}</b>
     </p>
     <label class="field-label">NY STATUS</label>
-    <select id="item-new-status">${Object.entries(MAT_STATS).map(([k, v]) =>
+    <select id="item-new-status" onchange="toggleReservedForField(this.value)">${Object.entries(MAT_STATS).map(([k, v]) =>
       `<option value="${k}" ${it.status === k ? "selected" : ""}>${v.emoji} ${v.label}</option>`
     ).join("")}</select>
+    <!-- Fas 6.5: reserved_for syns bara när status='reserverad' -->
+    <div id="reserved-for-wrap" style="display:${it.status === "reserverad" ? "block" : "none"}">
+      <label class="field-label">RESERVERAD TILL</label>
+      <input type="text" id="item-reserved-for" placeholder="T.ex. 'Festivalen 2026' eller kundnamn" value="${escAttr(reservedForVal)}">
+    </div>
     <label class="field-label">KOMMENTAR (valfritt)</label>
     <input type="text" id="item-status-comment" placeholder="T.ex. 'Reparation klar'">
     <div class="modal-actions">
@@ -391,6 +407,46 @@ function openChangeItemStatus(itemId, matId) {
       <button class="btn" onclick="saveItemStatus(${itemId},${matId})" style="flex:1">SPARA</button>
     </div>
   `);
+}
+
+// Fas 6.5: visa/dölj reserved_for-fält baserat på vald status.
+function toggleReservedForField(status) {
+  const wrap = document.getElementById("reserved-for-wrap");
+  if (wrap) wrap.style.display = status === "reserverad" ? "block" : "none";
+}
+
+// Fas 6.8: sätt service-intervall på en artikel.
+function openServiceIntervalModal(itemId, matId) {
+  const items = materials.items[matId] || [];
+  const it = items.find(i => i.id === itemId);
+  if (!it) return;
+  openModal(`
+    <div class="modal-title">Service-intervall — ${esc(it.article_id)}</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">
+      Varningen visas i Dashboard när det gått fler dagar sedan senast tvättat än intervallet.<br>
+      Lämna tomt för att inaktivera.
+    </p>
+    <label class="field-label">DAGAR MELLAN SERVICE</label>
+    <input type="number" id="item-service-days" min="1" placeholder="t.ex. 90" value="${it.service_interval_days != null ? it.service_interval_days : ""}">
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()" style="flex:1">Avbryt</button>
+      <button class="btn" onclick="saveServiceInterval(${itemId},${matId})" style="flex:1">SPARA</button>
+    </div>
+  `);
+}
+
+async function saveServiceInterval(itemId, matId) {
+  const raw = document.getElementById("item-service-days")?.value;
+  const service_interval_days = raw ? parseInt(raw) : null;
+  try {
+    await saveMatItem({ id: itemId, service_interval_days });
+    await loadMats();
+    closeModal();
+    toast(service_interval_days ? `✓ Service-intervall: ${service_interval_days}d` : "✓ Service-intervall borttaget");
+    render();
+  } catch (e) {
+    toast("Kunde inte spara", 1);
+  }
 }
 
 async function saveItemStatus(itemId, matId) {
@@ -412,6 +468,14 @@ async function saveItemStatus(itemId, matId) {
     // Uppdatera senast tvättat-datum om vi rör tvätt
     if (it.status === "tvätt" && newStatus !== "tvätt") {
       update.last_washed = new Date().toISOString();
+    }
+    // Fas 6.5: sätt eller rensa reserved_for beroende på ny status.
+    if (newStatus === "reserverad") {
+      const rf = document.getElementById("item-reserved-for")?.value?.trim() || null;
+      update.reserved_for = rf;
+    } else if (it.status === "reserverad") {
+      // Lämnar reserverad-state → rensa reserved_for
+      update.reserved_for = null;
     }
     await saveMatItem(update);
     await logMatHistory({

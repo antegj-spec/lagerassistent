@@ -34,7 +34,8 @@ export type MaterialStatus =
   | 'tillgänglig'
   | 'uthyrd'
   | 'tvätt'
-  | 'reparation';
+  | 'reparation'
+  | 'reserverad';
 
 export type TaskStatus = 'ny' | 'pågår' | 'klar';
 
@@ -103,6 +104,8 @@ export interface Material extends BaseRow, SoftDeletable {
   unit?: string | null;
   total_count?: number | null;
   info_text?: string | null;
+  // Fas 6.6: tröskel för "lågt lager"-varning (count-based). NULL = av.
+  min_threshold?: number | null;
 }
 
 export interface MaterialItem extends BaseRow {
@@ -110,6 +113,11 @@ export interface MaterialItem extends BaseRow {
   article_id: string;
   status: MaterialStatus;
   last_washed?: string | null;
+  // Fas 6.5: målet för reservationen ("Festivalen 2026"). Bara meningsfullt
+  // när status === 'reserverad'.
+  reserved_for?: string | null;
+  // Fas 6.8: dagar mellan service. Räknas från last_washed. NULL = av.
+  service_interval_days?: number | null;
 }
 
 export interface MaterialCount {
