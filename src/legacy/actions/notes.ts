@@ -248,6 +248,43 @@ function toggleVoiceInput(input: HTMLTextAreaElement, btn: HTMLButtonElement): v
   }
 }
 
+// ============================================================
+// Fas 5.6: Foto-först-flöde
+// Trigger: input[type=file capture=environment] från Hem-fliken.
+// Flöde: upload → saveNote med default-värden → loadNotes → render
+// → openEdit(newId) så användaren kan fylla i text/kategori utan
+// extra navigation. Default-text "📸 Foto" så listan har något att visa
+// om användaren stänger edit-modalen utan att fylla i.
+// ============================================================
+async function quickPhotoNote(inputEl: HTMLInputElement): Promise<void> {
+  const file = inputEl.files?.[0];
+  if (!file) return;
+  // Nollställ input direkt så samma file kan väljas igen efter avbruten edit
+  inputEl.value = "";
+
+  toast("📸 Laddar upp foto...");
+  try {
+    const image_url = await uploadImg(file);
+    const newNote = await saveNote({
+      text: "📸 Foto",
+      category: "övrigt",
+      priority: "medel",
+      status: "ny",
+      created_by: auth.user || "",
+      image_url,
+    });
+    if (!newNote || newNote.id == null) throw new Error("Saknar id i svar");
+    await loadNotes();
+    updMeta();
+    render();
+    toast("✓ Foto sparat — fyll i detaljer");
+    // Öppna edit-modal så användaren kan ändra text/kategori/prio direkt
+    openEdit(newNote.id);
+  } catch (e) {
+    toast("Kunde inte spara foto — kontrollera anslutning", 1);
+  }
+}
+
 async function addNote(): Promise<void> {
   const inp  = document.getElementById("note-input") as HTMLTextAreaElement | HTMLInputElement | null;
   const text = inp?.value?.trim();

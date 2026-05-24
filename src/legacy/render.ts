@@ -58,6 +58,13 @@ function rHem(): string {
   const userOpts = USERS.filter(u => u !== "Admin").map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join("");
 
   return `
+<!-- Fas 5.6: Foto-först-flöde — kamera direkt, anteckning skapas i bakgrunden -->
+<button class="btn quick-photo-btn" onclick="document.getElementById('quick-photo-file').click()"
+  style="width:100%;padding:18px;font-size:16px;font-family:var(--display);font-weight:800;letter-spacing:1px;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:10px">
+  <span style="font-size:24px">📸</span> SNABBT FOTO
+</button>
+<input type="file" id="quick-photo-file" accept="image/*" capture="environment" style="display:none" onchange="quickPhotoNote(this)">
+
 <div class="desktop-grid">
   <div class="card">
     <div class="lbl">NY ANTECKNING</div>
