@@ -553,6 +553,11 @@ async function submitMatComment(matId, itemId) {
     if (commentStatus === "åtgärd_krävs") await loadActionComments();
     render();
     toast("✓ Kommentar sparad");
+    // Fas 6.2: åtgärd_krävs → auto-skapa task (efter huvud-toasten, så
+    // den nya ÅNGRA-toasten ersätter den efter ~2s).
+    if (commentStatus === "åtgärd_krävs" && typeof autoCreateTaskFromMatComment === "function") {
+      autoCreateTaskFromMatComment(matId, itemId, text || "", auth.user || "");
+    }
   } catch (e) {
     toast("Kunde inte spara kommentar", 1);
   }
