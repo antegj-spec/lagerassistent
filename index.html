@@ -140,14 +140,32 @@
 <script type="module" src="/src/main.js"></script>
 
 <!-- JavaScript — laddas i rätt ordning (paritet med pre-Vite-läget) -->
+<!-- Block B (Fas 4): supabase.ts är nu bara sb/sbPaged/getAuthToken. -->
+<!-- Per-aggregate load/save ligger i /js/services/*.js. Action-handlers
+     ligger i /js/actions/*.js. -->
 <script src="/js/config.js"></script>
 <script src="/js/store.js"></script>
 <script src="/js/supabase.js"></script>
+<script src="/js/services/notes.js"></script>
+<script src="/js/services/materials.js"></script>
+<script src="/js/services/returns.js"></script>
+<script src="/js/services/tasks.js"></script>
+<script src="/js/services/info.js"></script>
+<script src="/js/services/pins.js"></script>
+<script src="/js/services/images.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/ui.js"></script>
 <script src="/js/render.js"></script>
+<script src="/js/render/patches.js"></script>
+<script src="/js/render/subscribers.js"></script>
 <script src="/js/realtime.js"></script>
-<script src="/js/actions.js"></script>
+<script src="/js/components/imageUpload.js"></script>
+<script src="/js/components/commentSystem.js"></script>
+<script src="/js/actions/notes.js"></script>
+<script src="/js/actions/materials.js"></script>
+<script src="/js/actions/returns.js"></script>
+<script src="/js/actions/tasks.js"></script>
+<script src="/js/actions/info.js"></script>
 <script>
 function toggleTheme() {
   var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';

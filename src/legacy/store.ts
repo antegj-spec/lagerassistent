@@ -286,3 +286,53 @@ function notify(key: StoreKey): void {
     catch (e) { console.warn("store listener for " + key + " threw:", e); }
   });
 }
+
+// ============================================================
+// OPTIMISTIC — local-first updates med rollback (Fas 4.6)
+//
+// Mönster: ändra appState lokalt, notifiera (så UI patchar
+// omedelbart), kör API i bakgrunden, rollback + notify igen
+// vid fel. Försnabbar uppfattat svar från ~300ms till <50ms
+// på single-user-actions (status-byte, toggle, etc.).
+//
+// Begränsning: race med realtime mellan apply och api. Om en
+// annan användare ändrar samma rad just nu, har vi en kort
+// inconsistency-fönster. Acceptabelt — vid nästa realtime-
+// reload synkar vi om ändå.
+//
+// Användning:
+//   await optimistic({
+//     apply: () => {
+//       const prev = notes.list;
+//       notes.list = notes.list.map(n => n.id === id ? {...n, status} : n);
+//       return prev;                       // snapshot för rollback
+//     },
+//     rollback: (prev) => { notes.list = prev; },
+//     api: () => saveNote({ id, status }),
+//     storeKey: "notes",                   // triggas vid både apply OCH rollback
+//   });
+// ============================================================
+
+interface OptimisticArgs<T> {
+  apply: () => T;
+  rollback: (snapshot: T) => void;
+  api: () => Promise<unknown>;
+  storeKey: StoreKey;
+  errorToast?: string;
+}
+
+async function optimistic<T>(args: OptimisticArgs<T>): Promise<void> {
+  const snapshot = args.apply();
+  notify(args.storeKey);
+  try {
+    await args.api();
+  } catch (e) {
+    args.rollback(snapshot);
+    notify(args.storeKey);
+    if (typeof toast === "function") {
+      toast(args.errorToast ?? "Misslyckades — ångrat", 1);
+    }
+    // Re-throw så callsite kan logga eller hantera vidare.
+    throw e;
+  }
+}
