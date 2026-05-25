@@ -13,6 +13,9 @@ dist/
 # Genererat: tsc transpilerar src/legacy/ → public/js/ vid build (Fas 2.3)
 public/js/
 
+# Supabase CLI lokal state (per-maskin) — Fas 6 M4 cleanup glömdes
+supabase/.temp/
+
 # OS
 .DS_Store
 Thumbs.db
