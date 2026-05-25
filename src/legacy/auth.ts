@@ -217,13 +217,15 @@ function completeLogin(): void {
   const exportBtn = document.getElementById("export-btn") as HTMLElement | null;
   const trashBtn = document.getElementById("trash-btn") as HTMLElement | null;
   const aiBtn = document.getElementById("ai-btn") as HTMLElement | null;
-  if (exportBtn) exportBtn.style.display = auth.isAdmin ? "flex" : "none";
-  if (trashBtn)  trashBtn.style.display  = auth.isAdmin ? "flex" : "none";
-  if (aiBtn)     aiBtn.style.display     = auth.isAdmin ? "flex" : "none";
+  const dashboardBtn = document.getElementById("dashboard-btn") as HTMLElement | null;
+  if (exportBtn)    exportBtn.style.display    = auth.isAdmin ? "flex" : "none";
+  if (trashBtn)     trashBtn.style.display     = auth.isAdmin ? "flex" : "none";
+  if (aiBtn)        aiBtn.style.display        = auth.isAdmin ? "flex" : "none";
+  if (dashboardBtn) dashboardBtn.style.display = auth.isAdmin ? "flex" : "none";
 
   // SÄKERHET: om current ui.tab är admin-only och auth.user inte är admin → fallback hem.
   // Förhindrar att t.ex. Andreas hamnar på AI-fliken om Admin var där sist.
-  const ADMIN_ONLY_TABS: TabName[] = ["chat", "export", "trash"];
+  const ADMIN_ONLY_TABS: TabName[] = ["chat", "export", "trash", "dashboard"];
   if (!auth.isAdmin && ADMIN_ONLY_TABS.includes(ui.tab)) {
     ui.tab = "hem";
   }
@@ -319,9 +321,11 @@ function logout(): void {
   const exportBtn = document.getElementById("export-btn") as HTMLElement | null;
   const trashBtn = document.getElementById("trash-btn") as HTMLElement | null;
   const aiBtn = document.getElementById("ai-btn") as HTMLElement | null;
-  if (exportBtn) exportBtn.style.display = "none";
-  if (trashBtn) trashBtn.style.display = "none";
-  if (aiBtn) aiBtn.style.display = "none";
+  const dashboardBtn = document.getElementById("dashboard-btn") as HTMLElement | null;
+  if (exportBtn)    exportBtn.style.display    = "none";
+  if (trashBtn)     trashBtn.style.display     = "none";
+  if (aiBtn)        aiBtn.style.display        = "none";
+  if (dashboardBtn) dashboardBtn.style.display = "none";
 
   const pinScr = document.getElementById("pin-screen") as HTMLElement | null;
   if (pinScr) pinScr.style.display = "flex";

@@ -54,7 +54,8 @@ export type TabName =
   | 'info'
   | 'chat'
   | 'export'
-  | 'trash';
+  | 'trash'
+  | 'dashboard';
 
 // ---------- ISO-tidsstämpel-alias ----------
 
