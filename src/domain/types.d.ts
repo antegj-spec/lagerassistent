@@ -52,6 +52,7 @@ export type TabName =
   | 'material'
   | 'returer'
   | 'plan'
+  | 'körjournal'
   | 'info'
   | 'chat'
   | 'export'
@@ -308,6 +309,37 @@ export interface UserPin {
 export interface UserRole {
   user_name: UserName | string;
   role: Role;
+}
+
+// ---------- Körjournal (Fas 8 Etapp B) ----------
+
+export interface Car {
+  id: string;                    // uuid
+  reg_nr: string;
+  nickname?: string | null;
+  active: boolean;
+  created_at: Timestamp;
+  created_by?: string;
+}
+
+export interface CarTrip {
+  id: string;                    // uuid
+  car_id: string;                // uuid → cars.id
+  driver: string;                // user name
+  trip_date: string;             // ISO date (YYYY-MM-DD)
+  from_loc?: string | null;
+  to_loc?: string | null;
+  purpose?: string | null;
+  odometer_start: number;
+  odometer_end: number;
+  is_private: boolean;
+  is_fueling: boolean;
+  liters?: number | null;
+  total_price?: number | null;
+  image_path?: string | null;
+  created_by: string;
+  created_at: Timestamp;
+  updated_at?: Timestamp | null;
 }
 
 // ---------- Chat (in-memory, ej DB) ----------

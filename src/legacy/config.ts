@@ -127,8 +127,8 @@ const MAIN_TABS: readonly MainTabDef[] = [
     id: "drift",
     label: "Drift",
     subTabs: [
-      // Körjournal läggs till i Etapp B
-      { id: "info", label: "Info", emoji: "ℹ" }
+      { id: "körjournal", label: "Körjournal", emoji: "🚗" },
+      { id: "info",       label: "Info",       emoji: "ℹ" }
     ]
   },
   {

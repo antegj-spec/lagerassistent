@@ -277,7 +277,7 @@ function _highlightMainNav(): void {
 async function initApp(): Promise<void> {
   const main = document.getElementById("main");
   if (main) main.innerHTML = `<div class="empty"><div class="spinner"></div> Laddar...</div>`;
-  await Promise.all([loadNotes(), loadMats(), loadReturns(), loadTasks(), loadInfoArticles(), loadActionComments()]);
+  await Promise.all([loadNotes(), loadMats(), loadReturns(), loadTasks(), loadInfoArticles(), loadActionComments(), loadCars(), loadCarTrips()]);
   updMeta();
   render();
   _navReplace();

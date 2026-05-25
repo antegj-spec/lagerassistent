@@ -32,7 +32,9 @@ const RT_TABLE_RELOADERS: Record<string, RtTableEntry> = {
   material_items:    { reload: async () => { await loadMats(); },    storeKey: "materials" },
   borrowed_material: { reload: async () => { await loadMats(); },    storeKey: "materials" },
   tasks:             { reload: async () => { await loadTasks(); },   storeKey: "tasks" },
-  returns:           { reload: async () => { await loadReturns(); }, storeKey: "returns" }
+  returns:           { reload: async () => { await loadReturns(); }, storeKey: "returns" },
+  cars:              { reload: async () => { await loadCars(); },    storeKey: "cars" },
+  car_trips:         { reload: async () => { await loadCarTrips(); },storeKey: "cars" }
 };
 
 // ---- STATE (modul-globalt) ----

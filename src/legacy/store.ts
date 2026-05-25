@@ -97,6 +97,11 @@ interface ChatState {
   list: ChatMessage[];
 }
 
+interface CarsState {
+  list: Car[];
+  trips: CarTrip[];
+}
+
 interface AppState {
   auth: AuthState;
   ui: UiState;
@@ -106,6 +111,7 @@ interface AppState {
   tasks: TasksState;
   info: InfoState;
   chat: ChatState;
+  cars: CarsState;
 }
 
 // ---- CANONICAL STATE ----
@@ -181,6 +187,10 @@ const appState: AppState = {
   chat: {
     list: [],
   },
+  cars: {
+    list: [],
+    trips: [],
+  },
 };
 
 // ---- TOP-LEVEL ALIASES ----
@@ -197,6 +207,7 @@ const returns = appState.returns;
 const tasks = appState.tasks;
 const info = appState.info;
 const chat = appState.chat;
+const cars = appState.cars;
 
 // ---- RESET HELPERS ----
 // Anropas av logout() för att rensa state mellan användare.
@@ -240,6 +251,9 @@ function resetAppState(): void {
   info.editImages = [];
   // Chat
   chat.list = [];
+  // Cars (Fas 8 Etapp B)
+  cars.list = [];
+  cars.trips = [];
 }
 
 function resetUiState(): void {
@@ -275,7 +289,7 @@ function resetUiState(): void {
 // ============================================================
 
 type StoreKey = "notes" | "materials" | "returns" | "tasks"
-              | "info" | "chat" | "auth" | "ui";
+              | "info" | "chat" | "auth" | "ui" | "cars";
 type StoreListener = () => void;
 
 const _storeListeners: Partial<Record<StoreKey, Set<StoreListener>>> = {};

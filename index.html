@@ -141,6 +141,9 @@
      legacy-filerna nedan in i src/ och blir riktiga ES modules. -->
 <script type="module" src="/src/main.js"></script>
 
+<!-- xlsx (SheetJS) som UMD-global. Används av körjournals-export. -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
 <!-- JavaScript — laddas i rätt ordning (paritet med pre-Vite-läget) -->
 <!-- Block B (Fas 4): supabase.ts är nu bara sb/sbPaged/getAuthToken. -->
 <!-- Per-aggregate load/save ligger i /js/services/*.js. Action-handlers
@@ -155,6 +158,7 @@
 <script src="/js/services/info.js"></script>
 <script src="/js/services/pins.js"></script>
 <script src="/js/services/images.js"></script>
+<script src="/js/services/cars.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/ui.js"></script>
 <script src="/js/render.js"></script>
@@ -168,6 +172,7 @@
 <script src="/js/actions/returns.js"></script>
 <script src="/js/actions/tasks.js"></script>
 <script src="/js/actions/info.js"></script>
+<script src="/js/actions/cars.js"></script>
 <script src="/js/actions/autoTask.js"></script>
 <script src="/js/actions/dashboard.js"></script>
 <script src="/js/actions/export.js"></script>
