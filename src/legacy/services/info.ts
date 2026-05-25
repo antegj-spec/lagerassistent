@@ -7,12 +7,18 @@ async function loadInfoArticles(): Promise<void> {
   try {
     const all = await sb<InfoArticle[]>("/rest/v1/info_articles?order=is_pinned.desc,created_at.desc") || [];
     info.articles = all.filter(a => !a.deleted_at);
-    // Ladda alla bilder och kommentarer i en svep
+    // Ladda alla bilder, PDF:er och kommentarer i en svep
     const imgs = await sb<InfoImage[]>("/rest/v1/info_images?order=created_at.asc") || [];
     info.images = {};
     imgs.forEach(img => {
       if (!info.images[img.article_id]) info.images[img.article_id] = [];
       info.images[img.article_id].push(img);
+    });
+    const pdfs = await sb<InfoPdf[]>("/rest/v1/info_pdfs?order=created_at.asc") || [];
+    info.pdfs = {};
+    pdfs.forEach(p => {
+      if (!info.pdfs[p.article_id]) info.pdfs[p.article_id] = [];
+      info.pdfs[p.article_id].push(p);
     });
     const cmts = await sb<InfoComment[]>("/rest/v1/info_comments?order=created_at.asc") || [];
     info.comments = {};
@@ -74,4 +80,18 @@ async function addInfoComment(article_id: number, body: string, image_url?: stri
 
 async function delInfoComment(id: number): Promise<void> {
   await sb("/rest/v1/info_comments?id=eq." + id, { method: "DELETE" });
+}
+
+// ---- PDF-BIFOGNINGAR ----
+
+async function addInfoPdf(article_id: number, pdf_url: string, file_name: string): Promise<void> {
+  await sb("/rest/v1/info_pdfs", {
+    method: "POST",
+    body: JSON.stringify({ article_id, pdf_url, file_name, uploaded_by: auth.user }),
+    prefer: "return=minimal"
+  });
+}
+
+async function delInfoPdf(id: number): Promise<void> {
+  await sb("/rest/v1/info_pdfs?id=eq." + id, { method: "DELETE" });
 }

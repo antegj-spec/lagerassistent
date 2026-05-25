@@ -9,6 +9,7 @@
 function openInfo(id: number): void {
   info.openId = id;
   info.editMode = null;
+  _navPush();
   render();
 }
 
@@ -172,4 +173,50 @@ async function doDelInfoComment(commentId: number): Promise<void> {
     del: delInfoComment,
     reload: loadInfoArticles
   });
+}
+
+// ---- PDF-HANTERING ----
+
+async function handleInfoAddPdf(articleId: number, inputEl: HTMLInputElement): Promise<void> {
+  const file = inputEl.files?.[0];
+  if (!file) return;
+  if (file.type !== "application/pdf") { toast("Välj en PDF-fil", 1); return; }
+  if (file.size > 20 * 1024 * 1024) { toast("PDF:en får max vara 20 MB", 1); return; }
+  toast("Laddar upp PDF...");
+  try {
+    const url = await uploadPdf(file);
+    await addInfoPdf(articleId, url, file.name);
+    await loadInfoArticles();
+    toast("✓ PDF uppladdad");
+    render();
+  } catch (e) {
+    toast("Kunde inte ladda upp PDF", 1);
+  }
+}
+
+async function doDelInfoPdf(pdfId: number): Promise<void> {
+  if (!auth.isAdmin) return;
+  if (!await confirmModal("Ta bort PDF:en?", { confirmLabel: "Ta bort", danger: true })) return;
+  try {
+    await delInfoPdf(pdfId);
+    await loadInfoArticles();
+    toast("🗑 PDF borttagen");
+    render();
+  } catch (e) {
+    toast("Kunde inte ta bort", 1);
+  }
+}
+
+function openPdfOverlay(url: string, name: string): void {
+  const c = document.getElementById("modal-container");
+  if (!c) return;
+  c.innerHTML = `
+    <div class="info-pdf-overlay">
+      <div class="info-pdf-overlay-bar">
+        <span>${esc(name)}</span>
+        <a href="${escAttr(url)}" download="${escAttr(name)}" class="btn-ghost" style="flex-shrink:0">⬇ Ladda ned</a>
+        <button class="btn-ghost" onclick="closeModal()" style="flex-shrink:0">✕ Stäng</button>
+      </div>
+      <iframe src="${escAttr(url)}" title="${escAttr(name)}"></iframe>
+    </div>`;
 }
