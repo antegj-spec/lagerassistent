@@ -83,6 +83,7 @@
           </button>
           <div class="hdr-gear-menu" id="hdr-gear-menu">
             <button class="hdr-gear-item" onclick="toggleTheme();closeGearMenu()">🌙 Växla tema</button>
+            <button class="hdr-gear-item" id="hdr-gear-push-btn" onclick="togglePush();closeGearMenu()">🔔 Aktivera notiser</button>
             <button class="hdr-gear-item" onclick="openChangePin();closeGearMenu()">🔑 Byt PIN</button>
             <button class="hdr-gear-item hdr-gear-item--danger" onclick="logout()">🚪 Logga ut</button>
           </div>
@@ -166,6 +167,7 @@
 <script src="/js/actions/returns.js"></script>
 <script src="/js/actions/tasks.js"></script>
 <script src="/js/actions/info.js"></script>
+<script src="/js/actions/push.js"></script>
 <script>
 function toggleTheme() {
   var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
