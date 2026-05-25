@@ -286,6 +286,29 @@ nav button.active { color: var(--accent); border-top-color: var(--accent); }
 
 main { flex: 1; padding: var(--sp-lg) var(--sp-md) 100px; overflow-y: auto; }
 
+/* Fas 7: Top-level sub-tab-chips för main-grupperna (Arbete, Lager, Drift, Admin) */
+.main-subtabs {
+  display: flex; gap: var(--sp-xs); flex-wrap: wrap;
+  margin: calc(-1 * var(--sp-sm)) 0 var(--sp-md);
+  padding-bottom: var(--sp-sm);
+  border-bottom: 1px solid var(--border);
+}
+.subtab-btn {
+  min-height: 36px; padding: 0 14px;
+  font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .5px;
+  border-radius: 18px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+  cursor: pointer; white-space: nowrap;
+  transition: border-color .15s, color .15s, background .15s, box-shadow .15s;
+  box-shadow: var(--shadow-sm);
+  -webkit-tap-highlight-color: transparent;
+}
+@media (hover: hover) {
+  .subtab-btn:hover { border-color: var(--muted); color: var(--text); }
+}
+.subtab-btn:active { transform: scale(.97); }
+.subtab-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); box-shadow: 0 1px 3px var(--accent-shadow); }
+
 /* ============================================================
    UTILITY-KLASSER
    ============================================================ */

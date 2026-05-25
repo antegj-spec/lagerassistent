@@ -50,12 +50,20 @@ export type TabName =
   | 'hem'
   | 'anteckningar'
   | 'material'
+  | 'returer'
   | 'plan'
   | 'info'
   | 'chat'
   | 'export'
   | 'trash'
   | 'dashboard';
+
+export type MainTabName =
+  | 'hem'
+  | 'arbete'
+  | 'lager'
+  | 'drift'
+  | 'admin';
 
 // ---------- ISO-tidsstämpel-alias ----------
 

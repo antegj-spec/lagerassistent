@@ -11,22 +11,40 @@ function render(): void {
   // SÄKERHET (defense in depth): blockera admin-only tabs för icke-admin.
   // Förhindrar att ett tab-state från tidigare session leder till
   // rendering av admin-data (t.ex. AI-sammanfattning som genererats av Admin).
-  const ADMIN_ONLY_TABS = ["chat", "export", "trash", "dashboard"];
-  if (!auth.isAdmin && ADMIN_ONLY_TABS.includes(ui.tab)) {
+  if (!auth.isAdmin && isTabAdminOnly(ui.tab)) {
     ui.tab = "hem";
+    ui.mainTab = "hem";
   }
+  // Synka mainTab med tab (skydd mot stale state).
+  ui.mainTab = TAB_TO_MAIN[ui.tab] ?? "hem";
+
+  const subTabBar = rMainSubTabs();
 
   if (ui.tab === "hem")               m.innerHTML = rHem();
-  else if (ui.tab === "anteckningar") m.innerHTML = rNotes();
-  else if (ui.tab === "material")     m.innerHTML = rMat();
-  else if (ui.tab === "plan")         m.innerHTML = rPlan();
-  else if (ui.tab === "info")         m.innerHTML = rInfo();
-  else if (ui.tab === "chat")         m.innerHTML = rChat();
-  else if (ui.tab === "export")       m.innerHTML = rExport();
-  else if (ui.tab === "trash")        m.innerHTML = rTrash();
-  else if (ui.tab === "dashboard")    m.innerHTML = rDashboard();
-  else                              m.innerHTML = rHem();  // fallback
+  else if (ui.tab === "anteckningar") m.innerHTML = subTabBar + rNotes();
+  else if (ui.tab === "material")     m.innerHTML = subTabBar + rMat();
+  else if (ui.tab === "returer")      m.innerHTML = subTabBar + rReturer();
+  else if (ui.tab === "plan")         m.innerHTML = subTabBar + rPlan();
+  else if (ui.tab === "info")         m.innerHTML = subTabBar + rInfo();
+  else if (ui.tab === "chat")         m.innerHTML = subTabBar + rChat();
+  else if (ui.tab === "export")       m.innerHTML = subTabBar + rExport();
+  else if (ui.tab === "trash")        m.innerHTML = subTabBar + rTrash();
+  else if (ui.tab === "dashboard")    m.innerHTML = subTabBar + rDashboard();
+  else                                m.innerHTML = rHem();  // fallback
   bindEvents();
+}
+
+// Fas 7: top-level sub-tab-chips för aktuell main-grupp.
+// Tom string om gruppen bara har 1 sub-tab (Hem).
+function rMainSubTabs(): string {
+  const def = MAIN_TABS.find(m => m.id === ui.mainTab);
+  if (!def) return "";
+  const visible = def.subTabs.filter(s => auth.isAdmin || !s.adminOnly);
+  if (visible.length <= 1) return "";
+  return `
+<div class="main-subtabs">
+  ${visible.map(s => `<button class="subtab-btn ${ui.tab === s.id ? "active" : ""}" onclick="showTab('${s.id}')">${s.emoji} ${esc(s.label)}</button>`).join("")}
+</div>`;
 }
 
 // ============================================================
@@ -249,15 +267,17 @@ function rCard(n: Note, inTrash: boolean = false): string {
 // MATERIAL-FLIKEN — med sub-tabs (Status / Åtgärder / Returer)
 // ============================================================
 function rMat(): string {
+  // Fas 7: "Returer" lyftes ut till egen top-level sub-tab under Lager.
+  // Material-internal sub-tabs är nu bara Status + Åtgärder.
   const actionCount = materials.actionComments.length;
+  // Säkerställ att vi inte hänger på "returer"-state från före Fas 7.
+  if (ui.matSubTab === "returer") ui.matSubTab = "status";
   const subTabs = `
 <div class="filter-row mb" style="border-bottom:1px solid var(--border);padding-bottom:8px">
   <button class="filter-btn ${ui.matSubTab === "status" ? "active" : ""}" onclick="setMatSubTab('status')">📦 MATERIAL STATUS</button>
   <button class="filter-btn ${ui.matSubTab === "åtgärder" ? "active" : ""}" onclick="setMatSubTab('åtgärder')" style="${actionCount > 0 ? "border-color:#E8521A;color:#E8521A" : ""}">🚨 ÅTGÄRDER${actionCount > 0 ? ` (${actionCount})` : ""}</button>
-  <button class="filter-btn ${ui.matSubTab === "returer" ? "active" : ""}" onclick="setMatSubTab('returer')">↩ RETURER (${returns.list.length})</button>
 </div>`;
 
-  if (ui.matSubTab === "returer") return subTabs + rReturer();
   if (ui.matSubTab === "åtgärder") return subTabs + rMatActions();
   return subTabs + rMatStatus();
 }

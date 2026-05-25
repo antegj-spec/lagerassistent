@@ -217,6 +217,7 @@ function resolveConfirm(value: boolean): void {
 // ---- BROWSER HISTORY (SPA-navigering) ----
 
 interface NavState {
+  mainTab: MainTabName;
   tab: TabName;
   notesId: number | null;
   matsId: number | null;
@@ -228,6 +229,7 @@ interface NavState {
 
 function _navSnapshot(): NavState {
   return {
+    mainTab: ui.mainTab,
     tab: ui.tab,
     notesId: notes.openId,
     matsId: materials.openId,
@@ -251,6 +253,7 @@ window.addEventListener("popstate", (e: PopStateEvent) => {
   const s: NavState | null = e.state;
   if (!s) return;
   ui.tab = s.tab ?? "hem";
+  ui.mainTab = s.mainTab ?? TAB_TO_MAIN[ui.tab] ?? "hem";
   notes.openId = s.notesId ?? null;
   materials.openId = s.matsId ?? null;
   tasks.openId = s.tasksId ?? null;
@@ -258,11 +261,17 @@ window.addEventListener("popstate", (e: PopStateEvent) => {
   info.editMode = null;
   ui.matSubTab = (s.matSubTab as "status" | "returer" | "åtgärder") ?? "status";
   ui.planSubTab = (s.planSubTab as "aktiva" | "arkiv") ?? "aktiva";
-  document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
-  const tabs: TabName[] = ["hem", "anteckningar", "material", "plan", "info", "chat", "export", "trash", "dashboard"];
-  document.querySelectorAll("nav button")[tabs.indexOf(ui.tab)]?.classList.add("active");
+  _highlightMainNav();
   render();
 });
+
+// Markerar aktiv main-nav-knapp baserat på ui.mainTab.
+function _highlightMainNav(): void {
+  document.querySelectorAll("nav button[data-main-tab]").forEach(b => {
+    const m = b.getAttribute("data-main-tab");
+    b.classList.toggle("active", m === ui.mainTab);
+  });
+}
 
 // ---- INIT & TABS ----
 async function initApp(): Promise<void> {
@@ -276,11 +285,12 @@ async function initApp(): Promise<void> {
 
 function showTab(t: TabName): void {
   // Blockera admin-only-flikar för icke-admin
-  if ((t === "chat" || t === "dashboard") && !auth.isAdmin) {
+  if (isTabAdminOnly(t) && !auth.isAdmin) {
     toast("Den här fliken är endast tillgänglig för Admin", 1);
     return;
   }
   ui.tab = t;
+  ui.mainTab = TAB_TO_MAIN[t] ?? "hem";
   notes.openId = null;
   materials.openId = null;
   tasks.openId = null;
@@ -298,9 +308,7 @@ function showTab(t: TabName): void {
   ui.matCommentImgUrl = null;
   ui.itemCommentImgUrl = null;
   ui.infoCommentImgUrl = null;
-  document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
-  const tabs: TabName[] = ["hem", "anteckningar", "material", "plan", "info", "chat", "export", "trash", "dashboard"];
-  document.querySelectorAll("nav button")[tabs.indexOf(t)]?.classList.add("active");
+  _highlightMainNav();
   // Fas 6.9: Dashboard laddar feed-data on-demand via openDashboard.
   if (t === "dashboard" && typeof openDashboard === "function") {
     _navPush();
@@ -311,8 +319,25 @@ function showTab(t: TabName): void {
   render();
 }
 
+// Fas 7: klick på main-nav-knapp → navigera till första (synliga) sub-tab.
+function setMainTab(m: MainTabName): void {
+  const def = MAIN_TABS.find(x => x.id === m);
+  if (!def) return;
+  if (def.adminOnly && !auth.isAdmin) {
+    toast("Den här gruppen är endast tillgänglig för Admin", 1);
+    return;
+  }
+  // Välj första sub-tab som är tillgänglig för den här användaren.
+  const firstAccessibleSub = def.subTabs.find(s => auth.isAdmin || !s.adminOnly);
+  if (!firstAccessibleSub) return;
+  showTab(firstAccessibleSub.id);
+}
+
 // ---- SUB-TABS för Material ----
+// Fas 7: "returer" har lyfts ut till egen top-level sub-tab (Lager > Returer)
+// men typunionen behåller den för bakåtkompatibilitet med popstate-state.
 async function setMatSubTab(t: "status" | "returer" | "åtgärder"): Promise<void> {
+  if (t === "returer") { showTab("returer"); return; }
   ui.matSubTab = t;
   materials.openId = null;
   materials.openItemId = null;

@@ -24,6 +24,7 @@ declare global {
   type InfoCategory = D.InfoCategory;
   type MaterialCommentStatus = D.MaterialCommentStatus;
   type TabName = D.TabName;
+  type MainTabName = D.MainTabName;
   type Timestamp = D.Timestamp;
 
   type Note = D.Note;

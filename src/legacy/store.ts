@@ -24,6 +24,7 @@ interface AuthState {
 }
 
 interface UiState {
+  mainTab: MainTabName;
   tab: TabName;
   fCat: string;
   fStat: string;
@@ -115,6 +116,7 @@ const appState: AppState = {
     isAdmin: false,
   },
   ui: {
+    mainTab: "hem",
     tab: "hem",
     fCat: "alla",
     fStat: "alla",
@@ -241,6 +243,7 @@ function resetAppState(): void {
 }
 
 function resetUiState(): void {
+  ui.mainTab = "hem";
   ui.tab = "hem";
   ui.fCat = "alla";
   ui.fStat = "alla";
