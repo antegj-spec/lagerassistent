@@ -1,12 +1,14 @@
 -- ============================================================
 -- 015_cron_jobs_and_backup_bucket.sql  (Fas 6 Milstolpe 4)
 --
--- Aktiverar pg_cron + pg_net och sätter upp 5 schemalagda jobb:
+-- Aktiverar pg_cron + pg_net och sätter upp 4 schemalagda jobb:
 --  - 6.3:  Auto-arkivera klara tasks äldre än 30 dagar (dagligen 03:00 UTC)
---  - 6.4:  Tvätt → tillgänglig efter 7 dagar (dagligen 03:15 UTC)
 --  - 6.14: Daglig JSON-backup till storage bucket (dagligen 02:00 UTC)
 --         + backup-cleanup som raderar > 30d (dagligen 04:00 UTC)
 --  - 6.15: Veckomail varje måndag 06:00 UTC (07:00 CET / 08:00 CEST)
+--
+-- Not: 6.4 (auto-flytta tvätt → tillgänglig) bortvald — användaren vill
+-- behålla manuell kontroll över tvätt-cykeln.
 --
 -- IDEMPOTENT — cron.schedule ersätter ev. tidigare jobb med samma namn.
 -- vault.create_secret är INTE idempotent — använd ON CONFLICT-pattern
@@ -107,32 +109,6 @@ select cron.schedule(
 );
 
 
--- ---- 6.4: TVÄTT → TILLGÄNGLIG EFTER 7 DAGAR ----
--- Kör dagligen 03:15 UTC. Flyttar material_items.status='tvätt' →
--- 'tillgänglig' när updated_at är äldre än 7 dagar. Sätter last_washed=now()
--- och loggar till material_history med changed_by='system'.
-
-select cron.schedule(
-  'auto-flytta-tvatt',
-  '15 3 * * *',
-  $$
-    with flipped as (
-      update material_items
-      set status = 'tillgänglig',
-          last_washed = now(),
-          updated_at = now()
-      where status = 'tvätt'
-        and updated_at < now() - interval '7 days'
-      returning id, material_id, article_id
-    )
-    insert into material_history
-      (material_id, item_id, article_id, old_status, new_status, changed_by, created_at)
-    select material_id, id, article_id, 'tvätt', 'tillgänglig', 'system', now()
-    from flipped;
-  $$
-);
-
-
 -- ---- 6.14: DAGLIG BACKUP ----
 -- Kör dagligen 02:00 UTC. Triggar Edge Function via pg_net.
 
@@ -191,8 +167,8 @@ select cron.schedule(
 --
 -- 2. Schemalagda jobb?
 --    select jobid, schedule, jobname, active from cron.job
---      where jobname in ('auto-archive-tasks', 'auto-flytta-tvatt',
---                        'daily-backup', 'backup-cleanup', 'send-weekly-mail');
+--      where jobname in ('auto-archive-tasks', 'daily-backup',
+--                        'backup-cleanup', 'send-weekly-mail');
 --
 -- 3. Manuell test av backup-flödet (utan att vänta till 02:00):
 --    select net.http_post(
@@ -230,10 +206,12 @@ select cron.schedule(
 -- ============================================================
 -- Avschemalägg alla jobb:
 --   select cron.unschedule('auto-archive-tasks');
---   select cron.unschedule('auto-flytta-tvatt');
 --   select cron.unschedule('daily-backup');
 --   select cron.unschedule('backup-cleanup');
 --   select cron.unschedule('send-weekly-mail');
+--
+-- (Om du tidigare körde en version som innehöll auto-flytta-tvatt,
+--  kör även: select cron.unschedule('auto-flytta-tvatt');)
 --
 -- Ta bort wrapper-funktion:
 --   drop function if exists public.cron_secret(text);
