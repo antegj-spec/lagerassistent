@@ -8,6 +8,246 @@
 // Fas 4.5/4.6: hot paths använder patchNoteCard + optimistic().
 // ============================================================
 
+// Fas 5.8: spara/återställ senast använda värden i note-formuläret.
+// Per användare i localStorage. Deadline hoppas över (datum-specifikt).
+function noteDefaultsKey(): string {
+  return `lager-note-defaults-${auth.user || "default"}`;
+}
+
+function saveNoteFormDefaults(): void {
+  const cat      = (document.getElementById("note-cat") as HTMLSelectElement | null)?.value;
+  const prio     = (document.getElementById("note-prio") as HTMLSelectElement | null)?.value;
+  const assigned = (document.getElementById("note-assign") as HTMLSelectElement | null)?.value;
+  const matId    = (document.getElementById("note-material") as HTMLSelectElement | null)?.value;
+  try {
+    localStorage.setItem(noteDefaultsKey(), JSON.stringify({ cat, prio, assigned, matId }));
+  } catch (e) { /* storage full / disabled — strunta */ }
+}
+
+function applyNoteFormDefaults(): void {
+  let saved: { cat?: string; prio?: string; assigned?: string; matId?: string } | null = null;
+  try { saved = JSON.parse(localStorage.getItem(noteDefaultsKey()) || "null"); }
+  catch (e) { return; }
+  if (!saved) return;
+
+  const setIfOption = (id: string, val: string | undefined): void => {
+    if (!val) return;
+    const el = document.getElementById(id) as HTMLSelectElement | null;
+    if (!el) return;
+    if ([...el.options].some(o => o.value === val)) el.value = val;
+  };
+  setIfOption("note-cat", saved.cat);
+  setIfOption("note-prio", saved.prio);
+  setIfOption("note-assign", saved.assigned);
+  setIfOption("note-material", saved.matId);
+}
+
+// ============================================================
+// Fas 5.7: Mall-anteckningar — sparas per användare i localStorage.
+// ============================================================
+interface NoteTemplate {
+  name: string;
+  text: string;
+  cat?: string;
+  prio?: string;
+  assigned?: string;
+  matId?: string;
+}
+
+function noteTemplatesKey(): string {
+  return `lager-note-templates-${auth.user || "default"}`;
+}
+
+function getNoteTemplates(): NoteTemplate[] {
+  try {
+    const raw = localStorage.getItem(noteTemplatesKey());
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function setNoteTemplates(list: NoteTemplate[]): void {
+  try { localStorage.setItem(noteTemplatesKey(), JSON.stringify(list)); }
+  catch (e) { /* storage full / disabled */ }
+}
+
+function renderNoteTemplatesUI(): void {
+  const input = document.getElementById("note-input");
+  if (!input || !input.parentElement) return;
+  // Förhindra dubbel-injicering om bindEvents körs flera gånger
+  document.getElementById("note-templates-row")?.remove();
+
+  const tpls = getNoteTemplates();
+  const row = document.createElement("div");
+  row.id = "note-templates-row";
+  row.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;align-items:center";
+
+  const lbl = document.createElement("span");
+  lbl.style.cssText = "font-size:10px;color:var(--muted);font-family:var(--display);font-weight:700";
+  lbl.textContent = tpls.length ? "📋 MALLAR:" : "📋 MALLAR (inga ännu)";
+  row.appendChild(lbl);
+
+  for (const t of tpls) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.style.cssText = "font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer";
+    chip.textContent = t.name;
+    chip.title = "Klicka för att fylla i — högerklick för att radera";
+    chip.onclick = () => applyNoteTemplate(t.name);
+    chip.oncontextmenu = (e) => { e.preventDefault(); void deleteNoteTemplate(t.name); };
+    row.appendChild(chip);
+  }
+
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.style.cssText = "font-size:11px;padding:3px 10px;border-radius:12px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;margin-left:auto";
+  saveBtn.textContent = "+ Spara som mall";
+  saveBtn.onclick = () => void saveCurrentAsTemplate();
+  row.appendChild(saveBtn);
+
+  input.parentElement.insertBefore(row, input);
+}
+
+function applyNoteTemplate(name: string): void {
+  const t = getNoteTemplates().find(x => x.name === name);
+  if (!t) return;
+  const input = document.getElementById("note-input") as HTMLTextAreaElement | HTMLInputElement | null;
+  if (input) input.value = t.text;
+  const setIfOption = (id: string, val: string | undefined): void => {
+    if (!val) return;
+    const el = document.getElementById(id) as HTMLSelectElement | null;
+    if (!el) return;
+    if ([...el.options].some(o => o.value === val)) el.value = val;
+  };
+  setIfOption("note-cat", t.cat);
+  setIfOption("note-prio", t.prio);
+  setIfOption("note-assign", t.assigned);
+  setIfOption("note-material", t.matId);
+  toast(`✓ Mall "${t.name}" tillämpad`);
+}
+
+async function saveCurrentAsTemplate(): Promise<void> {
+  const input = document.getElementById("note-input") as HTMLTextAreaElement | HTMLInputElement | null;
+  const text = input?.value?.trim();
+  if (!text) { toast("Skriv text i anteckningen först", 1); return; }
+
+  const suggestedName = text.substring(0, 30);
+  const name = prompt("Namn på mallen?", suggestedName);
+  if (!name || !name.trim()) return;
+
+  const tpls = getNoteTemplates();
+  const existing = tpls.findIndex(t => t.name === name.trim());
+  const tpl: NoteTemplate = {
+    name: name.trim(),
+    text,
+    cat: (document.getElementById("note-cat") as HTMLSelectElement | null)?.value,
+    prio: (document.getElementById("note-prio") as HTMLSelectElement | null)?.value,
+    assigned: (document.getElementById("note-assign") as HTMLSelectElement | null)?.value,
+    matId: (document.getElementById("note-material") as HTMLSelectElement | null)?.value,
+  };
+  if (existing >= 0) tpls[existing] = tpl;
+  else tpls.push(tpl);
+  setNoteTemplates(tpls);
+  renderNoteTemplatesUI();
+  toast(`✓ Mall "${tpl.name}" sparad`);
+}
+
+async function deleteNoteTemplate(name: string): Promise<void> {
+  if (!await confirmModal(`Radera mallen "${name}"?`, { confirmLabel: "Radera", danger: true })) return;
+  setNoteTemplates(getNoteTemplates().filter(t => t.name !== name));
+  renderNoteTemplatesUI();
+  toast("🗑 Mall raderad");
+}
+
+// ============================================================
+// Fas 5.5: Voice input för anteckningar via Web Speech API.
+// Mic-knapp i textarea-hörnet — sv-SE, continuous mode.
+// Tyst om SpeechRecognition saknas (alltid på iOS Safari pre-15).
+// ============================================================
+let voiceRecognition: any = null;
+let voiceActive: boolean = false;
+
+function attachVoiceInput(): void {
+  const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!SR) return;
+
+  // Stoppa ev. tidigare session om DOM:en byttes mellan renders.
+  if (voiceRecognition && voiceActive) {
+    try { voiceRecognition.stop(); } catch (e) { /* ignore */ }
+    voiceActive = false;
+    voiceRecognition = null;
+  }
+
+  const input = document.getElementById("note-input") as HTMLTextAreaElement | null;
+  if (!input || !input.parentElement) return;
+  if (document.getElementById("note-mic-btn")) return;
+
+  // Wrap textarea i relativ container för att kunna ankra mic-knappen.
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "position:relative";
+  input.parentElement.insertBefore(wrap, input);
+  wrap.appendChild(input);
+
+  const btn = document.createElement("button");
+  btn.id = "note-mic-btn";
+  btn.type = "button";
+  btn.title = "Diktera anteckningen (sv-SE)";
+  btn.textContent = "🎤";
+  btn.style.cssText = "position:absolute;right:8px;bottom:8px;font-size:16px;width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--surface);cursor:pointer;z-index:5;padding:0";
+  btn.onclick = () => toggleVoiceInput(input, btn);
+  wrap.appendChild(btn);
+}
+
+function toggleVoiceInput(input: HTMLTextAreaElement, btn: HTMLButtonElement): void {
+  const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!SR) { toast("Voice input stöds inte i denna webbläsare", 1); return; }
+
+  if (voiceActive && voiceRecognition) {
+    try { voiceRecognition.stop(); } catch (e) { /* ignore */ }
+    return;
+  }
+
+  const rec = new SR();
+  rec.lang = "sv-SE";
+  rec.continuous = true;
+  rec.interimResults = false;
+
+  rec.onresult = (e: any) => {
+    let chunk = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) chunk += e.results[i][0].transcript;
+    }
+    if (!chunk) return;
+    const sep = (input.value && !input.value.endsWith(" ") && !input.value.endsWith("\n")) ? " " : "";
+    input.value = (input.value || "") + sep + chunk;
+    // trigga classifyCat/classifyPrio via befintlig input-listener
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+
+  rec.onerror = (e: any) => {
+    toast(`Mic-fel: ${e.error || "okänt"}`, 1);
+  };
+
+  rec.onend = () => {
+    voiceActive = false;
+    voiceRecognition = null;
+    btn.style.background = "var(--surface)";
+    btn.textContent = "🎤";
+  };
+
+  try {
+    rec.start();
+    voiceRecognition = rec;
+    voiceActive = true;
+    btn.style.background = "#E8521A";
+    btn.textContent = "⏹";
+    toast("🎤 Lyssnar — tala på svenska");
+  } catch (e) {
+    toast("Kunde inte starta voice input", 1);
+  }
+}
+
 async function addNote(): Promise<void> {
   const inp  = document.getElementById("note-input") as HTMLTextAreaElement | HTMLInputElement | null;
   const text = inp?.value?.trim();
@@ -29,6 +269,7 @@ async function addNote(): Promise<void> {
     await saveNote({ text, category: cat, priority: prio, status: "ny", created_by: auth.user || "", image_url, assigned_to: assigned, material_id, deadline });
     await loadNotes();
     updMeta();
+    saveNoteFormDefaults();   // Fas 5.8: minns valen till nästa anteckning
     ui.imgData = null;
     ui.imgFile = null;
     toast("✓ Anteckning sparad");
@@ -49,6 +290,18 @@ async function toggleNote(id: number): Promise<void> {
   // istället för full render(). Vid första-toggle är prevOpen null.
   if (prevOpen != null && prevOpen !== id) patchNoteCard(prevOpen);
   patchNoteCard(id);
+}
+
+// Fas 5.4: cykla genom statusar (ny → pågår → klar → ny) vid tap
+// på status-badge i note-kortet. Använder befintlig setStatus med
+// optimistic + patchNoteCard.
+async function cycleNoteStatus(id: number): Promise<void> {
+  const note = notes.list.find(n => n.id === id);
+  if (!note) return;
+  const order: NoteStatus[] = ["ny", "pågår", "klar"];
+  const idx = order.indexOf(note.status);
+  const next = order[(idx + 1) % order.length];
+  await setStatus(id, next);
 }
 
 async function setStatus(id: number, status: NoteStatus): Promise<void> {
