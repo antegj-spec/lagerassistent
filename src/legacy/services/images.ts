@@ -3,6 +3,21 @@
 // Beror på: config.ts (SB_URL, SB_KEY)
 // ============================================================
 
+async function uploadPdf(file: File): Promise<string> {
+  const name = Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+  const r = await fetch(SB_URL + "/storage/v1/object/lager-pdfs/" + name, {
+    method: "POST",
+    headers: {
+      "apikey": SB_KEY,
+      "Authorization": "Bearer " + SB_KEY,
+      "Content-Type": "application/pdf"
+    },
+    body: file
+  });
+  if (!r.ok) throw new Error("PDF-uppladdning misslyckades");
+  return SB_URL + "/storage/v1/object/public/lager-pdfs/" + name;
+}
+
 async function uploadImg(file: File): Promise<string> {
   const blob = await compressImg(file, 800, 0.72);
   const name = Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9.]/g, "_");

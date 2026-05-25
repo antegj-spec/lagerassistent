@@ -117,3 +117,28 @@ async function toggleChecklistItem(id: number, done: boolean): Promise<void> {
 async function delChecklistItem(id: number): Promise<void> {
   await sb("/rest/v1/task_checklist?id=eq." + id, { method: "DELETE" });
 }
+
+// ---- INFO-ARTIKEL-LÄNKAR ----
+
+async function loadTaskInfoLinks(task_id: number): Promise<void> {
+  try {
+    const rows = await sb<TaskInfoLink[]>("/rest/v1/task_info_links?task_id=eq." + task_id + "&order=created_at.asc") || [];
+    tasks.infoLinks[task_id] = rows.map(r => r.info_article_id);
+  } catch (e) {
+    tasks.infoLinks[task_id] = [];
+  }
+}
+
+async function addTaskInfoLink(task_id: number, info_article_id: number): Promise<void> {
+  await sb("/rest/v1/task_info_links", {
+    method: "POST",
+    body: JSON.stringify({ task_id, info_article_id, created_by: auth.user }),
+    prefer: "return=minimal"
+  });
+}
+
+async function removeTaskInfoLink(task_id: number, info_article_id: number): Promise<void> {
+  await sb("/rest/v1/task_info_links?task_id=eq." + task_id + "&info_article_id=eq." + info_article_id, {
+    method: "DELETE"
+  });
+}

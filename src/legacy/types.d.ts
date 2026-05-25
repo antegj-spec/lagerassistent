@@ -44,6 +44,8 @@ declare global {
   type InfoArticle = D.InfoArticle;
   type InfoImage = D.InfoImage;
   type InfoComment = D.InfoComment;
+  type InfoPdf = D.InfoPdf;
+  type TaskInfoLink = D.TaskInfoLink;
   type UserPin = D.UserPin;
   type UserRole = D.UserRole;
   type ChatMessage = D.ChatMessage;

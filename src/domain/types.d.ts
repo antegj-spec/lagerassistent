@@ -267,6 +267,23 @@ export interface InfoComment {
   created_at: Timestamp;
 }
 
+export interface InfoPdf {
+  id: number;
+  article_id: number;
+  pdf_url: string;
+  file_name: string;
+  uploaded_by: UserName | string;
+  created_at: Timestamp;
+}
+
+export interface TaskInfoLink {
+  id: number;
+  task_id: number;
+  info_article_id: number;
+  created_by: UserName | string;
+  created_at: Timestamp;
+}
+
 // ---------- PINs & roller (Supabase-tabeller) ----------
 
 export interface UserPin {

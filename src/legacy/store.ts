@@ -78,12 +78,14 @@ interface TasksState {
   statusLogs: Record<number, TaskStatusLog[]>;
   comments: Record<number, TaskComment[]>;
   checklists: Record<number, TaskChecklistItem[]>;
+  infoLinks: Record<number, number[]>;                    // task_id → [info_article_id]
   openId: number | null;
 }
 
 interface InfoState {
   articles: InfoArticle[];
   images: Record<number, InfoImage[]>;
+  pdfs: Record<number, InfoPdf[]>;
   comments: Record<number, InfoComment[]>;
   openId: number | null;
   editMode: null | "new" | "edit";
@@ -162,11 +164,13 @@ const appState: AppState = {
     statusLogs: {},
     comments: {},
     checklists: {},
+    infoLinks: {},
     openId: null,
   },
   info: {
     articles: [],
     images: {},
+    pdfs: {},
     comments: {},
     openId: null,
     editMode: null,
@@ -222,10 +226,12 @@ function resetAppState(): void {
   tasks.statusLogs = {};
   tasks.comments = {};
   tasks.checklists = {};
+  tasks.infoLinks = {};
   tasks.openId = null;
   // Info
   info.articles = [];
   info.images = {};
+  info.pdfs = {};
   info.comments = {};
   info.openId = null;
   info.editMode = null;

@@ -149,6 +149,21 @@ function closeModal(): void {
   if (c) c.innerHTML = "";
 }
 
+// ---- LIGHTBOX ----
+function openLightbox(url: string): void {
+  const c = document.getElementById("modal-container");
+  if (!c) return;
+  c.innerHTML = `
+    <div class="lightbox-overlay" onclick="closeLightbox()">
+      <img class="lightbox-img" src="${escAttr(url)}" onclick="event.stopPropagation()" alt="">
+      <button class="lightbox-close" onclick="closeLightbox()">×</button>
+    </div>`;
+}
+function closeLightbox(): void {
+  const c = document.getElementById("modal-container");
+  if (c) c.innerHTML = "";
+}
+
 // Fas 3.7 (B20): Promise-baserad ersättare för window.confirm().
 // Använder samma modal-overlay men returnerar true/false så att
 // destruktiva action-funktioner kan await:a svaret. Ger tema-konsistent
@@ -199,6 +214,56 @@ function resolveConfirm(value: boolean): void {
   if (r) r(value);
 }
 
+// ---- BROWSER HISTORY (SPA-navigering) ----
+
+interface NavState {
+  tab: TabName;
+  notesId: number | null;
+  matsId: number | null;
+  tasksId: number | null;
+  infoId: number | null;
+  matSubTab: string;
+  planSubTab: string;
+}
+
+function _navSnapshot(): NavState {
+  return {
+    tab: ui.tab,
+    notesId: notes.openId,
+    matsId: materials.openId,
+    tasksId: tasks.openId,
+    infoId: info.openId,
+    matSubTab: ui.matSubTab,
+    planSubTab: ui.planSubTab,
+  };
+}
+
+function _navPush(): void {
+  history.pushState(_navSnapshot(), "");
+}
+
+function _navReplace(): void {
+  history.replaceState(_navSnapshot(), "");
+}
+
+window.addEventListener("popstate", (e: PopStateEvent) => {
+  if (!auth.user) return;
+  const s: NavState | null = e.state;
+  if (!s) return;
+  ui.tab = s.tab ?? "hem";
+  notes.openId = s.notesId ?? null;
+  materials.openId = s.matsId ?? null;
+  tasks.openId = s.tasksId ?? null;
+  info.openId = s.infoId ?? null;
+  info.editMode = null;
+  ui.matSubTab = (s.matSubTab as "status" | "returer" | "åtgärder") ?? "status";
+  ui.planSubTab = (s.planSubTab as "aktiva" | "arkiv") ?? "aktiva";
+  document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
+  const tabs: TabName[] = ["hem", "anteckningar", "material", "plan", "info", "chat", "export", "trash", "dashboard"];
+  document.querySelectorAll("nav button")[tabs.indexOf(ui.tab)]?.classList.add("active");
+  render();
+});
+
 // ---- INIT & TABS ----
 async function initApp(): Promise<void> {
   const main = document.getElementById("main");
@@ -206,6 +271,7 @@ async function initApp(): Promise<void> {
   await Promise.all([loadNotes(), loadMats(), loadReturns(), loadTasks(), loadInfoArticles(), loadActionComments()]);
   updMeta();
   render();
+  _navReplace();
 }
 
 function showTab(t: TabName): void {
@@ -237,9 +303,11 @@ function showTab(t: TabName): void {
   document.querySelectorAll("nav button")[tabs.indexOf(t)]?.classList.add("active");
   // Fas 6.9: Dashboard laddar feed-data on-demand via openDashboard.
   if (t === "dashboard" && typeof openDashboard === "function") {
+    _navPush();
     void openDashboard();
     return;
   }
+  _navPush();
   render();
 }
 

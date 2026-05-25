@@ -14,7 +14,9 @@ async function openTaskDetail(id: number): Promise<void> {
   if (!tasks.statusLogs[id]) loads.push(loadTaskStatusLog(id));
   if (!tasks.comments[id]) loads.push(loadTaskComments(id));
   if (!tasks.checklists[id]) loads.push(loadTaskChecklist(id));
+  if (!tasks.infoLinks[id]) loads.push(loadTaskInfoLinks(id));
   if (loads.length) await Promise.all(loads);
+  _navPush();
   render();
 }
 
@@ -330,5 +332,36 @@ async function doDelTask(id: number): Promise<void> {
     render();
   } catch (e) {
     toast("Kunde inte radera", 1);
+  }
+}
+
+// ---- INFO-ARTIKEL-LÄNKNING ----
+
+async function addTaskInfoLinkAction(taskId: number): Promise<void> {
+  if (!auth.isAdmin) return;
+  const sel = document.getElementById("task-info-link-select-" + taskId) as HTMLSelectElement | null;
+  const articleId = Number(sel?.value);
+  if (!articleId) { toast("Välj en artikel att länka", 1); return; }
+  const existing = tasks.infoLinks[taskId] || [];
+  if (existing.includes(articleId)) { toast("Artikeln är redan länkad", 1); return; }
+  try {
+    await addTaskInfoLink(taskId, articleId);
+    await loadTaskInfoLinks(taskId);
+    toast("✓ Artikel länkad");
+    render();
+  } catch (e) {
+    toast("Kunde inte länka artikel", 1);
+  }
+}
+
+async function removeTaskInfoLinkAction(taskId: number, articleId: number): Promise<void> {
+  if (!auth.isAdmin) return;
+  try {
+    await removeTaskInfoLink(taskId, articleId);
+    await loadTaskInfoLinks(taskId);
+    toast("Länk borttagen");
+    render();
+  } catch (e) {
+    toast("Kunde inte ta bort länk", 1);
   }
 }

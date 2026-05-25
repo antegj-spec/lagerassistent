@@ -16,6 +16,7 @@ async function openMat(id) {
   if (!materials.comments[id]) loads.push(loadMatComments(id));
   if (!materials.images[id]) loads.push(loadMatImages(id));
   await Promise.all(loads);
+  _navPush();
   render();
 }
 

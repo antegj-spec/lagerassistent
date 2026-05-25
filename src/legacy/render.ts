@@ -286,7 +286,7 @@ function rMatCommentCard(c: MaterialComment, matId: number): string {
         </div>` : ""}
       </div>
     </div>
-    ${c.image_url ? `<img class="info-cmt-img" src="${escAttr(c.image_url)}" loading="lazy" onclick="window.open('${escAttr(c.image_url)}','_blank')">` : ""}
+    ${c.image_url ? `<img class="info-cmt-img" src="${escAttr(c.image_url)}" loading="lazy" onclick="openLightbox('${escAttr(c.image_url)}')">` : ""}
     <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}</div>
   </div>`;
 }
@@ -344,7 +344,7 @@ function rItemDetail(it: MaterialItem, m: Material): string {
     : null;
 
   return `
-<button class="btn-ghost mb" onclick="closeItem()">← Tillbaka till ${esc(m.name)}</button>
+<button class="btn-ghost mb" onclick="history.back()">← Tillbaka till ${esc(m.name)}</button>
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
     <div>
@@ -370,7 +370,7 @@ function rItemDetail(it: MaterialItem, m: Material): string {
   <div class="info-images">
     ${images.map(img =>
       `<div class="info-img-wrap">
-        <img src="${escAttr(img.image_url)}" loading="lazy" onclick="window.open('${escAttr(img.image_url)}','_blank')">
+        <img src="${escAttr(img.image_url)}" loading="lazy" onclick="openLightbox('${escAttr(img.image_url)}')">
         ${auth.isAdmin ? `<button class="info-img-del" onclick="doDelItemImg(${img.id},${it.id})">×</button>` : ""}
       </div>`
     ).join("")}
@@ -537,7 +537,7 @@ function rMatDetail(m: Material): string {
   let body = m.is_article_based ? rMatItemsView(m) : rMatCountsView(m);
 
   return `
-<button class="btn-ghost mb" onclick="closeMat()">← Tillbaka till lista</button>
+<button class="btn-ghost mb" onclick="history.back()">← Tillbaka till lista</button>
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
     <div>
@@ -558,7 +558,7 @@ function rMatDetail(m: Material): string {
   <div class="info-images">
     ${matImages.map(img =>
       `<div class="info-img-wrap">
-        <img src="${escAttr(img.image_url)}" loading="lazy" onclick="window.open('${escAttr(img.image_url)}','_blank')">
+        <img src="${escAttr(img.image_url)}" loading="lazy" onclick="openLightbox('${escAttr(img.image_url)}')">
         ${auth.isAdmin ? `<button class="info-img-del" onclick="doDelMatImg(${img.id},${m.id})">×</button>` : ""}
       </div>`
     ).join("")}
@@ -854,6 +854,51 @@ function rTaskListRow(t: Task, isArchived: boolean = false): string {
 </div>`;
 }
 
+// ---- INFO-LÄNK-SEKTION FÖR UPPGIFT ----
+function rTaskInfoLinks(taskId: number): string {
+  const linkedIds = tasks.infoLinks[taskId] || [];
+  const linkedArticles = linkedIds
+    .map(id => info.articles.find(a => a.id === id))
+    .filter(Boolean) as InfoArticle[];
+
+  const articleOptions = info.articles
+    .filter(a => !linkedIds.includes(a.id))
+    .map(a => `<option value="${a.id}">${esc(a.title)}</option>`)
+    .join("");
+
+  return `
+<div class="card">
+  <div class="lbl">KOPPLADE GUIDER & RUTINER (${linkedArticles.length})</div>
+  ${linkedArticles.length === 0 ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Inga kopplade artiklar — länka en INFO-artikel nedan</div>` : ""}
+  ${linkedArticles.map(a => {
+    const catCfg = INFO_CATS[a.category] || INFO_CATS.Utrustning;
+    const artImages = info.images[a.id] || [];
+    return `
+  <details class="task-info-link">
+    <summary>
+      ${catCfg.emoji} <span style="flex:1">${esc(a.title)}</span>
+      <span style="font-size:10px;color:var(--muted);font-weight:400">${esc(a.category)}</span>
+      ${auth.isAdmin ? `<button class="cmt-act-btn cmt-act-del" onclick="event.preventDefault();removeTaskInfoLinkAction(${taskId},${a.id})" style="flex-shrink:0">🗑</button>` : ""}
+    </summary>
+    <div class="task-info-link-content">
+      ${a.body ? `<div style="white-space:pre-wrap;margin-bottom:10px">${esc(a.body)}</div>` : ""}
+      ${artImages.length > 0 ? `<div class="info-images" style="margin-bottom:0">${artImages.map(img =>
+        `<div class="info-img-wrap"><img src="${escAttr(img.image_url)}" loading="lazy" onclick="openLightbox('${escAttr(img.image_url)}')"></div>`
+      ).join("")}</div>` : ""}
+    </div>
+  </details>`;
+  }).join("")}
+  ${auth.isAdmin && info.articles.length > linkedIds.length ? `
+  <div class="task-info-link-add">
+    <select id="task-info-link-select-${taskId}">
+      <option value="">— Välj artikel —</option>
+      ${articleOptions}
+    </select>
+    <button class="btn-ghost" onclick="addTaskInfoLinkAction(${taskId})">+ Länka</button>
+  </div>` : ""}
+</div>`;
+}
+
 // ---- FULL DETALJSIDA FÖR UPPGIFT ----
 function rTaskDetail(t: Task): string {
   const prio = PRIOS[t.priority || "medel"] || PRIOS.medel;
@@ -867,7 +912,7 @@ function rTaskDetail(t: Task): string {
   const isArchived = tasks.archived.some(a => a.id === t.id);
 
   return `
-<button class="btn-ghost mb" onclick="closeTaskDetail()">← Tillbaka till planering</button>
+<button class="btn-ghost mb" onclick="history.back()">← Tillbaka till planering</button>
 
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
@@ -911,6 +956,8 @@ ${t.description ? `<div class="card">
   <div class="lbl">BESKRIVNING</div>
   <div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${esc(t.description)}</div>
 </div>` : ""}
+
+${rTaskInfoLinks(t.id)}
 
 <!-- CHECKLISTA -->
 <div class="card">
@@ -1261,6 +1308,7 @@ function rInfoContent(): string {
 function rInfoArticle(a: InfoArticle): string {
   const catCfg = INFO_CATS[a.category] || INFO_CATS.Utrustning;
   const images = info.images[a.id] || [];
+  const pdfs = info.pdfs[a.id] || [];
   const cmts = info.comments[a.id] || [];
   const canEdit = auth.isAdmin || (a.created_by === auth.user && !a.is_pinned);
 
@@ -1284,7 +1332,7 @@ ${a.body ? `<div class="info-art-body">${esc(a.body)}</div>` : ""}
 <div class="info-images">
   ${images.map(img =>
     `<div class="info-img-wrap">
-      <img src="${escAttr(img.image_url)}" loading="lazy" onclick="window.open('${escAttr(img.image_url)}','_blank')">
+      <img src="${escAttr(img.image_url)}" loading="lazy" onclick="openLightbox('${escAttr(img.image_url)}')">
       ${auth.isAdmin ? `<button class="info-img-del" onclick="doDelInfoImage(${img.id})">×</button>` : ""}
     </div>`
   ).join("")}
@@ -1294,13 +1342,30 @@ ${a.body ? `<div class="info-art-body">${esc(a.body)}</div>` : ""}
   </label>
 </div>
 
+${`<div class="info-pdf-list">
+  ${pdfs.map(p =>
+    `<div class="info-pdf-item">
+      <span class="info-pdf-icon">📄</span>
+      <span class="info-pdf-name">${esc(p.file_name)}</span>
+      <div class="info-pdf-actions">
+        <button class="btn-ghost" onclick="openPdfOverlay('${escAttr(p.pdf_url)}','${escAttr(p.file_name)}')">Visa</button>
+        ${auth.isAdmin ? `<button class="btn-ghost" onclick="doDelInfoPdf(${p.id})" style="color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
+      </div>
+    </div>`
+  ).join("")}
+</div>
+<label class="btn-ghost" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-bottom:12px">
+  📄 Bifoga PDF
+  <input type="file" accept="application/pdf" style="display:none" onchange="handleInfoAddPdf(${a.id}, this)">
+</label>`}
+
 <div class="info-comments">
   <div class="comment-lbl">KOMMENTARER & FRÅGOR (${cmts.length})</div>
   ${cmts.map(c =>
     `<div class="info-comment">
       <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}${auth.isAdmin ? ` <button class="info-cmt-del" onclick="doDelInfoComment(${c.id})">×</button>` : ""}</div>
       ${c.body ? `<div class="comment-text" style="white-space:pre-wrap">${esc(c.body)}</div>` : ""}
-      ${c.image_url ? `<img class="info-cmt-img" src="${escAttr(c.image_url)}" loading="lazy" onclick="window.open('${escAttr(c.image_url)}','_blank')">` : ""}
+      ${c.image_url ? `<img class="info-cmt-img" src="${escAttr(c.image_url)}" loading="lazy" onclick="openLightbox('${escAttr(c.image_url)}')">` : ""}
     </div>`
   ).join("")}
   <div class="info-comment-form">
