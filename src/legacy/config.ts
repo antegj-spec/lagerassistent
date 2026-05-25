@@ -78,6 +78,94 @@ const TASK_STATS: Record<TaskStatus, { label: string; color: string }> = {
 };
 
 // ============================================================
+// NAVIGATION (Fas 7) — main-tabs + sub-tabs
+// 5 main-grupper i top-nav. Varje grupp har en lista sub-tabs.
+// Den första sub-tabben är default när man klickar main-knappen.
+// `adminOnly` på en grupp döljer hela gruppen för icke-admin.
+// `adminOnly` på en enskild sub-tab döljer bara den chippen.
+// ============================================================
+
+interface SubTabDef {
+  id: TabName;
+  label: string;
+  emoji: string;
+  adminOnly?: boolean;
+}
+
+interface MainTabDef {
+  id: MainTabName;
+  label: string;
+  adminOnly?: boolean;
+  subTabs: SubTabDef[];
+}
+
+const MAIN_TABS: readonly MainTabDef[] = [
+  {
+    id: "hem",
+    label: "Hem",
+    subTabs: [
+      { id: "hem", label: "Hem", emoji: "🏠" }
+    ]
+  },
+  {
+    id: "arbete",
+    label: "Arbete",
+    subTabs: [
+      { id: "anteckningar", label: "Noter", emoji: "📝" },
+      { id: "plan",         label: "Plan",  emoji: "📋" }
+    ]
+  },
+  {
+    id: "lager",
+    label: "Lager",
+    subTabs: [
+      { id: "material", label: "Material", emoji: "📦" },
+      { id: "returer",  label: "Returer",  emoji: "↩" }
+    ]
+  },
+  {
+    id: "drift",
+    label: "Drift",
+    subTabs: [
+      { id: "körjournal", label: "Körjournal", emoji: "🚗" },
+      { id: "info",       label: "Info",       emoji: "ℹ" }
+    ]
+  },
+  {
+    id: "admin",
+    label: "Admin",
+    adminOnly: true,
+    subTabs: [
+      { id: "dashboard", label: "Dashboard", emoji: "📊" },
+      { id: "export",    label: "Export",    emoji: "📤" },
+      { id: "chat",      label: "AI",        emoji: "🤖" },
+      // Ekonomi läggs till i Etapp C
+      { id: "trash",     label: "Papper",    emoji: "🗑" }
+    ]
+  }
+];
+
+// Reverse-mapping från sub-tab → main-tab. Genereras en gång vid load.
+const TAB_TO_MAIN: Record<TabName, MainTabName> = (() => {
+  const map = {} as Record<TabName, MainTabName>;
+  for (const main of MAIN_TABS) {
+    for (const sub of main.subTabs) {
+      map[sub.id] = main.id;
+    }
+  }
+  return map;
+})();
+
+// Snabb-lookup: är denna tab admin-only? (via dess main-grupp eller egen flagga)
+function isTabAdminOnly(t: TabName): boolean {
+  const main = MAIN_TABS.find(m => m.id === TAB_TO_MAIN[t]);
+  if (!main) return false;
+  if (main.adminOnly) return true;
+  const sub = main.subTabs.find(s => s.id === t);
+  return !!sub?.adminOnly;
+}
+
+// ============================================================
 // STATE
 // Fas 4.1: All mutabel state lever nu i store.ts (appState + top-
 // level aliases auth/ui/notes/materials/returns/tasks/info/chat).

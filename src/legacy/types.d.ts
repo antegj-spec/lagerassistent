@@ -24,6 +24,7 @@ declare global {
   type InfoCategory = D.InfoCategory;
   type MaterialCommentStatus = D.MaterialCommentStatus;
   type TabName = D.TabName;
+  type MainTabName = D.MainTabName;
   type Timestamp = D.Timestamp;
 
   type Note = D.Note;
@@ -49,6 +50,12 @@ declare global {
   type UserPin = D.UserPin;
   type UserRole = D.UserRole;
   type ChatMessage = D.ChatMessage;
+  type Car = D.Car;
+  type CarTrip = D.CarTrip;
+
+  // xlsx (SheetJS) laddas som UMD-global via <script>-tag i index.html.
+  // Använder typer från xlsx-paketet (npm devDep) för IntelliSense.
+  const XLSX: typeof import('xlsx');
 }
 
 export {};

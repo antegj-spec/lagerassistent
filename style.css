@@ -287,6 +287,113 @@ nav button.active { color: var(--accent); border-top-color: var(--accent); }
 main { flex: 1; padding: var(--sp-lg) var(--sp-md) 100px; overflow-y: auto; }
 
 /* ============================================================
+   Fas 8 Etapp B — Körjournal
+   ============================================================ */
+.cj-toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+.cj-add-btn { flex: 1; }
+.cj-filters {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+  margin-bottom: 12px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.cj-filters select, .cj-filters input[type="month"] {
+  font-size: 12px; padding: 6px 8px; min-height: 36px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--text);
+}
+.cj-filter-checkbox {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--muted);
+  grid-column: span 2;
+}
+.cj-gap-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.cj-gap-card {
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px; padding: 10px 12px;
+}
+.cj-gap-title { font-family: var(--display); font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+.cj-gap-meta { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.cj-gap-fill-btn { margin-top: 8px; }
+
+.cj-trip-card {
+  background: var(--surface);
+  border-radius: 10px; padding: 12px; margin-bottom: 8px;
+  box-shadow: var(--shadow-sm);
+}
+.cj-trip-private { border-left: 3px solid #9B59B6; }
+.cj-trip-fueling { border-left: 3px solid #E8A81A; }
+.cj-trip-private.cj-trip-fueling { border-left: 3px solid #E8A81A; box-shadow: -3px 0 0 0 #9B59B6, var(--shadow-sm); }
+.cj-trip-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px;
+}
+.cj-trip-date { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.cj-trip-badges { display: flex; gap: 4px; }
+.cj-badge {
+  font-size: 10px; padding: 2px 8px; border-radius: 10px;
+  font-family: var(--display); font-weight: 700; letter-spacing: .5px;
+  background: var(--border); color: var(--text);
+}
+.cj-badge-private { background: #9B59B6; color: #fff; }
+.cj-badge-fuel    { background: #E8A81A; color: #fff; }
+.cj-trip-row { font-size: 13px; line-height: 1.5; margin-top: 3px; }
+.cj-trip-purpose { color: var(--muted); font-style: italic; }
+.cj-trip-odo { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 5px; }
+.cj-trip-img { max-width: 120px; max-height: 90px; object-fit: cover; border-radius: 6px; margin-top: 8px; cursor: pointer; }
+.cj-trip-actions { display: flex; gap: 6px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); }
+
+.cj-car-list { display: flex; flex-direction: column; gap: 6px; max-height: 360px; overflow-y: auto; }
+.cj-car-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+}
+.cj-car-actions { display: flex; gap: 4px; }
+
+/* OCR/Geo-knapp intill input-fält */
+.trip-input-with-btn { display: flex; gap: 6px; align-items: stretch; }
+.trip-input-with-btn input { flex: 1; }
+.btn-icon {
+  min-width: 44px; padding: 0 10px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  border-radius: 8px; cursor: pointer;
+  font-size: 16px;
+  transition: border-color .15s, background .15s;
+}
+.btn-icon:hover { border-color: var(--accent); background: var(--accent-subtle); }
+.btn-icon:active { transform: scale(.96); }
+
+.trip-checkbox-row {
+  display: flex; gap: 16px; margin: 12px 0;
+  font-size: 13px; color: var(--text);
+}
+.trip-checkbox-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
+/* Fas 7: Top-level sub-tab-chips för main-grupperna (Arbete, Lager, Drift, Admin) */
+.main-subtabs {
+  display: flex; gap: var(--sp-xs); flex-wrap: wrap;
+  margin: calc(-1 * var(--sp-sm)) 0 var(--sp-md);
+  padding-bottom: var(--sp-sm);
+  border-bottom: 1px solid var(--border);
+}
+.subtab-btn {
+  min-height: 36px; padding: 0 14px;
+  font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .5px;
+  border-radius: 18px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+  cursor: pointer; white-space: nowrap;
+  transition: border-color .15s, color .15s, background .15s, box-shadow .15s;
+  box-shadow: var(--shadow-sm);
+  -webkit-tap-highlight-color: transparent;
+}
+@media (hover: hover) {
+  .subtab-btn:hover { border-color: var(--muted); color: var(--text); }
+}
+.subtab-btn:active { transform: scale(.97); }
+.subtab-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); box-shadow: 0 1px 3px var(--accent-shadow); }
+
+/* ============================================================
    UTILITY-KLASSER
    ============================================================ */
 .lbl { font-size: var(--fs-xs); letter-spacing: 2px; color: var(--dim); margin-top: var(--sp-lg); margin-bottom: var(--sp-sm); font-family: var(--display); font-weight: 700; text-transform: uppercase; line-height: var(--lh-snug); }
