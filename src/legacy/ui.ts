@@ -277,7 +277,17 @@ function _highlightMainNav(): void {
 async function initApp(): Promise<void> {
   const main = document.getElementById("main");
   if (main) main.innerHTML = `<div class="empty"><div class="spinner"></div> Laddar...</div>`;
-  await Promise.all([loadNotes(), loadMats(), loadReturns(), loadTasks(), loadInfoArticles(), loadActionComments(), loadCars(), loadCarTrips()]);
+  const loaders: Array<Promise<void>> = [
+    loadNotes(), loadMats(), loadReturns(), loadTasks(),
+    loadInfoArticles(), loadActionComments(),
+    loadCars(), loadCarTrips()
+  ];
+  // Ekonomi laddas bara för admin (RLS blockar ändå men vi sparar requests).
+  if (auth.isAdmin) {
+    loaders.push(loadEconomy());
+    loaders.push(refreshEconomyYears());
+  }
+  await Promise.all(loaders);
   updMeta();
   render();
   _navReplace();

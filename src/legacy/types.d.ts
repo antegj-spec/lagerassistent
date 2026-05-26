@@ -52,6 +52,8 @@ declare global {
   type ChatMessage = D.ChatMessage;
   type Car = D.Car;
   type CarTrip = D.CarTrip;
+  type EconomyEntry = D.EconomyEntry;
+  type EconomyCategory = D.EconomyCategory;
 
   // xlsx (SheetJS) laddas som UMD-global via <script>-tag i index.html.
   // Använder typer från xlsx-paketet (npm devDep) för IntelliSense.

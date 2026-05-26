@@ -102,6 +102,12 @@ interface CarsState {
   trips: CarTrip[];
 }
 
+interface EconomyState {
+  entries: EconomyEntry[];
+  year: number;
+  categoryFilter: string;     // "alla" eller en kategori-id
+}
+
 interface AppState {
   auth: AuthState;
   ui: UiState;
@@ -112,6 +118,7 @@ interface AppState {
   info: InfoState;
   chat: ChatState;
   cars: CarsState;
+  economy: EconomyState;
 }
 
 // ---- CANONICAL STATE ----
@@ -191,6 +198,11 @@ const appState: AppState = {
     list: [],
     trips: [],
   },
+  economy: {
+    entries: [],
+    year: new Date().getFullYear(),
+    categoryFilter: "alla",
+  },
 };
 
 // ---- TOP-LEVEL ALIASES ----
@@ -208,6 +220,7 @@ const tasks = appState.tasks;
 const info = appState.info;
 const chat = appState.chat;
 const cars = appState.cars;
+const economy = appState.economy;
 
 // ---- RESET HELPERS ----
 // Anropas av logout() för att rensa state mellan användare.
@@ -254,6 +267,10 @@ function resetAppState(): void {
   // Cars (Fas 8 Etapp B)
   cars.list = [];
   cars.trips = [];
+  // Economy (Fas 8 Etapp C)
+  economy.entries = [];
+  economy.year = new Date().getFullYear();
+  economy.categoryFilter = "alla";
 }
 
 function resetUiState(): void {
@@ -289,7 +306,7 @@ function resetUiState(): void {
 // ============================================================
 
 type StoreKey = "notes" | "materials" | "returns" | "tasks"
-              | "info" | "chat" | "auth" | "ui" | "cars";
+              | "info" | "chat" | "auth" | "ui" | "cars" | "economy";
 type StoreListener = () => void;
 
 const _storeListeners: Partial<Record<StoreKey, Set<StoreListener>>> = {};

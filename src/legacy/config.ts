@@ -78,6 +78,36 @@ const TASK_STATS: Record<TaskStatus, { label: string; color: string }> = {
 };
 
 // ============================================================
+// EKONOMI (Fas 8 Etapp C) — utgiftskategorier
+// Hardcoded — speglar Excel-filen (Utgifter 2026.xlsx). Lägg till
+// nya kategorier genom att utöka denna array + EconomyCategory-typen.
+// ============================================================
+
+interface EconomyCategoryDef {
+  id: EconomyCategory;
+  label: string;
+  emoji: string;
+}
+
+const ECONOMY_CATEGORIES: readonly EconomyCategoryDef[] = [
+  { id: "lunchrum",         label: "Lunchrum, kontor & omkläd.", emoji: "🍽" },
+  { id: "övrigt",           label: "Övrigt",                      emoji: "📋" },
+  { id: "personal",         label: "Personal",                    emoji: "👥" },
+  { id: "vatten_tvätt",     label: "Vatten & tvätt",              emoji: "💧" },
+  { id: "knickmop",         label: "Knickmop",                    emoji: "🧹" },
+  { id: "verkstad_verktyg", label: "Verkstad & verktyg",          emoji: "🔧" },
+  { id: "lagerutbyggnad",   label: "Lagerutbyggnad",              emoji: "🏗" },
+  { id: "reparation",       label: "Reparation",                  emoji: "🛠" }
+];
+
+function economyCategoryLabel(id: string): string {
+  return ECONOMY_CATEGORIES.find(c => c.id === id)?.label || id;
+}
+function economyCategoryEmoji(id: string): string {
+  return ECONOMY_CATEGORIES.find(c => c.id === id)?.emoji || "📋";
+}
+
+// ============================================================
 // NAVIGATION (Fas 7) — main-tabs + sub-tabs
 // 5 main-grupper i top-nav. Varje grupp har en lista sub-tabs.
 // Den första sub-tabben är default när man klickar main-knappen.
@@ -139,7 +169,7 @@ const MAIN_TABS: readonly MainTabDef[] = [
       { id: "dashboard", label: "Dashboard", emoji: "📊" },
       { id: "export",    label: "Export",    emoji: "📤" },
       { id: "chat",      label: "AI",        emoji: "🤖" },
-      // Ekonomi läggs till i Etapp C
+      { id: "ekonomi",   label: "Ekonomi",   emoji: "💰" },
       { id: "trash",     label: "Papper",    emoji: "🗑" }
     ]
   }
