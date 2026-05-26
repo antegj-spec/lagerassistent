@@ -12,11 +12,14 @@
   # SUPABASE_SERVICE_ROLE_KEY och CRON_SECRET fortsätter scannas (de är hemliga).
   SECRETS_SCAN_OMIT_KEYS = "SUPABASE_ANON_KEY,SUPABASE_URL"
 
-# Cron-trigger tillfälligt inaktiverad i Fas 1:
-# send-weekly kräver nu JWT eller CRON_SECRET-header.
-# Netlify scheduled-trigger skickar ingen header, så cron-flöde är brutet.
-# Fixas i Fas 6 (flytta schedule till Supabase pg_cron eller GitHub Action
-# som kan skicka CRON_SECRET-header).
+# Automatiskt veckomail är avstängt.
+# Sammanfattningen skickas manuellt av admin via knappen i Export-tabben
+# (→ /.netlify/functions/send-weekly, kräver admin-JWT).
+#
+# Om automatik ska återinföras: avkommentera blocket nedan, lägg tillbaka
+# x-cron-secret + CRON_SECRET-kontrollen i send-weekly.js, och skicka
+# x-cron-secret-header via en GitHub Action eller Supabase pg_cron
+# (Netlify scheduled-functions kan inte sätta egna headers).
 #
 # [[scheduled-functions]]
 #   name = "send-weekly"

@@ -1175,9 +1175,9 @@ function rExport(): string {
   <button class="btn-ghost" style="flex:1;min-width:140px" onclick="exportReturnsCsv()">↩ Returer</button>
 </div>
 
-<div class="lbl mt">SKICKA VECKOSAMMANFATTNING NU</div>
+<div class="lbl mt">SKICKA SAMMANFATTNING SOM MAIL</div>
 <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
-  <input type="email" id="weekly-mail-input" placeholder="E-postadress" value="andreas.glad@eps.net" style="flex:1">
+  <input type="email" id="weekly-mail-input" placeholder="E-postadress" value="ante.g.j@gmail.com" style="flex:1">
   <button class="btn btn-blue" onclick="sendWeeklyNow()">📧 SKICKA</button>
 </div>
 <div id="ai-box"></div>`;

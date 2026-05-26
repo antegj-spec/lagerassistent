@@ -478,10 +478,17 @@ async function sendWeeklyNow(): Promise<void> {
       body: JSON.stringify({ to: mail })
     });
     const d = await r.json();
-    if (d.ok) toast("✓ Sammanfattning skickad till " + mail);
-    else toast("Kunde inte skicka mail", 1);
+    if (d.ok) {
+      toast("✓ Sammanfattning skickad till " + (d.to || mail));
+    } else {
+      // Logga hela svaret för diagnostik (Resend-felmeddelande, status etc.)
+      console.error("[send-weekly] Backend-svar:", d);
+      const errMsg = d.error || d.resend_response?.message || "okänt fel";
+      toast("Mail misslyckades: " + errMsg, 1);
+    }
   } catch (e) {
-    toast("Kunde inte skicka mail", 1);
+    console.error("[send-weekly] Network/parse-fel:", e);
+    toast("Mail misslyckades: " + (e as Error).message, 1);
   }
 }
 
