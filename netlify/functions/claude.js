@@ -13,7 +13,10 @@
 // ============================================================
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://tzidalknfoumoknhsetx.supabase.co";
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
+// Anon-key är avsiktligt publik (RLS skyddar data server-side).
+// Hårdkodad fallback speglar config.ts — om env-var saknas i Netlify funkar auth ändå.
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6aWRhbGtuZm91bW9rbmhzZXR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczOTE1NjgsImV4cCI6MjA5Mjk2NzU2OH0.bqyMhiCK34gws-WKyYH0zBKAPPytywMJMuA9fL3-4cY";
 
 const ALLOWED_ORIGINS = [
   "https://lagerassistent.netlify.app",
