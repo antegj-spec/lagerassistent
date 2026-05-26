@@ -56,8 +56,19 @@ export type TabName =
   | 'info'
   | 'chat'
   | 'export'
+  | 'ekonomi'
   | 'trash'
   | 'dashboard';
+
+export type EconomyCategory =
+  | 'lunchrum'
+  | 'övrigt'
+  | 'personal'
+  | 'vatten_tvätt'
+  | 'knickmop'
+  | 'verkstad_verktyg'
+  | 'lagerutbyggnad'
+  | 'reparation';
 
 export type MainTabName =
   | 'hem'
@@ -337,6 +348,20 @@ export interface CarTrip {
   liters?: number | null;
   total_price?: number | null;
   image_path?: string | null;
+  created_by: string;
+  created_at: Timestamp;
+  updated_at?: Timestamp | null;
+}
+
+// ---------- Ekonomi (Fas 8 Etapp C) ----------
+
+export interface EconomyEntry {
+  id: string;                    // uuid
+  category: EconomyCategory | string;  // string för framtida ext-kategorier
+  year: number;
+  title: string;
+  price: number;
+  comment?: string | null;
   created_by: string;
   created_at: Timestamp;
   updated_at?: Timestamp | null;

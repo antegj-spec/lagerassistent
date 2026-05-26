@@ -34,7 +34,11 @@ const RT_TABLE_RELOADERS: Record<string, RtTableEntry> = {
   tasks:             { reload: async () => { await loadTasks(); },   storeKey: "tasks" },
   returns:           { reload: async () => { await loadReturns(); }, storeKey: "returns" },
   cars:              { reload: async () => { await loadCars(); },    storeKey: "cars" },
-  car_trips:         { reload: async () => { await loadCarTrips(); },storeKey: "cars" }
+  car_trips:         { reload: async () => { await loadCarTrips(); },storeKey: "cars" },
+  // Ekonomi: laddas bara om admin är inloggad. RLS blockerar non-admin
+  // ändå men join på kanalen ger error-loggar; vi följer samma mönster
+  // som övriga och förlitar oss på RLS.
+  economy_entries:   { reload: async () => { await loadEconomy(); }, storeKey: "economy" }
 };
 
 // ---- STATE (modul-globalt) ----
