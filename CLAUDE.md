@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Info-dokument:** När användaren ber om att skapa eller redigera dokument
+> till info-fliken (Utrustning / Maskiner / Rutiner), följ
+> [`docs/info/CLAUDE-GUIDE.md`](docs/info/CLAUDE-GUIDE.md) — den beskriver
+> mappstruktur, mallar, intake-flöde och PDF-generering.
+
 ## Project overview
 
 Lagerassistent is a single-page web app (Swedish) for managing an event equipment warehouse. It tracks notes/tasks, physical inventory, returns, and work planning. Deployed on Netlify with a Supabase backend.
