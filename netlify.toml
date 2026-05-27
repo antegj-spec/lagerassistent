@@ -4,8 +4,8 @@
   functions = "netlify/functions"
 
 [build.environment]
-  # Vite kraver Node 18+. Netlify defaultar till en aldre version.
-  NODE_VERSION = "20"
+  # Vite 8 kraver Node 20.19+ eller 22.12+. Pinnad till 22 (LTS).
+  NODE_VERSION = "22"
 
   # SUPABASE_ANON_KEY och SUPABASE_URL är MEDVETET publika.
   # Anon-key:s syfte är att vara öppen — RLS skyddar data server-side (Fas 1).
