@@ -1368,9 +1368,9 @@ ${`<div class="info-pdf-list">
   ${pdfs.map(p =>
     `<div class="info-pdf-item">
       <span class="info-pdf-icon">📄</span>
-      <span class="info-pdf-name">${esc(p.file_name)}</span>
+      <span class="info-pdf-name">${esc(p.pdf_name)}</span>
       <div class="info-pdf-actions">
-        <button class="btn-ghost" onclick="openPdfOverlay('${escAttr(p.pdf_url)}','${escAttr(p.file_name)}')">Visa</button>
+        <button class="btn-ghost" onclick="openPdfOverlay('${escAttr(p.pdf_url)}','${escAttr(p.pdf_name)}')">Visa</button>
         ${auth.isAdmin ? `<button class="btn-ghost" onclick="doDelInfoPdf(${p.id})" style="color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
       </div>
     </div>`
@@ -1444,6 +1444,23 @@ function rInfoEditor(): string {
       <input type="file" accept="image/*" style="display:none" onchange="handleInfoEditImg(this)">
     </label>
   </div>
+
+  <label class="field-label">BIFOGA PDF (${info.editPdfs.length} redo)</label>
+  <div class="info-pdf-list">
+    ${info.editPdfs.map((p, i) =>
+      `<div class="info-pdf-item">
+        <span class="info-pdf-icon">📄</span>
+        <span class="info-pdf-name">${esc(p.name)}</span>
+        <div class="info-pdf-actions">
+          <button class="btn-ghost" onclick="removeInfoEditPdf(${i})" style="color:var(--accent);border-color:var(--accent)">×</button>
+        </div>
+      </div>`
+    ).join("")}
+  </div>
+  <label class="btn-ghost" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+    📄 Välj PDF
+    <input type="file" accept="application/pdf" style="display:none" onchange="handleInfoEditPdf(this)">
+  </label>
 
   <div class="modal-actions" style="margin-top:14px">
     <button class="btn-ghost" onclick="cancelInfoEdit()" style="flex:1">Avbryt</button>

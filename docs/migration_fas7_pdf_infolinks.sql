@@ -9,7 +9,7 @@ create table if not exists info_pdfs (
   id          bigserial primary key,
   article_id  bigint not null references info_articles(id) on delete cascade,
   pdf_url     text not null,
-  file_name   text not null,
+  pdf_name    text not null,
   uploaded_by text not null,
   created_at  timestamptz default now()
 );

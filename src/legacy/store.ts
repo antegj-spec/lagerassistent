@@ -91,6 +91,7 @@ interface InfoState {
   openId: number | null;
   editMode: null | "new" | "edit";
   editImages: string[];                                   // bild-urls under redigering
+  editPdfs: { url: string; name: string }[];              // PDF:er under redigering
 }
 
 interface ChatState {
@@ -190,6 +191,7 @@ const appState: AppState = {
     openId: null,
     editMode: null,
     editImages: [],
+    editPdfs: [],
   },
   chat: {
     list: [],
@@ -262,6 +264,7 @@ function resetAppState(): void {
   info.openId = null;
   info.editMode = null;
   info.editImages = [];
+  info.editPdfs = [];
   // Chat
   chat.list = [];
   // Cars (Fas 8 Etapp B)

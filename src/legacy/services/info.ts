@@ -84,10 +84,10 @@ async function delInfoComment(id: number): Promise<void> {
 
 // ---- PDF-BIFOGNINGAR ----
 
-async function addInfoPdf(article_id: number, pdf_url: string, file_name: string): Promise<void> {
+async function addInfoPdf(article_id: number, pdf_url: string, pdf_name: string): Promise<void> {
   await sb("/rest/v1/info_pdfs", {
     method: "POST",
-    body: JSON.stringify({ article_id, pdf_url, file_name, uploaded_by: auth.user }),
+    body: JSON.stringify({ article_id, pdf_url, pdf_name, uploaded_by: auth.user }),
     prefer: "return=minimal"
   });
 }

@@ -17,6 +17,7 @@ function closeInfo(): void {
   info.openId = null;
   info.editMode = null;
   info.editImages = [];
+  info.editPdfs = [];
   // Fas 3.6 (B14): rensa bifogad kommentar-bild
   ui.infoCommentImgUrl = null;
   render();
@@ -26,6 +27,7 @@ function startNewInfo(presetCat?: InfoCategory | string): void {
   info.openId = null;
   info.editMode = "new";
   info.editImages = [];
+  info.editPdfs = [];
   (window as any)._infoEditPreset = presetCat || "Utrustning";
   render();
 }
@@ -34,12 +36,14 @@ function startEditInfo(id: number): void {
   info.openId = id;
   info.editMode = "edit";
   info.editImages = [];
+  info.editPdfs = [];
   render();
 }
 
 function cancelInfoEdit(): void {
   info.editMode = null;
   info.editImages = [];
+  info.editPdfs = [];
   render();
 }
 
@@ -57,13 +61,17 @@ async function saveInfoArticleForm(): Promise<void> {
         created_by: auth.user || ""
       });
       if (newId == null) throw new Error("Kunde inte skapa förslag");
-      // Koppla på uppladdade bilder
+      // Koppla på uppladdade bilder och PDF:er
       for (const url of info.editImages) {
         await addInfoImage(newId, url);
+      }
+      for (const pdf of info.editPdfs) {
+        await addInfoPdf(newId, pdf.url, pdf.name);
       }
       await loadInfoArticles();
       info.editMode = null;
       info.editImages = [];
+      info.editPdfs = [];
       info.openId = newId;
       toast("✓ Förslag skapat");
     } else if (info.editMode === "edit" && info.openId) {
@@ -71,9 +79,13 @@ async function saveInfoArticleForm(): Promise<void> {
       for (const url of info.editImages) {
         await addInfoImage(info.openId, url);
       }
+      for (const pdf of info.editPdfs) {
+        await addInfoPdf(info.openId, pdf.url, pdf.name);
+      }
       await loadInfoArticles();
       info.editMode = null;
       info.editImages = [];
+      info.editPdfs = [];
       toast("✓ Sparat");
     }
     render();
@@ -123,6 +135,29 @@ async function doDelInfoArticle(id: number): Promise<void> {
 // Bilder vid skapande/redigering
 async function handleInfoEditImg(inputEl: HTMLInputElement): Promise<void> {
   await handleImgInput(inputEl, (url) => { info.editImages.push(url); });
+}
+
+// PDF vid skapande/redigering — laddas upp direkt, kopplas till artikeln vid spar
+async function handleInfoEditPdf(inputEl: HTMLInputElement): Promise<void> {
+  const file = inputEl.files?.[0];
+  if (!file) return;
+  if (file.type !== "application/pdf") { toast("Välj en PDF-fil", 1); return; }
+  if (file.size > 20 * 1024 * 1024) { toast("PDF:en får max vara 20 MB", 1); return; }
+  toast("Laddar upp PDF...");
+  try {
+    const url = await uploadPdf(file);
+    info.editPdfs.push({ url, name: file.name });
+    inputEl.value = "";
+    render();
+  } catch (e) {
+    console.error("handleInfoEditPdf failed:", e);
+    toast("Kunde inte ladda upp PDF: " + (e as Error).message, 1);
+  }
+}
+
+function removeInfoEditPdf(idx: number): void {
+  info.editPdfs.splice(idx, 1);
+  render();
 }
 
 // Bilder direkt på en befintlig artikel (alla användare)
@@ -190,7 +225,8 @@ async function handleInfoAddPdf(articleId: number, inputEl: HTMLInputElement): P
     toast("✓ PDF uppladdad");
     render();
   } catch (e) {
-    toast("Kunde inte ladda upp PDF", 1);
+    console.error("handleInfoAddPdf failed:", e);
+    toast("Kunde inte ladda upp PDF: " + (e as Error).message, 1);
   }
 }
 

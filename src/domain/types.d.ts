@@ -291,7 +291,7 @@ export interface InfoPdf {
   id: number;
   article_id: number;
   pdf_url: string;
-  file_name: string;
+  pdf_name: string;
   uploaded_by: UserName | string;
   created_at: Timestamp;
 }

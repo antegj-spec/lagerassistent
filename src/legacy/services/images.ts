@@ -5,16 +5,17 @@
 
 async function uploadPdf(file: File): Promise<string> {
   const name = Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+  // Bucket-policyn kräver auth.role() = 'authenticated' → använd JWT, inte anon-key.
   const r = await fetch(SB_URL + "/storage/v1/object/lager-pdfs/" + name, {
     method: "POST",
     headers: {
       "apikey": SB_KEY,
-      "Authorization": "Bearer " + SB_KEY,
+      "Authorization": "Bearer " + getAuthToken(),
       "Content-Type": "application/pdf"
     },
     body: file
   });
-  if (!r.ok) throw new Error("PDF-uppladdning misslyckades");
+  if (!r.ok) throw new Error("PDF-uppladdning misslyckades: " + await r.text());
   return SB_URL + "/storage/v1/object/public/lager-pdfs/" + name;
 }
 
