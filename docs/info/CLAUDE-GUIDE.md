@@ -8,36 +8,58 @@ och fortsätt jobba enligt det. Jag vill skapa/ändra dokument om X."*
 
 ---
 
+## VIKTIGAST: dokumenten lever UTANFÖR repot
+
+Info-dokumenten (`.md`-källor + genererade `.pdf`) är **inte** en del av
+kodbasen. De serveras inte av appen — de är källor som vi redigerar och
+genererar PDF från, varefter användaren laddar upp PDF:en manuellt i appen.
+Därför ligger de medvetet i en mapp **utanför git-repot** så de aldrig blir en
+git- eller Netlify-fråga.
+
+**Hemmamappen för alla info-dokument:**
+
+```
+C:\Users\anteg\OneDrive - eps holding gmbh\eps-SCA-SP - Files & Data\Andreas Glad\Lagerassistent\Info\
+```
+
+(Mappen `Info` ligger bredvid `lagerassistent`-repot, inte i det. Den synkas
+via OneDrive = säkerhetskopierad, men hålls helt åtskild från koden.)
+
+**Regler:**
+- Skapa och redigera **aldrig** info-dokument inne i repot (`docs/info/` eller
+  någon annan plats under `lagerassistent\`). Allt sådant arbete sker i den
+  externa `Info\`-mappen ovan.
+- Det enda som hör hemma i repot är den här guiden samt PDF-byggaren
+  (`tools/md-to-pdf/`, det är kod).
+
 ## Bakgrund — vad är detta?
 
 Info-fliken i Lagerassistent har artiklar grupperade i fyra kategorier:
 **Utrustning**, **Maskiner**, **Rutiner**, **Platser och Arenor**. Varje
-artikel består av en rubrik,
-en kort beskrivning (visas i listan) och en eller flera bifogade PDF:er med
-djupgående info.
+artikel består av en rubrik, en kort beskrivning (visas i listan) och en eller
+flera bifogade PDF:er med djupgående info.
 
 Vi producerar dessa dokument utanför appen — som `.md`-källor som vi
 redigerar iterativt — och genererar PDF från dem. Användaren laddar sedan upp
 PDF:en manuellt i info-fliken och fyller i `title` + `category` +
 `short_description` från frontmattern.
 
-## Mappstruktur
+## Mappstruktur (i externa `Info\`-mappen)
 
 ```
-docs/info/
-├── CLAUDE-GUIDE.md          ← den här filen
+Info\
 ├── README.md                ← snabbstart för människor
-├── _templates/
+├── _templates\
 │   ├── utrustning.md
 │   ├── maskin.md
 │   ├── rutin.md
 │   └── plats.md
-└── <kategori>/<slug>/
+└── <kategori>\<slug>\
     ├── <slug>.md            ← källa, det vi redigerar tillsammans
     └── <slug>.pdf           ← genereras från .md
 ```
 
-Kategori-mappar: `utrustning/`, `maskiner/`, `rutiner/`, `platser/` (gemener,
+Kategori-mappar: `utrustning\`, `maskiner\`, `rutiner\`, `platser\` (gemener,
 plural-mappar matchar inte exakt category-värdet i frontmatter — det är okej,
 det är bara filsystem).
 
@@ -67,8 +89,8 @@ PDF:en bifogas separat i appen via "Lägg till PDF"-knappen på artikeln
    (inte AskUserQuestion om svaret är uppenbart från sammanhanget):
    - Kategori (om inte uppenbart från ämnet)
    - Titel (om bara ett ämne nämnts)
-2. **Skapa mappen** `docs/info/<kategori>/<slug>/` och kopiera rätt mall till
-   `<slug>.md`.
+2. **Skapa mappen** `Info\<kategori>\<slug>\` (i externa mappen) och kopiera
+   rätt mall från `Info\_templates\` till `<slug>.md`.
 3. **Fyll i frontmattern** + det användaren redan sagt, på rätt sektioner.
 4. **Markera luckor** med `*[Att fylla i — vad som behövs]*` så vi ser var
    info saknas.
@@ -90,12 +112,15 @@ PDF:en bifogas separat i appen via "Lägg till PDF"-knappen på artikeln
 
 ### Generera PDF
 
+PDF-byggaren ligger kvar i repot (det är kod), men körs mot `.md`-filen i
+externa mappen. Kör från repo-roten:
+
 ```bash
-python tools/md-to-pdf/build.py docs/info/<kategori>/<slug>/<slug>.md
+python tools/md-to-pdf/build.py "C:\Users\anteg\OneDrive - eps holding gmbh\eps-SCA-SP - Files & Data\Andreas Glad\Lagerassistent\Info\<kategori>\<slug>\<slug>.md"
 ```
 
-PDF:en hamnar bredvid `.md`-filen. Frontmattern renderas som ett meta-block
-överst.
+PDF:en hamnar bredvid `.md`-filen (i externa mappen). Frontmattern renderas
+som ett meta-block överst.
 
 Beroenden (engångsinstall): `pip install -r tools/md-to-pdf/requirements.txt`
 (reportlab + pyyaml + markdown-it-py).
@@ -149,6 +174,7 @@ station").
 Dessa fastslogs när workflow:n sattes upp. Avvik bara om användaren explicit
 ber om annat:
 
+- **Dokumenten ligger utanför repot** — i externa `Info\`-mappen. Aldrig i git.
 - **Skippa `.docx` som default.** Genereras bara på begäran.
 - **Inga bilder i denna fas** — läggs till manuellt via appen senare.
 - **PDF synkar alltid med `.md`** genom att alltid genereras från `.md`-källan.
@@ -160,10 +186,10 @@ ber om annat:
 
 ## Filer att läsa om något känns oklart
 
-- `docs/info/_templates/*.md` — mallarnas struktur
-- `docs/info/utrustning/alp-reparation/alp-reparation.md` — referensexempel
-  (ett färdigt utrustningsdokument)
-- `src/legacy/services/info.ts` — visar exakt vilka fält `info_articles` har
-  i databasen
-- `tools/md-to-pdf/build.py` — PDF-generatorn (om något ser konstigt ut i
-  PDF:en kan koden behöva justeras)
+- `Info\_templates\*.md` (externa mappen) — mallarnas struktur
+- `Info\utrustning\alp-reparation\alp-reparation.md` (externa mappen) —
+  referensexempel (ett färdigt utrustningsdokument)
+- `src/legacy/services/info.ts` (i repot) — visar exakt vilka fält
+  `info_articles` har i databasen
+- `tools/md-to-pdf/build.py` (i repot) — PDF-generatorn (om något ser
+  konstigt ut i PDF:en kan koden behöva justeras)
