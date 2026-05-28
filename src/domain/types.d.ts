@@ -39,7 +39,7 @@ export type MaterialStatus =
 
 export type TaskStatus = 'ny' | 'pågår' | 'klar';
 
-export type InfoCategory = 'Utrustning' | 'Maskiner' | 'Rutiner';
+export type InfoCategory = 'Utrustning' | 'Maskiner' | 'Rutiner' | 'Platser och Arenor';
 
 export type MaterialCommentStatus =
   | 'klart'

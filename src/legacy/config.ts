@@ -65,9 +65,10 @@ const MAT_STATS: Record<MaterialStatus, { label: string; emoji: string; color: s
 
 // INFO-KATEGORIER (FAQ/info-flik)
 const INFO_CATS: Record<InfoCategory, { emoji: string; color: string }> = {
-  "Utrustning": { emoji: "🛠", color: "#2E7DC4" },
-  "Maskiner":   { emoji: "⚙️", color: "#9B59B6" },
-  "Rutiner":    { emoji: "📋", color: "#4CAF7D" }
+  "Utrustning":        { emoji: "🛠", color: "#2E7DC4" },
+  "Maskiner":          { emoji: "⚙️", color: "#9B59B6" },
+  "Rutiner":           { emoji: "📋", color: "#4CAF7D" },
+  "Platser och Arenor": { emoji: "📍", color: "#E0772D" }
 };
 
 // TASK-STATUSAR

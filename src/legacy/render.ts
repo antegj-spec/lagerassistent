@@ -1275,23 +1275,30 @@ function rInfo(): string {
 }
 
 function rInfoList(): string {
+  const openArticle = info.openId != null ? info.articles.find(a => a.id === info.openId) : null;
   let html = `<button class="btn mb" onclick="startNewInfo()" style="width:100%">+ NYTT FÖRSLAG</button>`;
   Object.entries(INFO_CATS).forEach(([catName, catCfg]) => {
     const articles = info.articles.filter(a => a.category === catName);
+    const isOpen = openArticle?.category === catName;
+    const header = `<summary class="info-cat-header" style="color:${catCfg.color}">
+        <span class="info-cat-caret">▸</span>
+        <span class="info-cat-label">${catCfg.emoji} ${esc(catName.toUpperCase())}</span>
+        <span class="info-cat-count">${articles.length}</span>
+      </summary>`;
     if (articles.length === 0) {
-      html += `<div class="info-cat-section">
-        <div class="info-cat-header" style="color:${catCfg.color}">${catCfg.emoji} ${esc(catName.toUpperCase())}</div>
+      html += `<details class="info-cat-section"${isOpen ? " open" : ""}>
+        ${header}
         <div class="info-empty">Inga artiklar</div>
-      </div>`;
+      </details>`;
       return;
     }
     const pinned = articles.filter(a => a.is_pinned);
     const suggestions = articles.filter(a => !a.is_pinned);
-    html += `<div class="info-cat-section">
-      <div class="info-cat-header" style="color:${catCfg.color}">${catCfg.emoji} ${esc(catName.toUpperCase())}</div>
+    html += `<details class="info-cat-section"${isOpen ? " open" : ""}>
+      ${header}
       ${pinned.map(a => rInfoListItem(a, catCfg)).join("")}
       ${suggestions.map(a => rInfoListItem(a, catCfg)).join("")}
-    </div>`;
+    </details>`;
   });
   return html;
 }

@@ -10,8 +10,9 @@ och fortsätt jobba enligt det. Jag vill skapa/ändra dokument om X."*
 
 ## Bakgrund — vad är detta?
 
-Info-fliken i Lagerassistent har artiklar grupperade i tre kategorier:
-**Utrustning**, **Maskiner**, **Rutiner**. Varje artikel består av en rubrik,
+Info-fliken i Lagerassistent har artiklar grupperade i fyra kategorier:
+**Utrustning**, **Maskiner**, **Rutiner**, **Platser och Arenor**. Varje
+artikel består av en rubrik,
 en kort beskrivning (visas i listan) och en eller flera bifogade PDF:er med
 djupgående info.
 
@@ -29,13 +30,14 @@ docs/info/
 ├── _templates/
 │   ├── utrustning.md
 │   ├── maskin.md
-│   └── rutin.md
+│   ├── rutin.md
+│   └── plats.md
 └── <kategori>/<slug>/
     ├── <slug>.md            ← källa, det vi redigerar tillsammans
     └── <slug>.pdf           ← genereras från .md
 ```
 
-Kategori-mappar: `utrustning/`, `maskiner/`, `rutiner/` (gemener,
+Kategori-mappar: `utrustning/`, `maskiner/`, `rutiner/`, `platser/` (gemener,
 plural-mappar matchar inte exakt category-värdet i frontmatter — det är okej,
 det är bara filsystem).
 
@@ -47,7 +49,7 @@ i Supabase-tabellen `info_articles` när användaren skapar artikeln i appen:
 ```yaml
 ---
 title: "..."                  → info_articles.title
-category: "Utrustning"        → info_articles.category (enum: Utrustning|Maskiner|Rutiner)
+category: "Utrustning"        → info_articles.category (enum: Utrustning|Maskiner|Rutiner|Platser och Arenor)
 short_description: "..."      → info_articles.body (det som syns i listan)
 slug: "..."                   → används för mapp/filnamn, ej i db
 last_updated: "YYYY-MM-DD"    → ej i db, för vår spårning

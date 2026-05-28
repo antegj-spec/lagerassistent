@@ -29,6 +29,21 @@ This project now uses **Vite + TypeScript** as the build tool (since Fas 2 merge
 
 NPM scripts invoke `node node_modules/<bin>` directly to bypass npm cmd-shim's bug with OneDrive paths containing spaces (Windows-specific).
 
+### Git worktrees: node_modules-setup
+
+A fresh git worktree has no `node_modules`, so `npm run dev/build/typecheck` fails
+there with `Cannot find module`. Don't run `npm install` in the worktree — it would
+copy the whole package tree into the OneDrive-synced folder and trigger needless sync.
+Instead create a **junction** pointing at the main checkout's `node_modules` (instant,
+no duplication). Run once per new worktree, from the worktree root:
+
+```powershell
+New-Item -ItemType Junction -Path ".\node_modules" `
+  -Target "C:\Users\anteg\OneDrive - eps holding gmbh\eps-SCA-SP - Files & Data\Andreas Glad\Lagerassistent\lagerassistent\node_modules"
+```
+
+The junction is local and untracked (`node_modules` is gitignored), so it never enters a commit.
+
 ## JavaScript load order
 
 Scripts in `index.html` must remain in this exact order — each file depends on the previous:

@@ -769,8 +769,14 @@ label.field-label { font-size: var(--fs-xs); letter-spacing: 1.5px; color: var(-
 .info-sidebar { background: var(--surface); border: none; border-radius: var(--r-md); padding: var(--sp-md); overflow-y: auto; max-height: 80vh; box-shadow: var(--shadow-sm); }
 .info-content { background: var(--surface); border: none; border-radius: var(--r-md); padding: var(--sp-lg); overflow-y: auto; max-height: 80vh; box-shadow: var(--shadow-sm); }
 
-.info-cat-section { margin-bottom: var(--sp-lg); }
-.info-cat-header { font-family: var(--display); font-size: var(--fs-xs); font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; padding: var(--sp-xs) 0; margin-bottom: var(--sp-xs); border-bottom: 1px solid var(--border); }
+.info-cat-section { margin-bottom: var(--sp-sm); }
+.info-cat-header { display: flex; align-items: center; gap: var(--sp-xs); font-family: var(--display); font-size: var(--fs-xs); font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; padding: var(--sp-sm) var(--sp-xs); margin-bottom: var(--sp-xs); border-bottom: 1px solid var(--border); cursor: pointer; list-style: none; user-select: none; transition: background .15s; border-radius: var(--r-sm); }
+.info-cat-header::-webkit-details-marker { display: none; }
+.info-cat-header:hover { background: var(--bg); }
+.info-cat-caret { font-size: 10px; transition: transform .15s; opacity: .7; }
+details[open] > .info-cat-header .info-cat-caret { transform: rotate(90deg); }
+.info-cat-label { flex: 1; }
+.info-cat-count { font-size: 10px; font-weight: 700; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 1px 7px; }
 .info-empty { font-size: var(--fs-sm); color: var(--muted); padding: 6px 0 10px; font-style: italic; }
 
 .info-list-item { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: var(--r-sm); padding: var(--sp-sm) var(--sp-sm); margin-bottom: var(--sp-xs); cursor: pointer; transition: background .15s, border-color .15s; box-shadow: var(--shadow-sm); }
