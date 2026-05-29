@@ -103,7 +103,7 @@ function rGapCard(g: { car_id: string; prev: CarTrip; next: CarTrip; gap_km: num
 
 function rTripCard(t: CarTrip): string {
   const car = carById(t.car_id);
-  const distance = t.odometer_end - t.odometer_start;
+  const distance = tripDistance(t);
   const canEdit = auth.isAdmin || t.created_by === auth.user;
   return `
 <div class="cj-trip-card${t.is_private ? " cj-trip-private" : ""}${t.is_fueling ? " cj-trip-fueling" : ""}">

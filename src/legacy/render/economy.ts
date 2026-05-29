@@ -18,12 +18,9 @@ function rEkonomi(): string {
   const visible = cf === "alla" ? allEntries : allEntries.filter(e => e.category === cf);
 
   // Summor per kategori (på hela året, inte filtered — chips visar totals).
-  const sumByCat: Record<string, number> = {};
-  for (const e of allEntries) {
-    sumByCat[e.category] = (sumByCat[e.category] || 0) + Number(e.price);
-  }
-  const yearTotal = allEntries.reduce((acc, e) => acc + Number(e.price), 0);
-  const filteredTotal = visible.reduce((acc, e) => acc + Number(e.price), 0);
+  const sumByCat = ecoSumByCategory(allEntries);
+  const yearTotal = ecoTotal(allEntries);
+  const filteredTotal = ecoTotal(visible);
 
   const chips = `
 <div class="eco-chips">
@@ -73,7 +70,7 @@ ${orderedCats.length === 0
 }
 
 function rEcoCategorySection(cid: string, entries: EconomyEntry[]): string {
-  const total = entries.reduce((a, e) => a + Number(e.price), 0);
+  const total = ecoTotal(entries);
   return `
 <div class="eco-section">
   <div class="eco-section-header">
@@ -97,10 +94,4 @@ function rEcoEntry(e: EconomyEntry): string {
     <button class="cmt-act-btn cmt-act-del" onclick="doDelEconomy('${escAttr(e.id)}')" title="Radera">🗑</button>
   </div>
 </div>`;
-}
-
-// SEK-formatering: 11116 → "11 116 kr", 2557.88 → "2 558 kr" (avrundat).
-function formatSek(n: number): string {
-  const rounded = Math.round(Number(n));
-  return rounded.toLocaleString("sv-SE") + " kr";
 }

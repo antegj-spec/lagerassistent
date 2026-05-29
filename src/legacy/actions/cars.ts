@@ -41,34 +41,8 @@ function carLabel(c: Car): string {
   return c.nickname ? `${c.reg_nr} (${c.nickname})` : c.reg_nr;
 }
 
-// ---- GAP-DETEKTION ----
-// Returnerar luckor per bil där en resa börjar högre än föregående resa slutade.
-// Sorteras kronologiskt så vi kan hitta hopp mellan rader.
-interface TripGap {
-  car_id: string;
-  prev: CarTrip;
-  next: CarTrip;
-  gap_km: number;
-}
-
-function detectTripGaps(tripsForCar: CarTrip[]): TripGap[] {
-  // Sortera kronologiskt (äldst först, sen odometer_start) per bil.
-  const sorted = [...tripsForCar].sort((a, b) => {
-    if (a.trip_date < b.trip_date) return -1;
-    if (a.trip_date > b.trip_date) return 1;
-    return a.odometer_start - b.odometer_start;
-  });
-  const gaps: TripGap[] = [];
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = sorted[i - 1];
-    const next = sorted[i];
-    const diff = next.odometer_start - prev.odometer_end;
-    if (diff > 0) {
-      gaps.push({ car_id: next.car_id, prev, next, gap_km: diff });
-    }
-  }
-  return gaps;
-}
+// Gap-detektion (detectTripGaps) + TripGap-typen bor i lib/calc.ts —
+// ren, sidoeffektsfri logik som enhetstestas isolerat.
 
 // ---- LÄGG TILL RESA ----
 
@@ -566,7 +540,7 @@ function _tripToRow(t: CarTrip): Record<string, unknown> {
     "Syfte":       t.purpose ?? "",
     "Start-km":    t.odometer_start,
     "Slut-km":     t.odometer_end,
-    "Körd sträcka (km)": t.odometer_end - t.odometer_start,
+    "Körd sträcka (km)": tripDistance(t),
     "Privat/Tjänst": t.is_private ? "Privat" : "Tjänst",
     "Tankning":    t.is_fueling ? "Ja" : "",
     "Liter":       t.is_fueling ? t.liters ?? "" : "",
