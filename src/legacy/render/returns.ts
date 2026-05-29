@@ -37,7 +37,7 @@ function rReturCard(r: Return, isArchived: boolean = false): string {
       ? `<button class="btn-ghost" onclick="toggleReturnArchive(${r.id},false)">↩ Aktivera</button>`
       : `<button class="btn-ghost" onclick="toggleReturnArchive(${r.id},true)">📁 Arkivera</button>`
     ) : ""}
-    ${auth.isAdmin ? `<button class="btn-ghost" onclick="doDelReturn(${r.id})" style="margin-left:auto;color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
+    ${auth.isAdmin ? `<button class="btn-ghost danger ml-auto" onclick="doDelReturn(${r.id})">🗑</button>` : ""}
   </div>
 </div>`;
 }

@@ -93,7 +93,7 @@ function rInfoArticle(a: InfoArticle): string {
     ${auth.isAdmin && !a.is_pinned ? `<button class="btn" onclick="pinInfoArticle(${a.id})">📌 FÄST</button>` : ""}
     ${auth.isAdmin && a.is_pinned ? `<button class="btn-ghost" onclick="unpinInfoArticle(${a.id})">Avfäst</button>` : ""}
     ${canEdit ? `<button class="btn-ghost" onclick="startEditInfo(${a.id})">✎ Redigera</button>` : ""}
-    ${auth.isAdmin ? `<button class="btn-ghost" onclick="doDelInfoArticle(${a.id})" style="color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
+    ${auth.isAdmin ? `<button class="btn-ghost danger" onclick="doDelInfoArticle(${a.id})">🗑</button>` : ""}
   </div>
 </div>
 
@@ -119,7 +119,7 @@ ${`<div class="info-pdf-list">
       <span class="info-pdf-name">${esc(p.pdf_name)}</span>
       <div class="info-pdf-actions">
         <button class="btn-ghost" onclick="openPdfOverlay('${escAttr(p.pdf_url)}','${escAttr(p.pdf_name)}')">Visa</button>
-        ${auth.isAdmin ? `<button class="btn-ghost" onclick="doDelInfoPdf(${p.id})" style="color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
+        ${auth.isAdmin ? `<button class="btn-ghost danger" onclick="doDelInfoPdf(${p.id})">🗑</button>` : ""}
       </div>
     </div>`
   ).join("")}
@@ -200,7 +200,7 @@ function rInfoEditor(): string {
         <span class="info-pdf-icon">📄</span>
         <span class="info-pdf-name">${esc(p.name)}</span>
         <div class="info-pdf-actions">
-          <button class="btn-ghost" onclick="removeInfoEditPdf(${i})" style="color:var(--accent);border-color:var(--accent)">×</button>
+          <button class="btn-ghost danger" onclick="removeInfoEditPdf(${i})">×</button>
         </div>
       </div>`
     ).join("")}

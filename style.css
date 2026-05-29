@@ -558,6 +558,30 @@ label.field-label { font-size: var(--fs-xs); letter-spacing: 1.5px; color: var(-
 }
 .btn-ghost:active { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); }
 
+/* Danger-variant (radera-åtgärder) — accentfärgad redan i viloläge */
+.btn-ghost.danger { color: var(--accent); border-color: var(--accent); }
+
+/* ============================================================
+   INLINE-FORMULÄRKONTROLLER
+   Ersätter upprepade style="..."-block på textarea/select i
+   material-kommentar- och redigeringsfält.
+   ============================================================ */
+.field-input {
+  width: 100%; box-sizing: border-box;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px; color: var(--text); font-size: var(--fs-sm);
+  resize: vertical; font-family: inherit;
+}
+.field-select {
+  font-size: 11px; padding: 4px 8px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+}
+
+/* ============================================================
+   LAYOUT-UTILITIES (små, återanvändbara primitiver)
+   ============================================================ */
+.ml-auto { margin-left: auto; }
+
 /* ============================================================
    ALERT-BOXAR
    ============================================================ */

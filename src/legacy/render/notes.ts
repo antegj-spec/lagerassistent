@@ -119,7 +119,7 @@ function rCard(n: Note, inTrash: boolean = false): string {
   ${open && inTrash ? `
   <div class="note-actions" onclick="event.stopPropagation()">
     <button class="btn-ghost" onclick="restoreNote(${n.id})">↩ Återställ</button>
-    <button class="btn-ghost" onclick="permDelete(${n.id})" style="margin-left:auto;color:var(--accent);border-color:var(--accent)">🗑 Radera permanent</button>
+    <button class="btn-ghost danger ml-auto" onclick="permDelete(${n.id})">🗑 Radera permanent</button>
   </div>
   ` : ""}
 </div>`;

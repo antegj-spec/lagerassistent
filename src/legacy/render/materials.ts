@@ -121,7 +121,7 @@ function rItemDetail(it: MaterialItem, m: Material): string {
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
       <span class="tag" style="background:${stat.color}22;color:${stat.color};font-size:12px;padding:4px 10px">${stat.emoji} ${stat.label.toUpperCase()}</span>
       <button class="btn-ghost" onclick="openChangeItemStatus(${it.id},${m.id})">✎ Ändra status</button>
-      ${auth.isAdmin ? `<button class="btn-ghost" onclick="doDelItem(${it.id},${m.id})" style="color:var(--accent);border-color:var(--accent)">🗑 Radera</button>` : ""}
+      ${auth.isAdmin ? `<button class="btn-ghost danger" onclick="doDelItem(${it.id},${m.id})">🗑 Radera</button>` : ""}
     </div>
   </div>
 </div>
@@ -148,12 +148,12 @@ function rItemDetail(it: MaterialItem, m: Material): string {
   <div style="margin-top:10px">
     <textarea id="item-comment-input-${it.id}" rows="2"
       placeholder="Skriv en uppdatering om ${escAttr(it.article_id)}..."
-      style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--fg);font-size:12px;resize:vertical;font-family:inherit"
+      class="field-input"
       onkeydown="if(event.ctrlKey&&event.key==='Enter')submitMatComment(${m.id},${it.id})"></textarea>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">
       <label class="field-label" style="margin:0;font-size:10px">STATUS:</label>
       <select id="item-comment-status-${it.id}"
-        style="font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--fg)">
+        class="field-select">
         <option value="klart">✅ Klart</option>
         <option value="åtgärd_behövs">⚠ Åtgärd behövs</option>
         <option value="åtgärd_krävs">🚨 Åtgärd krävs</option>
@@ -308,7 +308,7 @@ function rMatDetail(m: Material): string {
     </div>
     ${auth.isAdmin ? `<div style="display:flex;gap:6px">
       <button class="btn-ghost" onclick="openEditMat(${m.id})">✎ Redigera</button>
-      <button class="btn-ghost" onclick="doDelMat(${m.id})" style="color:var(--accent);border-color:var(--accent)">🗑</button>
+      <button class="btn-ghost danger" onclick="doDelMat(${m.id})">🗑</button>
     </div>` : ""}
   </div>
 </div>
@@ -364,12 +364,12 @@ ${m.info_text ? `<div class="card">
   <div style="margin-top:10px">
     <textarea id="mat-comment-input-${m.id}" rows="2"
       placeholder="Skriv en kommentar om ${escAttr(m.name)}..."
-      style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--fg);font-size:12px;resize:vertical;font-family:inherit"
+      class="field-input"
       onkeydown="if(event.ctrlKey&&event.key==='Enter')submitMatComment(${m.id},null)"></textarea>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">
       <label class="field-label" style="margin:0;font-size:10px">STATUS:</label>
       <select id="mat-comment-status-${m.id}"
-        style="font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--fg)">
+        class="field-select">
         <option value="klart">✅ Klart</option>
         <option value="åtgärd_behövs">⚠ Åtgärd behövs</option>
         <option value="åtgärd_krävs">🚨 Åtgärd krävs</option>

@@ -175,7 +175,7 @@ function rTaskDetail(t: Task): string {
     </div>
     ${auth.isAdmin || t.responsible === auth.user ? `<div style="display:flex;flex-direction:column;gap:6px">
       <button class="btn-ghost" onclick="openEditTask(${t.id})">✎ Redigera</button>
-      ${auth.isAdmin ? `<button class="btn-ghost" onclick="doDelTask(${t.id})" style="color:var(--accent);border-color:var(--accent)">🗑</button>` : ""}
+      ${auth.isAdmin ? `<button class="btn-ghost danger" onclick="doDelTask(${t.id})">🗑</button>` : ""}
     </div>` : ""}
   </div>
 
