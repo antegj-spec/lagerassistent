@@ -68,7 +68,8 @@ const INFO_CATS: Record<InfoCategory, { emoji: string; color: string }> = {
   "Utrustning":        { emoji: "🛠", color: "#2E7DC4" },
   "Maskiner":          { emoji: "⚙️", color: "#9B59B6" },
   "Rutiner":           { emoji: "📋", color: "#4CAF7D" },
-  "Platser och Arenor": { emoji: "📍", color: "#E0772D" }
+  "Platser och Arenor": { emoji: "📍", color: "#E0772D" },
+  "Material":          { emoji: "📦", color: "#C0392B" }
 };
 
 // TASK-STATUSAR
