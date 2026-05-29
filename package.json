@@ -10,11 +10,14 @@
     "typecheck": "npm run tsc:check && node node_modules/typescript/bin/tsc -p tsconfig.legacy.json --noEmit",
     "dev": "npm run tsc:legacy && node node_modules/vite/bin/vite.js",
     "build": "npm run tsc:check && npm run tsc:legacy && node node_modules/vite/bin/vite.js build",
-    "preview": "node node_modules/vite/bin/vite.js preview"
+    "preview": "node node_modules/vite/bin/vite.js preview",
+    "test": "node node_modules/vitest/vitest.mjs run",
+    "test:watch": "node node_modules/vitest/vitest.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
-    "vite": "^8.0.14"
+    "vite": "^8.0.14",
+    "vitest": "^4.1.7"
   },
   "dependencies": {
     "xlsx": "^0.18.5"

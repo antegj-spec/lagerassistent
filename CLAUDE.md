@@ -49,7 +49,8 @@ Scripts in `index.html` must remain in this exact order — each file depends on
 4. `/js/services/*.js` — per-aggregate CRUD (notes, materials, returns, tasks, info, pins, images)
 5. `/js/auth.js` — PIN-login + completeLogin/logout
 6. `/js/ui.js` — helpers (modal, toast, filters, AI chat)
-7. `/js/render.js` — HTML generation per tab
+7. `/js/render.js` — `render()`-dispatcher + delad sub-tab-bar (`rMainSubTabs`)
+7b. `/js/render/<flik>.js` — vy-specifika `r*`-funktioner, en fil per flik (hem, notes, materials, returns, tasks, trash, chat, export, dashboard, info, cars, economy). Delar global scope, så ordningen sinsemellan spelar ingen roll — de måste bara laddas före första `render()`-anropet.
 8. `/js/render/patches.js` — granular DOM-patches (Fas 4.5)
 9. `/js/render/subscribers.js` — store-subscribers som triggar cross-cutting patches
 10. `/js/realtime.js` — Supabase Realtime WebSocket
