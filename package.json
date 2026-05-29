@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "_comment": "node-anrop direkt bypassar npm cmd-shim som kraschar pa OneDrive-pathar med mellanslag (Windows). Funkar oforandrat pa Linux/Netlify.",
+    "_comment": "node-anrop direkt undviker npm cmd-shim som kraschar pa Windows-pathar med mellanslag. Funkar oforandrat pa Linux/Netlify.",
     "tsc:legacy": "node node_modules/typescript/bin/tsc -p tsconfig.legacy.json",
     "tsc:check": "node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
     "typecheck": "npm run tsc:check && node node_modules/typescript/bin/tsc -p tsconfig.legacy.json --noEmit",

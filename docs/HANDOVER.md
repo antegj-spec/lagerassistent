@@ -78,7 +78,7 @@ lagerassistent/
 
 Netlify kör exakt samma pipeline. TS-fel bryter bygget.
 
-NPM-scripts kallar `node node_modules/<bin>/...` direkt — bypassar npm cmd-shim som har en bug med OneDrive-pathar med mellanslag (Windows).
+NPM-scripts kallar `node node_modules/<bin>/...` direkt — bypassar npm cmd-shim som har en bug med Windows-pathar med mellanslag.
 
 ### Script load-order (KRITISKT)
 
@@ -346,7 +346,7 @@ Användarens prio: **6.2 (auto-task), 6.14 (daglig backup)**.
 - **Typer breddades vid behov** — varje upptäckt saknad fält triggade interface-uppdatering
 
 ### Fallgropar från Fas 2
-1. **npm cmd-shim kraschar på OneDrive-pathar med mellanslag** (Windows). Fix: `node node_modules/<bin>/...` direkt
+1. **npm cmd-shim kraschar på Windows-pathar med mellanslag**. Fix: `node node_modules/<bin>/...` direkt
 2. **Side-effect-import av non-module-JS tree-shakas bort** av Vite — därav klassisk script-tag-approach
 3. **`types.ts` (jämfört med `types.d.ts`) emittas av tsc** om det importeras från en typed fil. Fix: `.d.ts`-suffix (declaration only)
 4. **TS 6.x har deprecated `module: "none"` och `esModuleInterop: false`** — pinnade TS till `^5.6` istället
