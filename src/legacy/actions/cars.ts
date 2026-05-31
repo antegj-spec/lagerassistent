@@ -41,6 +41,25 @@ function carLabel(c: Car): string {
   return c.nickname ? `${c.reg_nr} (${c.nickname})` : c.reg_nr;
 }
 
+// Senast kända mätarställning för en bil = högsta odometer_end bland
+// avslutade resor. null om bilen aldrig haft en avslutad resa.
+function latestKnownOdo(car_id: string): number | null {
+  const ends = cars.trips
+    .filter(t => t.car_id === car_id && t.status === "closed" && t.odometer_end != null)
+    .map(t => t.odometer_end as number);
+  return ends.length ? Math.max(...ends) : null;
+}
+
+// Den (enda) pågående resan för en bil, om någon.
+function openTripForCar(car_id: string): CarTrip | undefined {
+  return cars.trips.find(t => t.car_id === car_id && t.status === "open");
+}
+
+// Alla pågående resor (för banner i körjournalvyn).
+function openTrips(): CarTrip[] {
+  return cars.trips.filter(t => t.status === "open");
+}
+
 // Gap-detektion (detectTripGaps) + TripGap-typen bor i lib/calc.ts —
 // ren, sidoeffektsfri logik som enhetstestas isolerat.
 
@@ -172,13 +191,13 @@ async function addTrip(): Promise<void> {
 
   // Varning vid odometer-konflikt mot senaste registrerade slut-km för samma bil.
   const latestForCar = cars.trips
-    .filter(t => t.car_id === car_id)
+    .filter(t => t.car_id === car_id && t.odometer_end != null)
     .sort((a, b) => {
       if (a.trip_date > b.trip_date) return -1;
       if (a.trip_date < b.trip_date) return 1;
-      return b.odometer_end - a.odometer_end;
+      return (b.odometer_end ?? 0) - (a.odometer_end ?? 0);
     })[0];
-  if (latestForCar && odometer_start < latestForCar.odometer_end) {
+  if (latestForCar && latestForCar.odometer_end != null && odometer_start < latestForCar.odometer_end) {
     const ok = await confirmModal(
       `Mätarställning ${odometer_start} km är lägre än senast registrerade slut (${latestForCar.odometer_end} km, ${latestForCar.trip_date}).\n\nSpara ändå? (Användbart om resan ligger i efterhand.)`,
       { confirmLabel: "Spara ändå", cancelLabel: "Avbryt" }
@@ -197,6 +216,7 @@ async function addTrip(): Promise<void> {
     await saveCarTrip({
       car_id, driver, trip_date, from_loc, to_loc, purpose,
       odometer_start, odometer_end,
+      status: "closed", needs_purpose: false,
       is_private, is_fueling,
       liters: is_fueling ? parseFloat(liters_str) : null,
       total_price: is_fueling ? parseFloat(price_str) : null,
@@ -303,6 +323,321 @@ async function doDelTrip(id: string): Promise<void> {
     render();
   } catch {
     toast("Kunde inte radera", 1);
+  }
+}
+
+// ============================================================
+// INLED / AVSLUTA RESA (körjournal v2)
+//
+// En resa är ett tillstånd: inled (status='open', odometer_end null)
+// → avsluta (status='closed'). Den öppna raden ligger i Supabase och
+// överlever omladdning/mobilbyte hur länge som helst.
+// ============================================================
+
+// ---- INLED RESA ----
+
+function startTrip(): void {
+  const activeCars = cars.list.filter(c => c.active);
+  if (!activeCars.length) {
+    openModal(`
+      <div class="modal-title">Inga bilar registrerade</div>
+      <p>Du måste lägga till minst en bil innan du kan logga en resa.</p>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="closeModal()" style="flex:1">Avbryt</button>
+        ${auth.isAdmin ? `<button class="btn" onclick="openAddCar()" style="flex:1">+ Bil</button>` : ""}
+      </div>
+    `);
+    return;
+  }
+
+  const last = _carLastGet();
+  const today = new Date().toISOString().split("T")[0];
+  const userOpts = USERS.filter(u => u !== "Admin").map(u =>
+    `<option value="${esc(u)}" ${u === (last.driver || auth.user) ? "selected" : ""}>${esc(u)}</option>`
+  ).join("");
+  const carOpts = activeCars.map(c =>
+    `<option value="${esc(c.id)}" ${c.id === last.car_id ? "selected" : ""}>${esc(carLabel(c))}</option>`
+  ).join("");
+
+  openModal(`
+    <div class="modal-title">Inled resa</div>
+    <label class="field-label">DATUM</label>
+    <input type="date" id="trip-date" value="${escAttr(today)}">
+
+    <label class="field-label">FÖRARE</label>
+    <select id="trip-driver">${userOpts}</select>
+
+    <label class="field-label">BIL</label>
+    <select id="trip-car" onchange="onStartCarChange()">${carOpts}</select>
+
+    <label class="field-label">FRÅN</label>
+    <div class="trip-input-with-btn">
+      <input type="text" id="trip-from" placeholder="Plats / adress">
+      <button type="button" class="btn-icon" onclick="fetchLocation('trip-from')" title="Hämta nuvarande plats">📍</button>
+    </div>
+
+    <label class="field-label">MÄTARSTÄLLNING NU (km)</label>
+    <div class="trip-input-with-btn">
+      <input type="number" id="trip-odo-start" inputmode="numeric" min="0">
+      <button type="button" class="btn-icon" onclick="scanOdometer('trip-odo-start')" title="Scanna med kamera">📷</button>
+    </div>
+    <div id="trip-known-hint" class="cj-hint"></div>
+
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal();ui.imgData=null;ui.imgFile=null" style="flex:1">Avbryt</button>
+      <button class="btn" onclick="submitStartTrip()" style="flex:1">INLED RESA</button>
+    </div>
+  `);
+  setTimeout(onStartCarChange, 0);
+}
+
+// Förifyll mätarställning + visa hint baserat på vald bil. Markerar
+// också om bilen redan har en pågående resa.
+function onStartCarChange(): void {
+  const car_id = (document.getElementById("trip-car") as HTMLSelectElement | null)?.value || "";
+  const odoEl = document.getElementById("trip-odo-start") as HTMLInputElement | null;
+  const hintEl = document.getElementById("trip-known-hint");
+  if (!car_id || !odoEl || !hintEl) return;
+
+  const ongoing = openTripForCar(car_id);
+  if (ongoing) {
+    hintEl.innerHTML = `<span class="cj-hint-warn">⚠ Bilen har redan en pågående resa (start ${ongoing.odometer_start} km). Avsluta den först.</span>`;
+    return;
+  }
+
+  const known = latestKnownOdo(car_id);
+  if (known != null) {
+    odoEl.value = String(known);
+    hintEl.innerHTML = `Senast kända ställning: <b>${known} km</b>. Stämmer det med mätaren? Annars ändra till verkligt värde.`;
+  } else {
+    odoEl.value = "";
+    hintEl.textContent = "Ingen tidigare resa för bilen — ange aktuell mätarställning.";
+  }
+}
+
+async function submitStartTrip(): Promise<void> {
+  const trip_date = (document.getElementById("trip-date") as HTMLInputElement | null)?.value || "";
+  const driver = (document.getElementById("trip-driver") as HTMLSelectElement | null)?.value || "";
+  const car_id = (document.getElementById("trip-car") as HTMLSelectElement | null)?.value || "";
+  const from_loc = (document.getElementById("trip-from") as HTMLInputElement | null)?.value?.trim() || null;
+  const odo_str = (document.getElementById("trip-odo-start") as HTMLInputElement | null)?.value || "";
+
+  if (!trip_date) { toast("Ange datum", 1); return; }
+  if (!driver) { toast("Ange förare", 1); return; }
+  if (!car_id) { toast("Ange bil", 1); return; }
+  const odometer_start = parseInt(odo_str, 10);
+  if (!Number.isFinite(odometer_start) || odometer_start < 0) { toast("Ange giltig mätarställning", 1); return; }
+
+  if (openTripForCar(car_id)) {
+    toast("Bilen har redan en pågående resa — avsluta den först", 1);
+    return;
+  }
+
+  const known = latestKnownOdo(car_id);
+
+  // Mätaren står lägre än senast kända → troligen efterhandsregistrering.
+  if (known != null && odometer_start < known) {
+    const ok = await confirmModal(
+      `Mätarställning ${odometer_start} km är lägre än senast kända (${known} km).\n\nInled ändå?`,
+      { confirmLabel: "Inled ändå", cancelLabel: "Avbryt" }
+    );
+    if (!ok) return;
+  }
+
+  // Mätaren står högre än senast kända → oförklarad körning. Skapa en
+  // lucka-rad (known→odometer_start) som fylls i syfte på i efterhand.
+  let createGap = false;
+  if (known != null && odometer_start > known) {
+    const gapKm = odometer_start - known;
+    const ok = await confirmModal(
+      `Mätaren visar ${odometer_start} km men senast kända var ${known} km — ${gapKm} km saknas i journalen.\n\nEn lucka skapas som du fyller i (vad bilen använts till) i efterhand. Fortsätt?`,
+      { confirmLabel: "Skapa lucka & inled", cancelLabel: "Avbryt" }
+    );
+    if (!ok) return;
+    createGap = true;
+  }
+
+  // Bild (om odometer-foto sparats via scan)
+  let image_path: string | null = null;
+  if (ui.imgFile) {
+    try { image_path = await uploadImg(ui.imgFile); }
+    catch { toast("Bilden kunde inte laddas upp — sparar utan", 1); }
+  }
+
+  try {
+    if (createGap && known != null) {
+      await saveCarTrip({
+        car_id, driver, trip_date,
+        from_loc: null, to_loc: null, purpose: null,
+        odometer_start: known, odometer_end: odometer_start,
+        status: "closed", needs_purpose: true,
+        is_private: false, is_fueling: false,
+        liters: null, total_price: null, image_path: null,
+        created_by: auth.user || "",
+      });
+    }
+    await saveCarTrip({
+      car_id, driver, trip_date, from_loc,
+      to_loc: null, purpose: null,
+      odometer_start, odometer_end: null,
+      status: "open", needs_purpose: false,
+      is_private: false, is_fueling: false,
+      liters: null, total_price: null, image_path,
+      created_by: auth.user || "",
+    });
+    _carLastSet({ car_id, driver });
+    ui.imgData = null; ui.imgFile = null;
+    await loadCarTrips();
+    closeModal();
+    toast(createGap ? "✓ Lucka skapad & resa inledd" : "✓ Resa inledd");
+    render();
+  } catch (e) {
+    toast("Kunde inte inleda: " + (e as Error).message, 1);
+  }
+}
+
+// ---- AVSLUTA RESA ----
+
+function endTrip(id?: string): void {
+  const t = id ? cars.trips.find(x => x.id === id) : openTrips()[0];
+  if (!t) { toast("Ingen pågående resa", 1); return; }
+  if (t.status !== "open") { toast("Resan är redan avslutad", 1); return; }
+  const car = carById(t.car_id);
+
+  openModal(`
+    <div class="modal-title">Avsluta resa</div>
+    <div class="cj-end-info">
+      <b>${esc(car ? carLabel(car) : "—")}</b> · ${esc(t.driver)}<br>
+      Start ${t.odometer_start} km · ${esc(t.trip_date)}${t.from_loc ? " · från " + esc(t.from_loc) : ""}
+    </div>
+
+    <label class="field-label">TILL</label>
+    <div class="trip-input-with-btn">
+      <input type="text" id="trip-to" value="${escAttr(t.to_loc || "")}" placeholder="Plats / adress">
+      <button type="button" class="btn-icon" onclick="fetchLocation('trip-to')" title="Hämta nuvarande plats">📍</button>
+    </div>
+
+    <label class="field-label">SYFTE</label>
+    <input type="text" id="trip-purpose" value="${escAttr(t.purpose || "")}" placeholder="T.ex. 'Leverans till kund'">
+
+    <label class="field-label">MÄTARSTÄLLNING SLUT (km)</label>
+    <div class="trip-input-with-btn">
+      <input type="number" id="trip-odo-end" inputmode="numeric" min="${t.odometer_start}">
+      <button type="button" class="btn-icon" onclick="scanOdometer('trip-odo-end')" title="Scanna med kamera">📷</button>
+    </div>
+
+    <div class="trip-checkbox-row">
+      <label><input type="checkbox" id="trip-private" ${t.is_private ? "checked" : ""}> Privat körning</label>
+      <label><input type="checkbox" id="trip-fueling" onchange="toggleFuelingFields()"> Tankning</label>
+    </div>
+
+    <div id="trip-fueling-fields" style="display:none">
+      <label class="field-label">LITER</label>
+      <input type="number" id="trip-liters" inputmode="decimal" step="0.01" min="0">
+      <label class="field-label">TOTALPRIS (SEK)</label>
+      <input type="number" id="trip-price" inputmode="decimal" step="0.01" min="0">
+    </div>
+
+    <label class="field-label">BILD / KVITTO (valfritt)</label>
+    <div class="img-upload-area" onclick="document.getElementById('trip-img-file').click()">
+      ${ui.imgData
+        ? `<img class="img-preview" src="${ui.imgData}">`
+        : `<div style="color:var(--muted);font-size:12px">📸 Lägg till bild</div>`}
+    </div>
+    <input type="file" id="trip-img-file" accept="image/*" capture="environment" style="display:none" onchange="handleImg(this)">
+
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal();ui.imgData=null;ui.imgFile=null" style="flex:1">Avbryt</button>
+      <button class="btn" onclick="submitEndTrip('${escAttr(t.id)}')" style="flex:1">AVSLUTA RESA</button>
+    </div>
+  `);
+}
+
+async function submitEndTrip(id: string): Promise<void> {
+  const t = cars.trips.find(x => x.id === id);
+  if (!t) { toast("Resan hittades inte", 1); return; }
+
+  const to_loc = (document.getElementById("trip-to") as HTMLInputElement | null)?.value?.trim() || null;
+  const purpose = (document.getElementById("trip-purpose") as HTMLInputElement | null)?.value?.trim() || null;
+  const odo_end_str = (document.getElementById("trip-odo-end") as HTMLInputElement | null)?.value || "";
+  const is_private = !!(document.getElementById("trip-private") as HTMLInputElement | null)?.checked;
+  const is_fueling = !!(document.getElementById("trip-fueling") as HTMLInputElement | null)?.checked;
+  const liters_str = (document.getElementById("trip-liters") as HTMLInputElement | null)?.value || "";
+  const price_str = (document.getElementById("trip-price") as HTMLInputElement | null)?.value || "";
+
+  const odometer_end = parseInt(odo_end_str, 10);
+  if (!Number.isFinite(odometer_end) || odometer_end < 0) { toast("Ange giltig slut-km", 1); return; }
+  if (odometer_end < t.odometer_start) {
+    toast(`Slut-km måste vara minst start-km (${t.odometer_start})`, 1);
+    return;
+  }
+  if (is_fueling) {
+    if (!liters_str || parseFloat(liters_str) <= 0) { toast("Ange liter tankat", 1); return; }
+    if (!price_str || parseFloat(price_str) <= 0) { toast("Ange totalpris", 1); return; }
+  }
+
+  let image_path: string | null | undefined = undefined;
+  if (ui.imgFile) {
+    try { image_path = await uploadImg(ui.imgFile); }
+    catch { toast("Bilden kunde inte laddas upp", 1); }
+  }
+
+  try {
+    await saveCarTrip({
+      id,
+      to_loc, purpose,
+      odometer_end, status: "closed",
+      is_private, is_fueling,
+      liters: is_fueling ? parseFloat(liters_str) : null,
+      total_price: is_fueling ? parseFloat(price_str) : null,
+      ...(image_path !== undefined ? { image_path } : {}),
+    });
+    ui.imgData = null; ui.imgFile = null;
+    await loadCarTrips();
+    closeModal();
+    toast("✓ Resa avslutad");
+    render();
+  } catch (e) {
+    toast("Kunde inte avsluta: " + (e as Error).message, 1);
+  }
+}
+
+// ---- FYLL I LUCKA (syfte i efterhand) ----
+
+function fillGapPurpose(id: string): void {
+  const t = cars.trips.find(x => x.id === id);
+  if (!t) return;
+  const car = carById(t.car_id);
+  openModal(`
+    <div class="modal-title">Fyll i lucka</div>
+    <div class="cj-end-info">
+      <b>${esc(car ? carLabel(car) : "—")}</b><br>
+      ${t.odometer_start} → ${t.odometer_end} km (${tripDistance(t)} km) · ${esc(t.trip_date)}
+    </div>
+    <label class="field-label">VAD ANVÄNDES BILEN TILL?</label>
+    <input type="text" id="gap-purpose" value="${escAttr(t.purpose || "")}" placeholder="T.ex. 'Privat körning' / 'Hämtning av material'">
+    <div class="trip-checkbox-row">
+      <label><input type="checkbox" id="gap-private" ${t.is_private ? "checked" : ""}> Privat körning</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()" style="flex:1">Avbryt</button>
+      <button class="btn" onclick="submitGapPurpose('${escAttr(t.id)}')" style="flex:1">SPARA</button>
+    </div>
+  `);
+}
+
+async function submitGapPurpose(id: string): Promise<void> {
+  const purpose = (document.getElementById("gap-purpose") as HTMLInputElement | null)?.value?.trim() || null;
+  const is_private = !!(document.getElementById("gap-private") as HTMLInputElement | null)?.checked;
+  if (!purpose) { toast("Ange vad bilen användes till", 1); return; }
+  try {
+    await saveCarTrip({ id, purpose, is_private, needs_purpose: false });
+    await loadCarTrips();
+    closeModal();
+    toast("✓ Lucka ifylld");
+    render();
+  } catch (e) {
+    toast("Kunde inte spara: " + (e as Error).message, 1);
   }
 }
 
@@ -417,7 +752,10 @@ async function _runOcr(file: File, targetFieldId: string): Promise<void> {
       toast("Kunde inte läsa siffran — ange manuellt", 1);
       return;
     }
-    const num = parseInt(raw.replace(/\D/g, ""), 10);
+    // Odometrar visar tiondelar (ex "84 938,5"). Behåll bara heltalsdelen
+    // före första decimaltecken (,/.) och strippa övriga icke-siffror —
+    // annars klistras decimalen ihop med talet (84938,5 → 849385).
+    const num = parseInt(raw.split(/[.,]/)[0].replace(/\D/g, ""), 10);
     if (!Number.isFinite(num)) {
       toast("Oklart svar — ange manuellt", 1);
       return;
@@ -519,7 +857,8 @@ interface ExportFilter {
 }
 
 function _tripsFiltered(f: ExportFilter): CarTrip[] {
-  let list = [...cars.trips];
+  // Pågående (öppna) resor exporteras inte förrän de avslutats.
+  let list = cars.trips.filter(t => t.status !== "open");
   if (f.car_id) list = list.filter(t => t.car_id === f.car_id);
   if (f.driver) list = list.filter(t => t.driver === f.driver);
   if (f.year != null) list = list.filter(t => new Date(t.trip_date).getFullYear() === f.year);

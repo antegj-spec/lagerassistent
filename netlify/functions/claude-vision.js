@@ -34,7 +34,7 @@ const ALLOWED_MEDIA = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 // Prompt-mallar per kind. Lägg fler här när behov uppstår.
 const PROMPTS = {
-  odometer: "Detta är ett foto av en bils odometer/mätarställning. Returnera ENDAST hela kilometer-talet som visas, som ett rent heltal utan mellanslag, kommatecken eller enhet. Om bilden är oklar eller du inte ser ett tydligt nummer, svara exakt: OKLART",
+  odometer: "Detta är ett foto av en bils odometer/mätarställning. Mätaren visar ofta en decimal (tiondels kilometer), t.ex. 84938,5. Returnera ENDAST heltalsdelen — alltså antal hela kilometer — och kasta bort decimalen helt UTAN att avrunda. Exempel: '84938,5' ska bli '84938', '12044.9' ska bli '12044'. Svara som ett rent heltal utan mellanslag, kommatecken, decimaler eller enhet. Om bilden är oklar eller du inte ser ett tydligt nummer, svara exakt: OKLART",
 };
 
 function corsHeaders(origin) {

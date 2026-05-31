@@ -10,14 +10,14 @@ beforeAll(() => {
 // Minimal trip-fabrik — bara fälten calc-funktionerna bryr sig om.
 function trip(over: Partial<{
   id: string; car_id: string; trip_date: string;
-  odometer_start: number; odometer_end: number;
+  odometer_start: number; odometer_end: number | null;
 }> = {}) {
   return {
     id: over.id ?? Math.random().toString(36).slice(2),
     car_id: over.car_id ?? "bil-1",
     trip_date: over.trip_date ?? "2026-01-01",
     odometer_start: over.odometer_start ?? 0,
-    odometer_end: over.odometer_end ?? 0,
+    odometer_end: over.odometer_end === undefined ? 0 : over.odometer_end,
   };
 }
 
@@ -78,6 +78,15 @@ describe("detectTripGaps", () => {
     expect(calc.detectTripGaps([trip()])).toEqual([]);
   });
 
+  it("ignorerar öppna (pågående) resor utan odometer_end", () => {
+    const trips = [
+      trip({ trip_date: "2026-01-01", odometer_start: 100, odometer_end: 150 }),
+      // Öppen resa: odometer_end null → ska inte ge falsk lucka
+      trip({ trip_date: "2026-01-02", odometer_start: 150, odometer_end: null }),
+    ];
+    expect(calc.detectTripGaps(trips)).toEqual([]);
+  });
+
   it("muterar inte input-arrayen", () => {
     const trips = [
       trip({ trip_date: "2026-01-02", odometer_start: 150, odometer_end: 200 }),
@@ -95,6 +104,9 @@ describe("tripDistance", () => {
   });
   it("ger 0 när start = slut", () => {
     expect(calc.tripDistance({ odometer_start: 500, odometer_end: 500 })).toBe(0);
+  });
+  it("ger 0 för öppen resa (odometer_end null)", () => {
+    expect(calc.tripDistance({ odometer_start: 500, odometer_end: null })).toBe(0);
   });
 });
 

@@ -18,16 +18,19 @@ interface TripGap {
 // (= körda km som saknas i journalen). Sorterar kronologiskt
 // (datum, sedan odometer_start) innan intilliggande rader jämförs.
 function detectTripGaps(tripsForCar: CarTrip[]): TripGap[] {
-  const sorted = [...tripsForCar].sort((a, b) => {
-    if (a.trip_date < b.trip_date) return -1;
-    if (a.trip_date > b.trip_date) return 1;
-    return a.odometer_start - b.odometer_start;
-  });
+  // Öppna (pågående) resor saknar odometer_end → ingår inte i kedjan.
+  const sorted = tripsForCar
+    .filter(t => t.odometer_end != null)
+    .sort((a, b) => {
+      if (a.trip_date < b.trip_date) return -1;
+      if (a.trip_date > b.trip_date) return 1;
+      return a.odometer_start - b.odometer_start;
+    });
   const gaps: TripGap[] = [];
   for (let i = 1; i < sorted.length; i++) {
     const prev = sorted[i - 1];
     const next = sorted[i];
-    const diff = next.odometer_start - prev.odometer_end;
+    const diff = next.odometer_start - (prev.odometer_end as number);
     if (diff > 0) {
       gaps.push({ car_id: next.car_id, prev, next, gap_km: diff });
     }
@@ -35,9 +38,9 @@ function detectTripGaps(tripsForCar: CarTrip[]): TripGap[] {
   return gaps;
 }
 
-// Körd sträcka för en resa.
-function tripDistance(t: { odometer_start: number; odometer_end: number }): number {
-  return t.odometer_end - t.odometer_start;
+// Körd sträcka för en resa. Öppen resa (odometer_end null) → 0.
+function tripDistance(t: { odometer_start: number; odometer_end: number | null }): number {
+  return t.odometer_end == null ? 0 : t.odometer_end - t.odometer_start;
 }
 
 // ---- EKONOMI ----

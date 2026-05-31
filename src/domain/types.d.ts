@@ -346,7 +346,9 @@ export interface CarTrip {
   to_loc?: string | null;
   purpose?: string | null;
   odometer_start: number;
-  odometer_end: number;
+  odometer_end: number | null;   // null = öppen (pågående) resa
+  status: "open" | "closed";     // open = inledd men ej avslutad
+  needs_purpose: boolean;        // true = lucka-rad, fyll i syfte i efterhand
   is_private: boolean;
   is_fueling: boolean;
   liters?: number | null;

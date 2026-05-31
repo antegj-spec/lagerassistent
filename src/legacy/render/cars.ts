@@ -10,7 +10,9 @@
 
 function rCarJournal(): string {
   const activeCars = cars.list.filter(c => c.active);
-  const allTrips = cars.trips;
+  // Öppna (pågående) resor visas som banner högst upp, inte i listan.
+  const allTrips = cars.trips.filter(t => t.status !== "open");
+  const ongoing = cars.trips.filter(t => t.status === "open");
 
   // Filter-state (lightweight, in-memory — inte i ui-store):
   // hanteras via DOM-läsning inom render-cycle.
@@ -50,10 +52,15 @@ function rCarJournal(): string {
 
   return `
 <div class="cj-toolbar">
-  <button class="btn cj-add-btn" onclick="openAddTrip()">+ NY RESA</button>
+  <button class="btn cj-add-btn" onclick="startTrip()">+ INLED RESA</button>
   ${auth.isAdmin ? `<button class="btn-ghost" onclick="openCarRegistry()" title="Bilregister">⚙ Bilar</button>` : ""}
   ${auth.isAdmin ? `<button class="btn-ghost" onclick="openCarExport()" title="Exportera">📤 Export</button>` : ""}
 </div>
+
+${ongoing.length ? `
+<div class="cj-ongoing-list">
+  ${ongoing.map(rOngoingBanner).join("")}
+</div>` : ""}
 
 <div class="cj-filters">
   <select id="cj-filter-car" onchange="render()">${carFilterOpts}</select>
@@ -101,10 +108,42 @@ function rGapCard(g: { car_id: string; prev: CarTrip; next: CarTrip; gap_km: num
 </div>`;
 }
 
+// Banner för en pågående (öppen) resa — visas högst upp, med Avsluta-knapp.
+function rOngoingBanner(t: CarTrip): string {
+  const car = carById(t.car_id);
+  return `
+<div class="cj-ongoing-card">
+  <div class="cj-ongoing-title">🚗 Pågående resa</div>
+  <div class="cj-ongoing-meta">
+    <b>${esc(car ? carLabel(car) : "Bil")}</b> · ${esc(t.driver)}<br>
+    Start ${t.odometer_start} km · ${esc(t.trip_date)}${t.from_loc ? " · från " + esc(t.from_loc) : ""}
+  </div>
+  <button class="btn cj-ongoing-end-btn" onclick="endTrip('${escAttr(t.id)}')">AVSLUTA RESA</button>
+</div>`;
+}
+
 function rTripCard(t: CarTrip): string {
   const car = carById(t.car_id);
   const distance = tripDistance(t);
   const canEdit = auth.isAdmin || t.created_by === auth.user;
+
+  // Lucka-rad som väntar på syfte — eget utseende + "fyll i"-knapp.
+  if (t.needs_purpose) {
+    return `
+<div class="cj-trip-card cj-trip-needsfill">
+  <div class="cj-trip-header">
+    <div class="cj-trip-date">⚠ Lucka · ${esc(t.trip_date)}</div>
+  </div>
+  <div class="cj-trip-row"><b>${esc(car ? carLabel(car) : "—")}</b></div>
+  <div class="cj-trip-row cj-trip-odo">
+    ${t.odometer_start} → ${t.odometer_end} km <b>(${distance} km)</b> — oförklarad körning
+  </div>
+  <div class="cj-trip-actions">
+    <button class="btn" onclick="fillGapPurpose('${escAttr(t.id)}')">+ Fyll i vad bilen användes till</button>
+  </div>
+</div>`;
+  }
+
   return `
 <div class="cj-trip-card${t.is_private ? " cj-trip-private" : ""}${t.is_fueling ? " cj-trip-fueling" : ""}">
   <div class="cj-trip-header">
