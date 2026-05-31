@@ -47,6 +47,42 @@ function closeItem() {
   render();
 }
 
+// ---- MATERIAL-LISTAN: basis-flik / kategori-filter / sök ----
+function setMatBasis(b) {
+  ui.matBasis = b === "article" ? "article" : "count";
+  ui.matCatFilter = null;
+  materials.openId = null;
+  render();
+}
+
+function setMatCatFilter(c) {
+  // null = Alla, "" = Okategoriserad, annars kategori-id.
+  ui.matCatFilter = c;
+  materials.openId = null;
+  render();
+}
+
+// Sök: re-rendera materialvyn in i #main och behåll fokus/caret i sökrutan
+// (mönster från setSearch() i ui.ts).
+function setMatSearch(v) {
+  ui.matSearch = v;
+  const m = document.getElementById("main");
+  if (!m) return;
+  const inp = document.getElementById("mat-search-input");
+  const pos = document.activeElement === inp && inp ? inp.selectionStart : null;
+  m.innerHTML = rMat();
+  if (pos !== null) {
+    const ni = document.getElementById("mat-search-input");
+    if (ni) { ni.focus(); ni.setSelectionRange(pos, pos); }
+  }
+  bindEvents();
+}
+
+function clearMatSearch() {
+  ui.matSearch = "";
+  render();
+}
+
 // ---- MATERIAL-BILDER (lagerräknande och artikelbaserade) ----
 async function handleMatImg(matId, inputEl) {
   await handleImgInput(inputEl, async (url) => {
@@ -147,6 +183,13 @@ function openAddMat() {
       <label class="field-label">TOTALT ANTAL (endast lagerräknande)</label>
       <input type="number" id="mat-total" placeholder="0" min="0" value="0">
     </div>
+    <label class="field-label">KATEGORI (lagerräknat)</label>
+    <select id="mat-category">
+      <option value="">— ingen —</option>
+      ${MAT_CATEGORIES.map(c => `<option value="${c.id}">${c.emoji} ${c.label}</option>`).join("")}
+    </select>
+    <label class="field-label">ARTIKELNUMMER (valfritt)</label>
+    <input type="text" id="mat-article-number" placeholder="T.ex. 1000247">
     <!-- Fas 6.6: lagernivå-tröskel, NULL = av -->
     <label class="field-label">LAGERNIVÅ-VARNING (under N tillgängliga = varning, valfritt)</label>
     <input type="number" id="mat-min-threshold" placeholder="t.ex. 10" min="0">
@@ -169,8 +212,10 @@ async function addMat() {
   const info_text = document.getElementById("mat-info")?.value?.trim() || null;
   const thresholdRaw = document.getElementById("mat-min-threshold")?.value;
   const min_threshold = thresholdRaw ? parseInt(thresholdRaw) : null;
+  const category = document.getElementById("mat-category")?.value || null;
+  const article_number = document.getElementById("mat-article-number")?.value?.trim() || null;
   try {
-    const newId = await saveMat({ name, emoji, is_article_based, total_count, unit, info_text, min_threshold });
+    const newId = await saveMat({ name, emoji, is_article_based, total_count, unit, info_text, min_threshold, category, article_number });
     // Initiera räkning för lagerräknande
     if (!is_article_based && total_count > 0) {
       await setMatCount(newId, "tillgänglig", total_count);
@@ -201,6 +246,14 @@ function openEditMat(id) {
       <option value="meter" ${m.unit === "meter" ? "selected" : ""}>meter</option>
       <option value="kg" ${m.unit === "kg" ? "selected" : ""}>kg</option>
     </select>
+    <label class="field-label">KATEGORI (lagerräknat)</label>
+    <select id="edit-mat-category">
+      <option value="" ${!m.category ? "selected" : ""}>— ingen —</option>
+      ${MAT_CATEGORIES.map(c => `<option value="${c.id}" ${m.category === c.id ? "selected" : ""}>${c.emoji} ${c.label}</option>`).join("")}
+      ${m.category && !MAT_CATEGORIES.some(c => c.id === m.category) ? `<option value="${escAttr(m.category)}" selected>${esc(m.category)}</option>` : ""}
+    </select>
+    <label class="field-label">ARTIKELNUMMER (valfritt)</label>
+    <input type="text" id="edit-mat-article-number" placeholder="T.ex. 1000247" value="${escAttr(m.article_number || "")}">
     <!-- Fas 6.6: lagernivå-tröskel -->
     <label class="field-label">LAGERNIVÅ-VARNING (under N tillgängliga = varning, tomt = av)</label>
     <input type="number" id="edit-mat-min-threshold" placeholder="t.ex. 10" min="0" value="${m.min_threshold != null ? m.min_threshold : ""}">
@@ -221,8 +274,10 @@ async function saveEditMat(id) {
   const info_text = document.getElementById("edit-mat-info")?.value?.trim() || null;
   const thresholdRaw = document.getElementById("edit-mat-min-threshold")?.value;
   const min_threshold = thresholdRaw ? parseInt(thresholdRaw) : null;
+  const category = document.getElementById("edit-mat-category")?.value || null;
+  const article_number = document.getElementById("edit-mat-article-number")?.value?.trim() || null;
   try {
-    await saveMat({ id, name, emoji, unit, info_text, min_threshold });
+    await saveMat({ id, name, emoji, unit, info_text, min_threshold, category, article_number });
     await loadMats();
     closeModal();
     toast("✓ Sparat");
@@ -346,6 +401,8 @@ function openAddItem(matId) {
     <div class="modal-title">Ny artikel — ${esc(m.name)}</div>
     <label class="field-label">ARTIKEL-ID</label>
     <input type="text" id="item-id" placeholder="T.ex. LD20-19">
+    <label class="field-label">ARTIKELNUMMER (valfritt)</label>
+    <input type="text" id="item-article-number" placeholder="T.ex. 1000247">
     <label class="field-label">STATUS</label>
     <select id="item-status">${Object.entries(MAT_STATS).map(([k, v]) =>
       `<option value="${k}">${v.emoji} ${v.label}</option>`
@@ -361,8 +418,9 @@ async function addItem(matId) {
   const article_id = document.getElementById("item-id")?.value?.trim();
   if (!article_id) { toast("Ange ett artikel-ID", 1); return; }
   const status = document.getElementById("item-status")?.value || "tillgänglig";
+  const article_number = document.getElementById("item-article-number")?.value?.trim() || null;
   try {
-    const newId = await saveMatItem({ material_id: matId, article_id, status });
+    const newId = await saveMatItem({ material_id: matId, article_id, status, article_number });
     await logMatHistory({
       material_id: matId,
       item_id: newId,

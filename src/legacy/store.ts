@@ -32,6 +32,11 @@ interface UiState {
   searchQuery: string;
   loading: boolean;
   matSubTab: "status" | "returer" | "åtgärder";
+  // Material-listan: basis-flik (lagerräknat/artikelbaserat), kategori-filter
+  // (NULL = Alla, "" = Okategoriserad) och fritextsök.
+  matBasis: "count" | "article";
+  matCatFilter: string | null;
+  matSearch: string;
   planSubTab: "aktiva" | "arkiv";
   planPersonFilter: string;
   pinBuf: string;
@@ -138,6 +143,9 @@ const appState: AppState = {
     searchQuery: "",
     loading: false,
     matSubTab: "status",
+    matBasis: "count",
+    matCatFilter: null,
+    matSearch: "",
     planSubTab: "aktiva",
     planPersonFilter: "alla",
     pinBuf: "",
@@ -285,6 +293,9 @@ function resetUiState(): void {
   ui.searchQuery = "";
   ui.loading = false;
   ui.matSubTab = "status";
+  ui.matBasis = "count";
+  ui.matCatFilter = null;
+  ui.matSearch = "";
   ui.planSubTab = "aktiva";
   ui.planPersonFilter = "alla";
   ui.pinBuf = "";

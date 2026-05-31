@@ -1,6 +1,6 @@
 // ============================================================
 // render/patches.ts — Granular DOM-patches per aggregate (Fas 4.5)
-// Beror på: store.ts, render.ts (rCard, rMatCardSummary,
+// Beror på: store.ts, render.ts (rCard, rMatRow,
 // rTaskListRow), ui.ts (updMeta)
 //
 // Hot-path-actions slipper anropa full render(). Istället plockar
@@ -51,9 +51,8 @@ function patchNoteCard(id: number): boolean {
 }
 
 // ---- MATERIAL ----
-// Byter ut ett mat-card i listan (rMatCardSummary). Detaljvy hanteras
-// separat — där kallar action full render() eftersom mer än ett
-// element ändras.
+// Byter ut en mat-row i listan (rMatRow). Detaljvy hanteras separat —
+// där kallar action full render() eftersom mer än ett element ändras.
 function patchMaterialCard(id: number): boolean {
   const mat = materials.list.find(m => m.id === id);
   if (!mat) {
@@ -61,7 +60,7 @@ function patchMaterialCard(id: number): boolean {
     if (el) el.remove();
     return false;
   }
-  return replaceCardHtml(`[data-material-id="${id}"]`, rMatCardSummary(mat));
+  return replaceCardHtml(`[data-material-id="${id}"]`, rMatRow(mat));
 }
 
 // ---- TASKS ----

@@ -716,8 +716,33 @@ label.field-label { font-size: var(--fs-xs); letter-spacing: 1.5px; color: var(-
 .mat-stats { display: flex; gap: var(--sp-lg); margin-top: var(--sp-sm); }
 .mat-stat { font-size: var(--fs-xs); color: var(--muted); line-height: var(--lh-snug); }
 .mat-stat span { font-family: var(--display); font-size: var(--fs-xl); font-weight: 700; display: block; color: var(--text); line-height: var(--lh-tight); }
-.mat-list { display: grid; grid-template-columns: 1fr; gap: var(--sp-sm); }
-@media (min-width: 1024px) { .mat-list { grid-template-columns: repeat(2, 1fr); } }
+.mat-list { display: flex; flex-direction: column; gap: var(--sp-xs); }
+
+/* Kompakt materialrad (en rad per material) */
+.mat-row {
+  background: var(--surface);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--sp-sm) var(--sp-md);
+  cursor: pointer;
+  transition: background .15s, transform .05s;
+}
+.mat-row:hover { background: var(--accent-subtle); }
+.mat-row:active { transform: scale(.995); }
+.mat-row-top { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-sm); }
+.mat-row-title { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.mat-row-emoji { font-size: var(--fs-md); }
+.mat-row-art { font-size: var(--fs-xs); color: var(--muted); font-family: var(--mono, monospace); }
+.mat-cat-badge {
+  font-size: var(--fs-xs); color: var(--accent);
+  background: var(--accent-subtle); border-radius: 10px;
+  padding: 1px 7px; line-height: 1.5;
+}
+.mat-row-avail { font-family: var(--display); font-weight: 700; font-size: var(--fs-lg); white-space: nowrap; }
+.mat-row-unit { font-size: var(--fs-xs); color: var(--muted); font-weight: 400; }
+.mat-row-stats { display: flex; gap: var(--sp-md); flex-wrap: wrap; margin-top: 4px; font-size: var(--fs-xs); }
+.mat-row-borrowed { color: var(--blue); }
+.mat-row-empty { color: var(--muted); }
 
 /* ============================================================
    AI-CHATT
