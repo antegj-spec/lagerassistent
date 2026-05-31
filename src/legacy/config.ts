@@ -63,6 +63,17 @@ const MAT_STATS: Record<MaterialStatus, { label: string; emoji: string; color: s
   reserverad:  { label: "Reserverad",   emoji: "📌", color: "#9B59B6" }
 };
 
+// MATERIAL-KATEGORIER (lagerräknat material)
+// Redigerbar kategori per material — låter användaren gruppera lagerräknat
+// material (GIGS, Golv, Staket, MCCS...). Material utan kategori (NULL/tom)
+// visas under "Okategoriserad". Lägg till nya kategorier här.
+const MAT_CATEGORIES: readonly { id: string; label: string; emoji: string }[] = [
+  { id: "GIGS",   label: "GIGS",   emoji: "🎤" },
+  { id: "Golv",   label: "Golv",   emoji: "🟫" },
+  { id: "Staket", label: "Staket", emoji: "🚧" },
+  { id: "MCCS",   label: "MCCS",   emoji: "🔌" }
+];
+
 // INFO-KATEGORIER (FAQ/info-flik)
 const INFO_CATS: Record<InfoCategory, { emoji: string; color: string }> = {
   "Utrustning":        { emoji: "🛠", color: "#2E7DC4" },

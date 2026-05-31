@@ -111,6 +111,7 @@ function rItemDetail(it: MaterialItem, m: Material): string {
     <div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${esc(m.emoji || "📦")} ${esc(m.name)}</div>
       <div style="font-family:var(--display);font-size:26px;font-weight:900">${esc(it.article_id)}</div>
+      ${it.article_number ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">Artikelnr: ${esc(it.article_number)}</div>` : ""}
       ${it.last_washed ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">🧼 Senast tvättat: ${fmtDateOnly(it.last_washed)}${daysSinceWash != null ? ` (${daysSinceWash}d sedan)` : ""}</div>` : ""}
       ${it.status === "reserverad" && it.reserved_for ? `<div style="font-size:12px;color:#9B59B6;margin-top:6px;font-family:var(--display);font-weight:700">📌 Reserverad till: ${esc(it.reserved_for)}</div>` : ""}
       <div style="font-size:11px;color:${serviceOverdue ? "#E8521A" : "var(--muted)"};margin-top:6px">
@@ -220,65 +221,127 @@ function rMatStatus(): string {
     ${overdueService.length > 8 ? `<div class="alert-item" style="color:var(--muted)">+ ${overdueService.length - 8} fler...</div>` : ""}` : ""}
 </div>` : "";
 
+  // Fas 9: två axlar (lagerräknat/artikelbaserat) + kategori-filter + sök.
+  const search = ui.matSearch.trim().toLowerCase();
+  const searching = search.length > 0;
+  const countList = materials.list.filter(m => !m.is_article_based);
+  const articleList = materials.list.filter(m => m.is_article_based);
+
+  // Vilka material visas?
+  let shown: Material[];
+  if (searching) {
+    // Sök över ALLT material (båda baser, ignorera flik/kategori).
+    shown = materials.list.filter(m =>
+      m.name.toLowerCase().includes(search) ||
+      (m.article_number || "").toLowerCase().includes(search) ||
+      (m.category || "").toLowerCase().includes(search)
+    );
+  } else if (ui.matBasis === "article") {
+    shown = articleList;
+  } else {
+    shown = ui.matCatFilter === null
+      ? countList
+      : ui.matCatFilter === ""
+        ? countList.filter(m => !m.category)
+        : countList.filter(m => m.category === ui.matCatFilter);
+  }
+  shown = [...shown].sort((a, b) => a.name.localeCompare(b.name, "sv"));
+
+  const searchBox = `
+<div class="search-box mb">
+  <input type="text" id="mat-search-input" placeholder="Sök material (namn, artikelnr, kategori)..."
+    value="${escAttr(ui.matSearch)}" oninput="setMatSearch(this.value)">
+  ${ui.matSearch ? `<button class="search-clear" onclick="clearMatSearch()">×</button>` : ""}
+</div>`;
+
+  const basisTabs = `
+<div class="filter-row">
+  <button class="filter-btn ${!searching && ui.matBasis === "count" ? "active" : ""}" onclick="setMatBasis('count')">📦 Lagerräknat (${countList.length})</button>
+  <button class="filter-btn ${!searching && ui.matBasis === "article" ? "active" : ""}" onclick="setMatBasis('article')">🔖 Artikelbaserat (${articleList.length})</button>
+</div>`;
+
+  // Kategori-chips visas bara för lagerräknat och inte under aktiv sökning.
+  let catChips = "";
+  if (!searching && ui.matBasis === "count") {
+    const uncat = countList.filter(m => !m.category).length;
+    const chip = (id: string | null, label: string, count: number, emoji = "") =>
+      `<button class="filter-btn ${ui.matCatFilter === id ? "active" : ""}" onclick="setMatCatFilter(${id === null ? "null" : `'${escAttr(id)}'`})">${emoji ? emoji + " " : ""}${esc(label)} (${count})</button>`;
+    catChips = `
+<div class="filter-row">
+  ${chip(null, "Alla", countList.length)}
+  ${MAT_CATEGORIES.map(c => chip(c.id, c.label, countList.filter(m => m.category === c.id).length, c.emoji)).join("")}
+  ${chip("", "Okategoriserad", uncat)}
+</div>`;
+  }
+
+  const heading = searching
+    ? `SÖKRESULTAT (${shown.length}) · "${esc(ui.matSearch)}"`
+    : `MATERIALREGISTER (${shown.length})`;
+
   return `
 ${warningsBlock}
 ${auth.isAdmin ? `<button class="btn mb" onclick="openAddMat()" style="width:100%">+ LÄGG TILL MATERIALTYP</button>` : ""}
-<div class="lbl">MATERIALREGISTER (${materials.list.length})</div>
+${searchBox}
+${basisTabs}
+${catChips}
+<div class="lbl">${heading}</div>
 <div class="mat-list">
-${materials.list.length === 0
-  ? `<div class="empty">Inga material tillagda ännu</div>`
-  : materials.list.map(m => rMatCardSummary(m)).join("")
+${shown.length === 0
+  ? `<div class="empty">${searching ? "Inga material matchar sökningen" : "Inga material här ännu"}</div>`
+  : shown.map(m => rMatRow(m)).join("")
 }
 </div>`;
 }
 
-// ---- KORT FÖR MATERIAL-LISTAN ----
-function rMatCardSummary(m: Material): string {
+// ---- KOMPAKT RAD FÖR MATERIAL-LISTAN ----
+// En rad per material. Behåller färg + antal + statuslinje. Används både
+// av listvyn och av patchMaterialCard() (data-material-id krävs).
+function rMatRow(m: Material): string {
+  const art = m.article_number
+    ? `<span class="mat-row-art">#${esc(m.article_number)}</span>` : "";
+  const cat = m.category
+    ? `<span class="mat-cat-badge">${esc(m.category)}</span>` : "";
+  const title = `<span class="mat-row-emoji">${esc(m.emoji || "📦")}</span><span class="mat-name">${esc(m.name)}</span>${art}${cat}`;
+
   if (m.is_article_based) {
     const items = materials.items[m.id] || [];
     const counts: Record<string, number> = {};
     Object.keys(MAT_STATS).forEach(s => counts[s] = 0);
     items.forEach(it => { if (counts[it.status] !== undefined) counts[it.status]++; });
 
-    return `<div class="mat-card" data-material-id="${m.id}" onclick="openMat(${m.id})" style="cursor:pointer">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <div>
-      <div style="font-size:20px">${esc(m.emoji || "📦")}</div>
-      <div class="mat-name">${esc(m.name)}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:2px">${items.length} artiklar · klicka för detaljer</div>
-    </div>
-    <div style="text-align:right;font-size:11px">
-      ${Object.entries(MAT_STATS).map(([k, v]) =>
-        counts[k] > 0 ? `<span style="color:${v.color};margin-left:8px">${v.emoji} ${counts[k]}</span>` : ""
-      ).join("")}
-    </div>
+    return `<div class="mat-row" data-material-id="${m.id}" onclick="openMat(${m.id})">
+  <div class="mat-row-top">
+    <div class="mat-row-title">${title}</div>
+    <div class="mat-row-avail">${items.length}<span class="mat-row-unit"> art.</span></div>
   </div>
-</div>`;
-  } else {
-    // Lagerräknande
-    const counts = materials.counts[m.id] || {};
-    const borrowed = (materials.borrowed[m.id] || []).reduce((sum, b) => sum + (b.quantity || 0), 0);
-    const total = (m.total_count || 0) + borrowed;
-    const tillgVal = counts.tillgänglig || 0;
-    const pct = total > 0 ? Math.round(tillgVal / total * 100) : 0;
-    const col = pct > 75 ? "#4CAF7D" : pct > 40 ? "#E8A81A" : "#E8521A";
-
-    return `<div class="mat-card" data-material-id="${m.id}" onclick="openMat(${m.id})" style="cursor:pointer">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <div>
-      <div style="font-size:20px">${esc(m.emoji || "📦")}</div>
-      <div class="mat-name">${esc(m.name)}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:2px">${total} ${esc(m.unit || "st")} totalt${borrowed > 0 ? ` (${borrowed} inhyrt)` : ""} · klicka för detaljer</div>
-    </div>
-  </div>
-  <div class="mat-bar"><div class="mat-fill" style="width:${pct}%;background:${col}"></div></div>
-  <div class="mat-stats">
+  <div class="mat-row-stats">
     ${Object.entries(MAT_STATS).map(([k, v]) =>
-      (counts[k as MaterialStatus] || 0) > 0 ? `<div class="mat-stat"><span style="color:${v.color}">${counts[k as MaterialStatus]}</span>${v.label.toUpperCase()}</div>` : ""
-    ).join("")}
+      counts[k] > 0 ? `<span style="color:${v.color}">${v.emoji} ${counts[k]}</span>` : ""
+    ).join("") || `<span class="mat-row-empty">Inga artiklar</span>`}
   </div>
 </div>`;
   }
+
+  // Lagerräknande
+  const counts = materials.counts[m.id] || {};
+  const borrowed = (materials.borrowed[m.id] || []).reduce((sum, b) => sum + (b.quantity || 0), 0);
+  const total = (m.total_count || 0) + borrowed;
+  const tillgVal = counts.tillgänglig || 0;
+  const pct = total > 0 ? Math.round(tillgVal / total * 100) : 0;
+  const col = pct > 75 ? "#4CAF7D" : pct > 40 ? "#E8A81A" : "#E8521A";
+
+  return `<div class="mat-row" data-material-id="${m.id}" onclick="openMat(${m.id})">
+  <div class="mat-row-top">
+    <div class="mat-row-title">${title}</div>
+    <div class="mat-row-avail" style="color:${col}">${tillgVal}<span class="mat-row-unit">/${total} ${esc(m.unit || "st")}</span></div>
+  </div>
+  <div class="mat-bar"><div class="mat-fill" style="width:${pct}%;background:${col}"></div></div>
+  <div class="mat-row-stats">
+    ${Object.entries(MAT_STATS).map(([k, v]) =>
+      (counts[k as MaterialStatus] || 0) > 0 ? `<span style="color:${v.color}">${v.emoji} ${counts[k as MaterialStatus]}</span>` : ""
+    ).join("")}${borrowed > 0 ? `<span class="mat-row-borrowed">+${borrowed} inhyrt</span>` : ""}
+  </div>
+</div>`;
 }
 
 // ---- DETALJVY FÖR ETT MATERIAL ----

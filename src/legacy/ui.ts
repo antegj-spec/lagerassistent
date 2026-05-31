@@ -307,6 +307,7 @@ function showTab(t: TabName): void {
   ui.imgData = null;
   ui.imgFile = null;
   ui.searchQuery = "";
+  ui.matSearch = "";
   // Fas 3.6 (B6): nollställ filter ihop med ui.searchQuery — annars hänger
   // en "Reparation"-status med från material-fliken in i anteckningar
   // (där status-domänen är en annan).

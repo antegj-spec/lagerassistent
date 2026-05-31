@@ -120,6 +120,8 @@ export interface Material extends BaseRow, SoftDeletable {
   is_article_based: boolean;
   supplier?: string | null;
   category?: string | null;
+  // Artikelnummer för lagerräknat material (fritext, ej unikt). NULL = saknas.
+  article_number?: string | null;
   notes?: string | null;
   emoji?: string | null;
   unit?: string | null;
@@ -132,6 +134,8 @@ export interface Material extends BaseRow, SoftDeletable {
 export interface MaterialItem extends BaseRow {
   material_id: number;
   article_id: string;
+  // Artikelnummer (fritext, ej unikt, valfritt). NULL = saknas.
+  article_number?: string | null;
   status: MaterialStatus;
   last_washed?: string | null;
   // Fas 6.5: målet för reservationen ("Festivalen 2026"). Bara meningsfullt
