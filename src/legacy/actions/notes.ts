@@ -318,6 +318,12 @@ async function addNote(): Promise<void> {
 }
 
 async function toggleNote(id: number): Promise<void> {
+  // Låt användaren markera/kopiera text utan att kortet öppnas/stängs.
+  // Vid en text-markering fyrar click ändå på kortet — men då finns en
+  // icke-tom selection som vi upptäcker här och avbryter toggeln för.
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) return;
+
   const prevOpen = notes.openId;
   notes.openId = prevOpen === id ? null : id;
   if (notes.openId && !notes.comments[id]) {

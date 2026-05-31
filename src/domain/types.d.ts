@@ -129,6 +129,9 @@ export interface Material extends BaseRow, SoftDeletable {
   info_text?: string | null;
   // Fas 6.6: tröskel för "lågt lager"-varning (count-based). NULL = av.
   min_threshold?: number | null;
+  // Länk till en info-artikel (info_articles.id). NULL = ingen koppling.
+  // Kräver migration 025_material_info_link.sql.
+  info_article_id?: number | null;
 }
 
 export interface MaterialItem extends BaseRow {

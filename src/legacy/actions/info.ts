@@ -13,6 +13,18 @@ function openInfo(id: number): void {
   render();
 }
 
+// Navigera till Info-fliken och öppna en artikel direkt. Används från Plan
+// (kopplade guider) så man kan hoppa vidare till själva info-sidan/PDF:en.
+function gotoInfo(id: number): void {
+  ui.tab = "info";
+  ui.mainTab = "drift";
+  info.openId = id;
+  info.editMode = null;
+  if (typeof _highlightMainNav === "function") _highlightMainNav();
+  _navPush();
+  render();
+}
+
 function closeInfo(): void {
   info.openId = null;
   info.editMode = null;

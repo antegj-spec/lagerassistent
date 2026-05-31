@@ -7,6 +7,18 @@
 //   ui.ts (toast, openModal, confirmModal, esc, escAttr), render.ts (render)
 // ============================================================
 
+// Navigera till material-fliken OCH öppna ett material direkt. Används av
+// dashboardens problem-artiklar (openMat ensam byter inte ui.tab, så vyn
+// stannade kvar på dashboarden).
+async function gotoMaterial(id) {
+  ui.tab = "material";
+  ui.mainTab = "lager";
+  ui.matSubTab = "status";
+  ui.matSearch = "";
+  if (typeof _highlightMainNav === "function") _highlightMainNav();
+  await openMat(id);
+}
+
 // ---- ÖPPNA/STÄNG DETALJVY ----
 async function openMat(id) {
   materials.openId = id;
@@ -259,6 +271,11 @@ function openEditMat(id) {
     <input type="number" id="edit-mat-min-threshold" placeholder="t.ex. 10" min="0" value="${m.min_threshold != null ? m.min_threshold : ""}">
     <label class="field-label">INFO</label>
     <textarea id="edit-mat-info" rows="6" placeholder="Vikt, packning, moduldelar, artikelnummer...">${esc(m.info_text || "")}</textarea>
+    <label class="field-label">KOPPLA TILL INFO-SIDA (valfritt)</label>
+    <select id="edit-mat-info-article">
+      <option value="">— ingen —</option>
+      ${info.articles.map(a => `<option value="${a.id}" ${m.info_article_id === a.id ? "selected" : ""}>${esc(a.category)} · ${esc(a.title)}</option>`).join("")}
+    </select>
     <div class="modal-actions">
       <button class="btn-ghost" onclick="closeModal()" style="flex:1">Avbryt</button>
       <button class="btn" onclick="saveEditMat(${id})" style="flex:1">SPARA</button>
@@ -276,8 +293,10 @@ async function saveEditMat(id) {
   const min_threshold = thresholdRaw ? parseInt(thresholdRaw) : null;
   const category = document.getElementById("edit-mat-category")?.value || null;
   const article_number = document.getElementById("edit-mat-article-number")?.value?.trim() || null;
+  const infoArticleRaw = document.getElementById("edit-mat-info-article")?.value;
+  const info_article_id = infoArticleRaw ? parseInt(infoArticleRaw) : null;
   try {
-    await saveMat({ id, name, emoji, unit, info_text, min_threshold, category, article_number });
+    await saveMat({ id, name, emoji, unit, info_text, min_threshold, category, article_number, info_article_id });
     await loadMats();
     closeModal();
     toast("✓ Sparat");

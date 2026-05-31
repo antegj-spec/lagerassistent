@@ -170,8 +170,8 @@ const MAIN_TABS: readonly MainTabDef[] = [
     id: "drift",
     label: "Drift",
     subTabs: [
-      { id: "körjournal", label: "Körjournal", emoji: "🚗" },
-      { id: "info",       label: "Info",       emoji: "ℹ" }
+      { id: "info",       label: "Info",       emoji: "ℹ" },
+      { id: "körjournal", label: "Körjournal", emoji: "🚗" }
     ]
   },
   {

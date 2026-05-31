@@ -7,53 +7,118 @@
 // ============================================================
 // ANTECKNINGAR-FLIKEN
 // ============================================================
-function rNotes(): string {
-  const userOpts = USERS.filter(u => u !== "Admin");
+// Gemensamt filter — används av rNotes och applyNoteFilters (list-patch).
+function getFilteredNotes(): Note[] {
   const filtered = notes.list.filter(n => {
-    if (ui.fCat !== "alla" && n.category !== ui.fCat) return false;
-    if (ui.fStat !== "alla" && n.status !== ui.fStat) return false;
-    if (ui.fAssigned !== "alla") {
-      if (ui.fAssigned === "ingen" && n.assigned_to) return false;
-      if (ui.fAssigned !== "ingen" && n.assigned_to !== ui.fAssigned) return false;
+    if (ui.fCat.length && !ui.fCat.includes(n.category)) return false;
+    if (ui.fStat.length && !ui.fStat.includes(n.status)) return false;
+    if (ui.fAssigned.length) {
+      const ok = ui.fAssigned.some(a => a === "ingen" ? !n.assigned_to : n.assigned_to === a);
+      if (!ok) return false;
     }
     if (ui.searchQuery && !n.text.toLowerCase().includes(ui.searchQuery.toLowerCase())) return false;
     return true;
   });
+  // Klarmarkerade noter hamnar längst ner; behåller inbördes ordning (stabil sort).
+  return filtered.sort((a, b) =>
+    (a.status === "klar" ? 1 : 0) - (b.status === "klar" ? 1 : 0)
+  );
+}
 
+interface NoteFilterCfg {
+  label: string;
+  selected: string[];
+  setter: string;
+  options: { value: string; label: string }[];
+}
+
+function noteFilterCfg(key: "cat" | "stat" | "assigned"): NoteFilterCfg {
+  if (key === "cat") {
+    return {
+      label: "Kategori", selected: ui.fCat, setter: "setFC",
+      options: Object.entries(CATS)
+        .filter(([k]) => k !== "intern" || INTERN_USERS.includes(auth.user || ""))
+        .map(([k, v]) => ({ value: k, label: `${v.emoji} ${v.label}` })),
+    };
+  }
+  if (key === "stat") {
+    return {
+      label: "Status", selected: ui.fStat, setter: "setFS",
+      options: Object.entries(STATS).map(([k, v]) => ({ value: k, label: v })),
+    };
+  }
+  return {
+    label: "Tilldelad", selected: ui.fAssigned, setter: "setFA",
+    options: [
+      { value: "ingen", label: "Ej tilldelad" },
+      ...USERS.filter(u => u !== "Admin").map(u => ({ value: u, label: `@${u}` })),
+    ],
+  };
+}
+
+function noteFilterSummary(label: string, n: number): string {
+  return n ? `${label} (${n})` : `${label}: Alla`;
+}
+
+function rNoteFilterDropdown(key: "cat" | "stat" | "assigned"): string {
+  const cfg = noteFilterCfg(key);
+  return `
+<details class="filter-dropdown" id="filter-dd-${key}">
+  <summary class="filter-dropdown-toggle">
+    <span id="filter-sum-${key}">${esc(noteFilterSummary(cfg.label, cfg.selected.length))}</span>
+    <span class="filter-caret">▾</span>
+  </summary>
+  <div class="filter-dropdown-menu">
+    ${cfg.options.map(o => `
+      <label class="filter-dropdown-opt">
+        <input type="checkbox" ${cfg.selected.includes(o.value) ? "checked" : ""} onchange="${cfg.setter}('${escAttr(o.value)}')">
+        <span>${esc(o.label)}</span>
+      </label>`).join("")}
+    <button class="filter-dropdown-clear" onclick="clearNoteFilter('${key}')">Rensa</button>
+  </div>
+</details>`;
+}
+
+function rNotes(): string {
+  const filtered = getFilteredNotes();
   return `
 <div class="search-box">
   <input type="text" id="search-input" placeholder="Sök bland anteckningar..." value="${escAttr(ui.searchQuery)}" oninput="setSearch(this.value)">
   ${ui.searchQuery ? `<button class="search-clear" onclick="clearSearch()">×</button>` : ""}
 </div>
-<div class="lbl">KATEGORI</div>
-<div class="filter-row">
-  <button class="filter-btn ${ui.fCat === "alla" ? "active" : ""}" onclick="setFC('alla')">Alla</button>
-  ${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(auth.user || "")).map(([k, v]) =>
-    `<button class="filter-btn ${ui.fCat === k ? "active" : ""}" onclick="setFC('${k}')">${v.emoji} ${v.label}</button>`
-  ).join("")}
+<div class="notes-filter-row mb">
+  ${rNoteFilterDropdown("cat")}
+  ${rNoteFilterDropdown("stat")}
+  ${rNoteFilterDropdown("assigned")}
 </div>
-<div class="lbl">STATUS</div>
-<div class="filter-row">
-  <button class="filter-btn ${ui.fStat === "alla" ? "active" : ""}" onclick="setFS('alla')">Alla</button>
-  ${Object.entries(STATS).map(([k, v]) =>
-    `<button class="filter-btn ${ui.fStat === k ? "active" : ""}" onclick="setFS('${k}')">${v}</button>`
-  ).join("")}
-</div>
-<div class="lbl">TILLDELAD</div>
-<div class="filter-row mb">
-  <button class="filter-btn ${ui.fAssigned === "alla" ? "active" : ""}" onclick="setFA('alla')">Alla</button>
-  <button class="filter-btn ${ui.fAssigned === "ingen" ? "active" : ""}" onclick="setFA('ingen')">Ingen</button>
-  ${userOpts.map(u =>
-    `<button class="filter-btn ${ui.fAssigned === u ? "active" : ""}" onclick="setFA('${esc(u)}')">@${esc(u)}</button>`
-  ).join("")}
-</div>
-<div class="lbl">${filtered.length} ANTECKNINGAR ${ui.searchQuery ? `("${esc(ui.searchQuery)}")` : ""}</div>
-<div class="note-list">
+<div class="lbl" id="notes-count">${filtered.length} ANTECKNINGAR ${ui.searchQuery ? `("${esc(ui.searchQuery)}")` : ""}</div>
+<div class="note-list" id="note-list">
   ${filtered.length === 0
     ? `<div class="empty">Inga matchar filtret</div>`
     : filtered.map(n => rCard(n)).join("")
   }
 </div>`;
+}
+
+// Patcha bara list + räknare när ett filter ändras — lämnar dropdownens
+// DOM orörd så den stannar öppen och kryssrutorna behåller fokus.
+function applyNoteFilters(): void {
+  const filtered = getFilteredNotes();
+  const list = document.getElementById("note-list");
+  if (list) {
+    list.innerHTML = filtered.length === 0
+      ? `<div class="empty">Inga matchar filtret</div>`
+      : filtered.map(n => rCard(n)).join("");
+  }
+  const cnt = document.getElementById("notes-count");
+  if (cnt) cnt.textContent = `${filtered.length} ANTECKNINGAR ${ui.searchQuery ? `("${ui.searchQuery}")` : ""}`;
+  const upd = (key: string, label: string, n: number) => {
+    const el = document.getElementById(`filter-sum-${key}`);
+    if (el) el.textContent = noteFilterSummary(label, n);
+  };
+  upd("cat", "Kategori", ui.fCat.length);
+  upd("stat", "Status", ui.fStat.length);
+  upd("assigned", "Tilldelad", ui.fAssigned.length);
 }
 
 // ---- ANTECKNINGSKORT ----
@@ -79,9 +144,10 @@ function rCard(n: Note, inTrash: boolean = false): string {
     ${linkedMat ? `<span class="note-link">📦 ${esc(linkedMat.name)}</span>` : ""}
     ${dlStatus ? `<span class="${deadlineBadgeClass(dlStatus)}">${esc(dlLabel)}</span>` : ""}
     ${commentCount > 0 ? `<span style="font-size:9px;color:var(--muted)">💬 ${commentCount}</span>` : ""}
+    ${n.image_url ? `<span style="font-size:9px;color:var(--muted)" title="Har bild">📷</span>` : ""}
   </div>
   <div class="note-text ${n.status === "klar" ? "done" : ""}">${esc(n.text)}</div>
-  ${n.image_url ? `<img class="note-img" src="${escAttr(n.image_url)}" loading="lazy">` : ""}
+  ${open && n.image_url ? `<img class="note-img" src="${escAttr(n.image_url)}" loading="lazy" style="cursor:zoom-in" onclick="event.stopPropagation();openLightbox('${escAttr(n.image_url)}')">` : ""}
   <div class="note-meta">
     <span>${fmtD(n.created_at)}</span>
     <span>· ${esc(n.created_by || "")}</span>

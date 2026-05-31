@@ -311,9 +311,9 @@ function showTab(t: TabName): void {
   // Fas 3.6 (B6): nollställ filter ihop med ui.searchQuery — annars hänger
   // en "Reparation"-status med från material-fliken in i anteckningar
   // (där status-domänen är en annan).
-  ui.fCat = "alla";
-  ui.fStat = "alla";
-  ui.fAssigned = "alla";
+  ui.fCat = [];
+  ui.fStat = [];
+  ui.fAssigned = [];
   ui.planPersonFilter = "alla";
   // Fas 3.6 (B14): rensa även kommentar-bild-globals vid tab-byte
   ui.matCommentImgUrl = null;
@@ -458,9 +458,21 @@ function closeGearMenu(): void {
 }
 
 // ---- FILTER ----
-function setFC(c: string): void { ui.fCat = c; render(); }
-function setFS(s: string): void { ui.fStat = s; render(); }
-function setFA(a: string): void { ui.fAssigned = a; render(); }
+// Not-filter (flerval): toggla värdet i respektive lista och patcha bara
+// listan (applyNoteFilters) så öppna dropdowns inte stängs vid varje klick.
+function _toggleNoteFilter(arr: string[], v: string): void {
+  const i = arr.indexOf(v);
+  if (i === -1) arr.push(v); else arr.splice(i, 1);
+}
+function setFC(c: string): void { _toggleNoteFilter(ui.fCat, c); applyNoteFilters(); }
+function setFS(s: string): void { _toggleNoteFilter(ui.fStat, s); applyNoteFilters(); }
+function setFA(a: string): void { _toggleNoteFilter(ui.fAssigned, a); applyNoteFilters(); }
+function clearNoteFilter(key: "cat" | "stat" | "assigned"): void {
+  if (key === "cat") ui.fCat = [];
+  else if (key === "stat") ui.fStat = [];
+  else ui.fAssigned = [];
+  render();   // full render för att avmarkera kryssrutorna
+}
 function setPlanPersonFilter(v: string): void { ui.planPersonFilter = v; render(); }
 
 // ---- VECKOSAMANFATTNING VIA MAIL ----

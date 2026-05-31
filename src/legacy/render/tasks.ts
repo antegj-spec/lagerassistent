@@ -31,6 +31,10 @@ function rPlanActive(): string {
     if (ui.planPersonFilter === "ingen") return !t.responsible && !(t.assigned_to || []).length;
     return t.responsible === ui.planPersonFilter || (t.assigned_to || []).includes(ui.planPersonFilter);
   });
+  // Klara uppgifter hamnar under aktiva (stabil sort behåller inbördes ordning).
+  const sorted = [...filtered].sort((a, b) =>
+    (a.status === "klar" ? 1 : 0) - (b.status === "klar" ? 1 : 0)
+  );
 
   return `
 ${auth.isAdmin ? `<button class="btn mb" onclick="openAddTask()" style="width:100%">+ NY UPPGIFT</button>` : ""}
@@ -41,9 +45,9 @@ ${auth.isAdmin ? `<button class="btn mb" onclick="openAddTask()" style="width:10
   ${allUsers.map(u => `<button class="filter-btn ${ui.planPersonFilter === u ? "active" : ""}" onclick="setPlanPersonFilter('${esc(u)}')">${esc(u)}</button>`).join("")}
 </div>
 <div class="lbl">${filtered.length} UPPGIFTER</div>
-${filtered.length === 0
+${sorted.length === 0
   ? `<div class="empty">Inga uppgifter matchar filtret</div>`
-  : filtered.map(t => rTaskListRow(t)).join("")
+  : sorted.map(t => rTaskListRow(t)).join("")
 }`;
 }
 
@@ -118,6 +122,7 @@ function rTaskInfoLinks(taskId: number): string {
   ${linkedArticles.map(a => {
     const catCfg = INFO_CATS[a.category] || INFO_CATS.Utrustning;
     const artImages = info.images[a.id] || [];
+    const artPdfs = info.pdfs[a.id] || [];
     return `
   <details class="task-info-link">
     <summary>
@@ -127,9 +132,13 @@ function rTaskInfoLinks(taskId: number): string {
     </summary>
     <div class="task-info-link-content">
       ${a.body ? `<div style="white-space:pre-wrap;margin-bottom:10px">${esc(a.body)}</div>` : ""}
-      ${artImages.length > 0 ? `<div class="info-images" style="margin-bottom:0">${artImages.map(img =>
+      ${artImages.length > 0 ? `<div class="info-images" style="margin-bottom:10px">${artImages.map(img =>
         `<div class="info-img-wrap"><img src="${escAttr(img.image_url)}" loading="lazy" onclick="openLightbox('${escAttr(img.image_url)}')"></div>`
       ).join("")}</div>` : ""}
+      ${artPdfs.map(p =>
+        `<button class="btn-ghost" style="margin:0 6px 6px 0" onclick="openPdfOverlay('${escAttr(p.pdf_url)}','${escAttr(p.pdf_name)}')">📄 ${esc(p.pdf_name)}</button>`
+      ).join("")}
+      <button class="btn-ghost" style="margin-bottom:0" onclick="gotoInfo(${a.id})">📖 Öppna i Info →</button>
     </div>
   </details>`;
   }).join("")}

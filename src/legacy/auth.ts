@@ -292,9 +292,9 @@ function logout(): void {
   info.editMode = null;
   info.editImages = [];
   ui.searchQuery = "";
-  ui.fCat = "alla";
-  ui.fStat = "alla";
-  ui.fAssigned = "alla";
+  ui.fCat = [];
+  ui.fStat = [];
+  ui.fAssigned = [];
   ui.imgData = null;
   ui.imgFile = null;
 
