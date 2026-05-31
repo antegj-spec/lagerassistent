@@ -76,7 +76,7 @@ ${groups.length === 0
           <span style="font-size:18px">${esc(g.mat.emoji || "📦")}</span>
           <span style="font-family:var(--display);font-weight:700;margin-left:6px">${esc(g.mat.name)}</span>
         </div>
-        <button class="btn-ghost" onclick="openMat(${g.mat.id})">Öppna →</button>
+        <button class="btn-ghost" onclick="gotoMaterial(${g.mat.id})">Öppna →</button>
       </div>
       ${g.items.map(c => {
         const it = c.item_id ? matItems.find(i => i.id === c.item_id) : null;
@@ -305,20 +305,10 @@ function rMatRow(m: Material): string {
 
   if (m.is_article_based) {
     const items = materials.items[m.id] || [];
-    const counts: Record<string, number> = {};
-    Object.keys(MAT_STATS).forEach(s => counts[s] = 0);
-    items.forEach(it => { if (counts[it.status] !== undefined) counts[it.status]++; });
-
-    return `<div class="mat-row" data-material-id="${m.id}" onclick="openMat(${m.id})">
-  <div class="mat-row-top">
-    <div class="mat-row-title">${title}</div>
-    <div class="mat-row-avail">${items.length}<span class="mat-row-unit"> art.</span></div>
-  </div>
-  <div class="mat-row-stats">
-    ${Object.entries(MAT_STATS).map(([k, v]) =>
-      counts[k] > 0 ? `<span style="color:${v.color}">${v.emoji} ${counts[k]}</span>` : ""
-    ).join("") || `<span class="mat-row-empty">Inga artiklar</span>`}
-  </div>
+    // Kompakt: allt på en rad — titel till vänster, antal artiklar till höger.
+    return `<div class="mat-row mat-row-compact" data-material-id="${m.id}" onclick="openMat(${m.id})">
+  <div class="mat-row-title">${title}</div>
+  <div class="mat-row-avail">${items.length}<span class="mat-row-unit"> art.</span></div>
 </div>`;
   }
 
@@ -330,17 +320,41 @@ function rMatRow(m: Material): string {
   const pct = total > 0 ? Math.round(tillgVal / total * 100) : 0;
   const col = pct > 75 ? "#4CAF7D" : pct > 40 ? "#E8A81A" : "#E8521A";
 
-  return `<div class="mat-row" data-material-id="${m.id}" onclick="openMat(${m.id})">
-  <div class="mat-row-top">
+  // Kompakt: titel + huvudsiffra på en rad. Tunn lagerstapel under som
+  // visuell indikator (status-uppdelningen med ✅-bocken är borttagen).
+  return `<div class="mat-row mat-row-compact" data-material-id="${m.id}" onclick="openMat(${m.id})">
+  <div class="mat-row-line">
     <div class="mat-row-title">${title}</div>
     <div class="mat-row-avail" style="color:${col}">${tillgVal}<span class="mat-row-unit">/${total} ${esc(m.unit || "st")}</span></div>
   </div>
   <div class="mat-bar"><div class="mat-fill" style="width:${pct}%;background:${col}"></div></div>
-  <div class="mat-row-stats">
-    ${Object.entries(MAT_STATS).map(([k, v]) =>
-      (counts[k as MaterialStatus] || 0) > 0 ? `<span style="color:${v.color}">${v.emoji} ${counts[k as MaterialStatus]}</span>` : ""
-    ).join("")}${borrowed > 0 ? `<span class="mat-row-borrowed">+${borrowed} inhyrt</span>` : ""}
+</div>`;
+}
+
+// ---- KOPPLAD INFO-ARTIKEL ----
+// Visar materialets länkade info-artikel (om någon) + ev. PDF:er, med
+// knapp för att hoppa vidare till själva Info-sidan. info_article_id sätts
+// via Redigera material-formuläret.
+function rMatLinkedInfo(m: Material): string {
+  const art = m.info_article_id != null
+    ? info.articles.find(a => a.id === m.info_article_id)
+    : null;
+  if (!art) return "";
+  const catCfg = INFO_CATS[art.category] || INFO_CATS.Utrustning;
+  const pdfs = info.pdfs[art.id] || [];
+  return `
+<div class="card">
+  <div class="lbl">KOPPLAD INFO</div>
+  <div class="mat-linked-info" onclick="gotoInfo(${art.id})" style="cursor:pointer">
+    <span class="mat-linked-info-cat" style="color:${catCfg.color}">${catCfg.emoji}</span>
+    <span class="mat-linked-info-title">${esc(art.title)}</span>
+    <span class="mat-linked-info-go">Öppna →</span>
   </div>
+  ${pdfs.length ? `<div class="mat-linked-pdfs">
+    ${pdfs.map(p =>
+      `<button class="btn-ghost" onclick="openPdfOverlay('${escAttr(p.pdf_url)}','${escAttr(p.pdf_name)}')">📄 ${esc(p.pdf_name)}</button>`
+    ).join("")}
+  </div>` : ""}
 </div>`;
 }
 
@@ -376,7 +390,11 @@ function rMatDetail(m: Material): string {
   </div>
 </div>
 
-<!-- BILDER PÅ MATERIAL -->
+${rMatLinkedInfo(m)}
+
+${body}
+
+<!-- BILDER PÅ MATERIAL (flyttad ner under antal) -->
 <div class="card">
   <div class="lbl">BILDER (${matImages.length})</div>
   <div class="info-images">
@@ -392,8 +410,6 @@ function rMatDetail(m: Material): string {
     </label>
   </div>
 </div>
-
-${body}
 
 <!-- INHYRT MATERIAL (lagerräknande) -->
 ${!m.is_article_based ? `

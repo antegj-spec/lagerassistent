@@ -712,6 +712,35 @@ label.field-label { font-size: var(--fs-xs); letter-spacing: 1.5px; color: var(-
 .filter-btn:active { transform: scale(.97); }
 .filter-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); box-shadow: 0 1px 3px var(--accent-shadow); }
 
+/* Not-filter: tre dropdowns på samma rad, flerval via kryssrutor */
+.notes-filter-row { display: flex; gap: var(--sp-xs); flex-wrap: wrap; align-items: center; }
+.filter-dropdown { position: relative; }
+.filter-dropdown-toggle {
+  list-style: none; cursor: pointer; user-select: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text); font-size: 12px; white-space: nowrap;
+}
+.filter-dropdown-toggle::-webkit-details-marker { display: none; }
+.filter-dropdown[open] > .filter-dropdown-toggle { border-color: var(--accent); color: var(--accent); }
+.filter-dropdown .filter-caret { font-size: 10px; color: var(--muted); }
+.filter-dropdown-menu {
+  position: absolute; z-index: 60; top: calc(100% + 4px); left: 0; min-width: 190px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm);
+  box-shadow: 0 8px 24px rgba(0,0,0,.35); padding: 6px; max-height: 320px; overflow-y: auto;
+}
+.filter-dropdown-opt {
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px;
+  border-radius: var(--r-sm); cursor: pointer; font-size: 13px; color: var(--text);
+}
+.filter-dropdown-opt:hover { background: var(--bg); }
+.filter-dropdown-opt input { width: 16px; height: 16px; accent-color: var(--accent); flex-shrink: 0; }
+.filter-dropdown-clear {
+  width: 100%; margin-top: 4px; padding: 6px; font-size: 11px; cursor: pointer;
+  background: transparent; color: var(--muted); border: 1px dashed var(--border); border-radius: var(--r-sm);
+}
+.filter-dropdown-clear:hover { color: var(--accent); border-color: var(--accent); }
+
 /* BILDUPPLADDNING */
 .img-upload-area {
   border: 2px dashed var(--border); border-radius: var(--r-md);
@@ -762,6 +791,23 @@ label.field-label { font-size: var(--fs-xs); letter-spacing: 1.5px; color: var(-
 .mat-row-stats { display: flex; gap: var(--sp-md); flex-wrap: wrap; margin-top: 4px; font-size: var(--fs-xs); }
 .mat-row-borrowed { color: var(--blue); }
 .mat-row-empty { color: var(--muted); }
+
+/* Kompakt material-rad — smalare kort, innehåll på en rad */
+.mat-row-compact { padding: var(--sp-sm) var(--sp-md); }
+.mat-row-compact.mat-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-sm); flex-wrap: wrap; }
+.mat-row-line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-sm); width: 100%; }
+.mat-row-compact .mat-row-title { flex: 1; min-width: 0; }
+.mat-row-compact .mat-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mat-row-compact .mat-bar { width: 100%; margin-top: 6px; height: 4px; }
+.mat-row-compact .mat-row-avail { font-size: var(--fs-md); }
+
+/* Kopplad info-artikel i material-detaljvyn */
+.mat-linked-info { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg); }
+.mat-linked-info:hover { border-color: var(--accent); }
+.mat-linked-info-cat { font-size: var(--fs-md); }
+.mat-linked-info-title { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mat-linked-info-go { font-size: var(--fs-xs); color: var(--accent); white-space: nowrap; }
+.mat-linked-pdfs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 
 /* ============================================================
    AI-CHATT

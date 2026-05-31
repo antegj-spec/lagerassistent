@@ -26,9 +26,10 @@ interface AuthState {
 interface UiState {
   mainTab: MainTabName;
   tab: TabName;
-  fCat: string;
-  fStat: string;
-  fAssigned: string;
+  // Not-filter (flerval). Tom array = "Alla". fAssigned-värdet "ingen" = ej tilldelad.
+  fCat: string[];
+  fStat: string[];
+  fAssigned: string[];
   searchQuery: string;
   loading: boolean;
   matSubTab: "status" | "returer" | "åtgärder";
@@ -137,9 +138,9 @@ const appState: AppState = {
   ui: {
     mainTab: "hem",
     tab: "hem",
-    fCat: "alla",
-    fStat: "alla",
-    fAssigned: "alla",
+    fCat: [],
+    fStat: [],
+    fAssigned: [],
     searchQuery: "",
     loading: false,
     matSubTab: "status",
@@ -287,9 +288,9 @@ function resetAppState(): void {
 function resetUiState(): void {
   ui.mainTab = "hem";
   ui.tab = "hem";
-  ui.fCat = "alla";
-  ui.fStat = "alla";
-  ui.fAssigned = "alla";
+  ui.fCat = [];
+  ui.fStat = [];
+  ui.fAssigned = [];
   ui.searchQuery = "";
   ui.loading = false;
   ui.matSubTab = "status";

@@ -39,7 +39,7 @@ function rDashboard(): string {
   const problems = dashboard.problemArticles.length === 0
     ? `<div class="empty">Inga problem-artiklar 🎉</div>`
     : dashboard.problemArticles.map(p => `
-      <div class="task-row" onclick="openMat(${p.matId})" style="border-left:3px solid #E8521A;cursor:pointer">
+      <div class="task-row" onclick="gotoMaterial(${p.matId})" style="border-left:3px solid #E8521A;cursor:pointer">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <div style="flex:1;min-width:0">
             <div style="font-family:var(--display);font-weight:700;font-size:15px">${esc(p.matEmoji)} ${esc(p.matName)}</div>
