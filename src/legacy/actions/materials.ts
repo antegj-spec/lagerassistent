@@ -324,14 +324,33 @@ async function doDelMat(id) {
 }
 
 // ---- TOTALT ANTAL (lagerräknande) ----
+// Summa av alla statusar UTOM "okänd" — dvs antal som är öronmärkta
+// (Tillgänglig/Uthyrd/Tvätt/Reparation/Reserverad). "Okänd" fungerar som
+// avstämnings-hög: okänd = total − allocated. Ändras totalen hamnar
+// mellanskillnaden där, och eventuellt befintligt glapp stäms av samtidigt.
+function allocatedExclOkand(matId) {
+  const counts = materials.counts[matId] || {};
+  return Object.entries(counts)
+    .filter(([k]) => k !== "okänd")
+    .reduce((sum, [, n]) => sum + (Number(n) || 0), 0);
+}
+
 function openSetTotal(matId) {
   const m = materials.list.find(m => m.id === matId);
   if (!m) return;
+  const unit = esc(m.unit || "st");
+  const allocated = allocatedExclOkand(matId);
+  const okand = (materials.counts[matId] || {})["okänd"] || 0;
+  const gap = (m.total_count || 0) - (allocated + okand);
   openModal(`
     <div class="modal-title">Ändra totalt antal</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
-      Sätt det totala antalet ${esc(m.unit || "st")} av ${esc(m.name)} (eget material, exklusive inhyrt).
+      Sätt det totala antalet ${unit} av ${esc(m.name)} (eget material, exklusive inhyrt).
+      Mellanskillnaden mot statusarna hamnar i <b>Okänd</b> ❓ som du sedan fördelar via "Flytta antal".
     </p>
+    ${gap !== 0 ? `<p style="font-size:12px;color:var(--red);background:var(--red-subtle);padding:8px 10px;border-radius:8px;margin-bottom:10px">
+      ⚠️ Just nu är ${allocated + okand} ${unit} fördelade på statusar men totalen är ${m.total_count || 0}. ${Math.abs(gap)} ${unit} ${gap > 0 ? "är oallokerat" : "är överallokerat"} — detta stäms av till Okänd när du sparar.
+    </p>` : ""}
     <label class="field-label">TOTALT ANTAL</label>
     <input type="number" id="set-total" min="0" value="${m.total_count || 0}">
     <div class="modal-actions">
@@ -343,9 +362,35 @@ function openSetTotal(matId) {
 
 async function saveTotal(matId) {
   const newTotal = parseInt(document.getElementById("set-total")?.value) || 0;
+  if (newTotal < 0) { toast("Ange ett antal som inte är negativt", 1); return; }
+
+  // Allt utom "okänd" är öronmärkt och får inte överskridas av totalen.
+  const allocated = allocatedExclOkand(matId);
+  if (newTotal < allocated) {
+    toast(`Totalen kan inte vara mindre än ${allocated} (redan fördelat på Tillgänglig/Uthyrd m.fl.). Flytta tillbaka antal först.`, 1);
+    return;
+  }
+
+  // Invariant: okänd absorberar mellanskillnaden. Detta täcker både en ökning
+  // av totalen OCH avstämning av eventuellt befintligt glapp.
+  const prevOkand = (materials.counts[matId] || {})["okänd"] || 0;
+  const newOkand = newTotal - allocated;
+
   try {
     await saveMat({ id: matId, total_count: newTotal });
+    if (newOkand !== prevOkand) {
+      await setMatCount(matId, "okänd", newOkand);
+      await logMatHistory({
+        material_id: matId,
+        old_status: null,
+        new_status: "okänd",
+        changed_by: auth.user,
+        count_change: newOkand - prevOkand,
+        comment: "Totalt antal ändrat — avstämt mot Okänd"
+      });
+    }
     await loadMats();
+    await loadMatHistory(matId);
     toast("✓ Totalt antal uppdaterat");
     closeModal();
     render();

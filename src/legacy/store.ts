@@ -98,6 +98,9 @@ interface InfoState {
   editMode: null | "new" | "edit";
   editImages: string[];                                   // bild-urls under redigering
   editPdfs: { url: string; name: string }[];              // PDF:er under redigering
+  // Snapshot av rubrik/kategori/text medan editorn är öppen, så en
+  // bild-/PDF-upload (som triggar full render()) inte slänger osparad text.
+  editDraft: { title: string; body: string; category: string } | null;
 }
 
 interface ChatState {
@@ -201,6 +204,7 @@ const appState: AppState = {
     editMode: null,
     editImages: [],
     editPdfs: [],
+    editDraft: null,
   },
   chat: {
     list: [],
@@ -274,6 +278,7 @@ function resetAppState(): void {
   info.editMode = null;
   info.editImages = [];
   info.editPdfs = [];
+  info.editDraft = null;
   // Chat
   chat.list = [];
   // Cars (Fas 8 Etapp B)

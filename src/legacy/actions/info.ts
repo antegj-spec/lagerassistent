@@ -40,6 +40,7 @@ function startNewInfo(presetCat?: InfoCategory | string): void {
   info.editMode = "new";
   info.editImages = [];
   info.editPdfs = [];
+  info.editDraft = null;
   (window as any)._infoEditPreset = presetCat || "Utrustning";
   render();
 }
@@ -49,6 +50,7 @@ function startEditInfo(id: number): void {
   info.editMode = "edit";
   info.editImages = [];
   info.editPdfs = [];
+  info.editDraft = null;
   render();
 }
 
@@ -56,7 +58,18 @@ function cancelInfoEdit(): void {
   info.editMode = null;
   info.editImages = [];
   info.editPdfs = [];
+  info.editDraft = null;
   render();
+}
+
+// Snapshot:a osparade fält innan en upload triggar full render() — annars
+// nollställs rubrik/kategori/text (de lever bara i DOM:en tills man sparar).
+function _captureInfoDraft(): void {
+  if (info.editMode !== "new" && info.editMode !== "edit") return;
+  const title = (document.getElementById("info-title") as HTMLInputElement | null)?.value ?? "";
+  const body = (document.getElementById("info-body") as HTMLTextAreaElement | null)?.value ?? "";
+  const category = (document.getElementById("info-cat") as HTMLSelectElement | null)?.value ?? "Utrustning";
+  info.editDraft = { title, body, category };
 }
 
 async function saveInfoArticleForm(): Promise<void> {
@@ -84,6 +97,7 @@ async function saveInfoArticleForm(): Promise<void> {
       info.editMode = null;
       info.editImages = [];
       info.editPdfs = [];
+      info.editDraft = null;
       info.openId = newId;
       toast("✓ Förslag skapat");
     } else if (info.editMode === "edit" && info.openId) {
@@ -98,6 +112,7 @@ async function saveInfoArticleForm(): Promise<void> {
       info.editMode = null;
       info.editImages = [];
       info.editPdfs = [];
+      info.editDraft = null;
       toast("✓ Sparat");
     }
     render();
@@ -146,6 +161,7 @@ async function doDelInfoArticle(id: number): Promise<void> {
 
 // Bilder vid skapande/redigering
 async function handleInfoEditImg(inputEl: HTMLInputElement): Promise<void> {
+  _captureInfoDraft();  // handleImgInput kör render() internt
   await handleImgInput(inputEl, (url) => { info.editImages.push(url); });
 }
 
@@ -155,6 +171,7 @@ async function handleInfoEditPdf(inputEl: HTMLInputElement): Promise<void> {
   if (!file) return;
   if (file.type !== "application/pdf") { toast("Välj en PDF-fil", 1); return; }
   if (file.size > 20 * 1024 * 1024) { toast("PDF:en får max vara 20 MB", 1); return; }
+  _captureInfoDraft();  // render() nedan får inte slänga osparad text
   toast("Laddar upp PDF...");
   try {
     const url = await uploadPdf(file);
@@ -168,6 +185,7 @@ async function handleInfoEditPdf(inputEl: HTMLInputElement): Promise<void> {
 }
 
 function removeInfoEditPdf(idx: number): void {
+  _captureInfoDraft();
   info.editPdfs.splice(idx, 1);
   render();
 }

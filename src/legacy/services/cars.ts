@@ -50,11 +50,17 @@ async function delCar(id: string): Promise<void> {
 async function saveCarTrip(t: Partial<CarTrip> & { id?: string }): Promise<string | undefined> {
   const { id, created_at, ...b } = t as Partial<CarTrip>;
   if (id) {
-    await sb("/rest/v1/car_trips?id=eq." + id, {
+    // return=representation så vi ser om en rad faktiskt ändrades. Om RLS
+    // filtrerar bort raden uppdateras 0 rader och PostgREST svarar [] (inte
+    // ett fel) — utan denna koll maskeras det som en lyckad "avsluta resa".
+    const res = await sb<CarTrip[]>("/rest/v1/car_trips?id=eq." + id, {
       method: "PATCH",
       body: JSON.stringify({ ...b, updated_at: new Date().toISOString() }),
-      prefer: "return=minimal"
+      prefer: "return=representation"
     });
+    if (!res || res.length === 0) {
+      throw new Error("ingen rad ändrades — du saknar troligen behörighet eller så finns resan inte längre");
+    }
     return id;
   } else {
     const res = await sb<{ id: string }[]>("/rest/v1/car_trips", {

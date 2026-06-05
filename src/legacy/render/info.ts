@@ -155,14 +155,19 @@ ${`<div class="info-pdf-list">
 function rInfoEditor(): string {
   const isNew = info.editMode === "new";
   const a = !isNew && info.openId ? info.articles.find(x => x.id === info.openId) : null;
-  const presetCat = isNew ? ((window as any)._infoEditPreset || "Utrustning") : (a?.category || "Utrustning");
+  // editDraft har företräde: bevarar osparad text när en upload re-renderar.
+  const draft = info.editDraft;
+  const titleVal = draft ? draft.title : (a ? a.title : "");
+  const bodyVal = draft ? draft.body : (a ? (a.body || "") : "");
+  const presetCat = draft ? draft.category
+    : (isNew ? ((window as any)._infoEditPreset || "Utrustning") : (a?.category || "Utrustning"));
   const existingImgs = !isNew && a ? (info.images[a.id] || []) : [];
 
   return `
 <div class="info-editor">
   <div class="info-art-cat">${isNew ? "💡 NYTT FÖRSLAG" : "✎ REDIGERA ARTIKEL"}</div>
   <label class="field-label">RUBRIK</label>
-  <input type="text" id="info-title" placeholder="T.ex. Truckladdning — så gör du" value="${a ? escAttr(a.title) : ""}">
+  <input type="text" id="info-title" placeholder="T.ex. Truckladdning — så gör du" value="${escAttr(titleVal)}">
   <label class="field-label">KATEGORI</label>
   <select id="info-cat">
     ${Object.entries(INFO_CATS).map(([k, v]) =>
@@ -170,7 +175,7 @@ function rInfoEditor(): string {
     ).join("")}
   </select>
   <label class="field-label">BESKRIVNING</label>
-  <textarea id="info-body" rows="10" placeholder="Steg-för-steg, viktiga detaljer, varningar...">${a ? esc(a.body || "") : ""}</textarea>
+  <textarea id="info-body" rows="10" placeholder="Steg-för-steg, viktiga detaljer, varningar...">${esc(bodyVal)}</textarea>
 
   ${existingImgs.length ? `<label class="field-label">BEFINTLIGA BILDER</label>
   <div class="info-images">
