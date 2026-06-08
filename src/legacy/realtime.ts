@@ -31,6 +31,7 @@ const RT_TABLE_RELOADERS: Record<string, RtTableEntry> = {
   material_counts:   { reload: async () => { await loadMats(); },    storeKey: "materials" },
   material_items:    { reload: async () => { await loadMats(); },    storeKey: "materials" },
   borrowed_material: { reload: async () => { await loadMats(); },    storeKey: "materials" },
+  material_allocations: { reload: async () => { await loadMats(); }, storeKey: "materials" },
   tasks:             { reload: async () => { await loadTasks(); },   storeKey: "tasks" },
   returns:           { reload: async () => { await loadReturns(); }, storeKey: "returns" },
   cars:              { reload: async () => { await loadCars(); },    storeKey: "cars" },

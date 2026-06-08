@@ -37,6 +37,9 @@ declare global {
   type MaterialImage = D.MaterialImage;
   type MaterialItemImage = D.MaterialItemImage;
   type BorrowedMaterial = D.BorrowedMaterial;
+  type MaterialAllocation = D.MaterialAllocation;
+  type AllocationKind = D.AllocationKind;
+  type AllocationStatus = D.AllocationStatus;
   type Return = D.Return;
   type Task = D.Task;
   type TaskStatusLog = D.TaskStatusLog;

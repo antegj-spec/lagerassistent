@@ -66,6 +66,7 @@ interface MaterialsState {
   counts: Record<number, Partial<Record<MaterialStatus, number>>>;
   history: Record<number, MaterialHistory[]>;             // laddas vid behov
   borrowed: Record<number, BorrowedMaterial[]>;
+  allocations: Record<number, MaterialAllocation[]>;      // { materialId: [aktiva reservationer/uthyrningar] }
   comments: Record<number, MaterialComment[]>;            // item_id null = materialkommentar, annars artikelkommentar
   images: Record<number, MaterialImage[]>;
   itemImages: Record<number, MaterialItemImage[]>;
@@ -175,6 +176,7 @@ const appState: AppState = {
     counts: {},
     history: {},
     borrowed: {},
+    allocations: {},
     comments: {},
     images: {},
     itemImages: {},
@@ -252,6 +254,7 @@ function resetAppState(): void {
   materials.counts = {};
   materials.history = {};
   materials.borrowed = {};
+  materials.allocations = {};
   materials.comments = {};
   materials.images = {};
   materials.itemImages = {};

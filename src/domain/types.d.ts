@@ -201,6 +201,34 @@ export interface MaterialItemImage {
   created_at: Timestamp;
 }
 
+// Reserverat/uthyrt material — en rad per allokering (migration 028).
+// Lägger metadata (mål, datum) ovanpå material_counts aggregaten.
+export type AllocationKind = 'reserverad' | 'uthyrd';
+export type AllocationStatus = 'aktiv' | 'återlämnad' | 'avbruten';
+
+export interface MaterialAllocation {
+  id: number;
+  material_id: number;
+  // NULL för lagerräknat; satt för artikelbaserat (en artikel per rad).
+  item_id?: number | null;
+  kind: AllocationKind;
+  quantity: number;
+  // Fritext-mål (små gig/kund). Används när place_id är NULL.
+  target_text?: string | null;
+  // Strukturerad plats-koppling (större gig) — ligger redo, FK byggs senare.
+  place_id?: number | null;
+  status: AllocationStatus;
+  reserved_at: Timestamp;
+  // När uthyrt skickades iväg.
+  sent_at?: Timestamp | null;
+  expected_return?: string | null;
+  returned_at?: Timestamp | null;
+  comment?: string | null;
+  created_by: UserName | string;
+  created_at: Timestamp;
+  updated_at?: Timestamp;
+}
+
 export interface BorrowedMaterial extends BaseRow, SoftDeletable {
   material_id: number;
   supplier?: string | null;
