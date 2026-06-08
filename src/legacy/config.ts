@@ -53,14 +53,18 @@ const STATS: Record<NoteStatus, string> = {
 };
 
 // MATERIAL-STATUSAR
+// Ordningen styr default-val i alla dropdowns (FRÅN/TILL i flytta-dialogen,
+// ny artikel, ändra status) OCH visningsordningen i status-fördelningen.
+// Tillgänglig först = vanligaste utgångsläget förvalt; Okänd sist = sällan
+// startpunkt för en flytt.
 const MAT_STATS: Record<MaterialStatus, { label: string; emoji: string; color: string }> = {
-  okänd:       { label: "Okänd",        emoji: "❓", color: "#94A3B8" },
   tillgänglig: { label: "Tillgänglig",  emoji: "✅", color: "#4CAF7D" },
   uthyrd:      { label: "Uthyrd",       emoji: "📤", color: "#2E7DC4" },
+  // Fas 6.5: Reserverad till framtida event/kund. reserved_for fångar målet.
+  reserverad:  { label: "Reserverad",   emoji: "📌", color: "#9B59B6" },
   tvätt:       { label: "Tvätt behövs", emoji: "🧼", color: "#E8A81A" },
   reparation:  { label: "Reparation",   emoji: "🔧", color: "#E8521A" },
-  // Fas 6.5: Reserverad till framtida event/kund. reserved_for fångar målet.
-  reserverad:  { label: "Reserverad",   emoji: "📌", color: "#9B59B6" }
+  okänd:       { label: "Okänd",        emoji: "❓", color: "#94A3B8" }
 };
 
 // MATERIAL-KATEGORIER (lagerräknat material)

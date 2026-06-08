@@ -33,6 +33,17 @@ async function loadMats(): Promise<void> {
       if (!materials.borrowed[b.material_id]) materials.borrowed[b.material_id] = [];
       materials.borrowed[b.material_id].push(b);
     });
+
+    // Ladda aktiva allokeringar (reserverat + uthyrt). Avslutade (återlämnad/
+    // avbruten) syns i historiken, inte i de aktiva listorna.
+    const allocs = await sbPaged<MaterialAllocation>(
+      "/rest/v1/material_allocations?status=eq.aktiv&order=reserved_at.desc"
+    );
+    materials.allocations = {};
+    allocs.forEach(a => {
+      if (!materials.allocations[a.material_id]) materials.allocations[a.material_id] = [];
+      materials.allocations[a.material_id].push(a);
+    });
   } catch (e) {
     console.error("loadMats failed:", e);
   }
@@ -146,6 +157,71 @@ async function moveCount(
     } catch { /* var inte JSON — behåll originalet */ }
     throw new Error(msg);
   }
+}
+
+// ---- ALLOKERINGAR: RESERVERAT/UTHYRT (Fas 6.9) ----
+// Alla tre går via SECURITY DEFINER-RPC som flyttar material_counts (eller
+// artikelstatus) ATOMISKT i samma transaktion som allokeringsraden ändras.
+// Speglar moveCount()-mönstret inkl. error-unwrap från PostgREST-JSON.
+function unwrapRpcError(e: any): never {
+  let msg = e?.message ?? String(e);
+  try {
+    const parsed = JSON.parse(msg);
+    if (parsed?.message) msg = parsed.message;
+  } catch { /* var inte JSON — behåll originalet */ }
+  throw new Error(msg);
+}
+
+async function createAllocation(args: {
+  material_id: number;
+  kind: AllocationKind;
+  qty?: number;
+  item_id?: number | null;
+  target_text?: string | null;
+  place_id?: number | null;
+  expected_return?: string | null;
+  comment?: string | null;
+}): Promise<void> {
+  try {
+    await sb("/rest/v1/rpc/create_allocation", {
+      method: "POST",
+      body: JSON.stringify({
+        p_material_id: args.material_id,
+        p_kind: args.kind,
+        p_qty: args.qty ?? 1,
+        p_item_id: args.item_id ?? null,
+        p_target_text: args.target_text ?? null,
+        p_place_id: args.place_id ?? null,
+        p_expected_return: args.expected_return ?? null,
+        p_comment: args.comment ?? null
+      }),
+      prefer: "return=minimal"
+    });
+  } catch (e) { unwrapRpcError(e); }
+}
+
+async function promoteAllocation(allocation_id: number, comment: string | null = null): Promise<void> {
+  try {
+    await sb("/rest/v1/rpc/promote_allocation", {
+      method: "POST",
+      body: JSON.stringify({ p_allocation_id: allocation_id, p_comment: comment }),
+      prefer: "return=minimal"
+    });
+  } catch (e) { unwrapRpcError(e); }
+}
+
+async function closeAllocation(
+  allocation_id: number,
+  to_status: MaterialStatus = "tillgänglig",
+  comment: string | null = null
+): Promise<void> {
+  try {
+    await sb("/rest/v1/rpc/close_allocation", {
+      method: "POST",
+      body: JSON.stringify({ p_allocation_id: allocation_id, p_to_status: to_status, p_comment: comment }),
+      prefer: "return=minimal"
+    });
+  } catch (e) { unwrapRpcError(e); }
 }
 
 async function loadMatHistory(material_id: number): Promise<void> {

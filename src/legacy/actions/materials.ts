@@ -457,6 +457,136 @@ async function doMoveCount(matId) {
   }
 }
 
+// ============================================================
+// ALLOKERINGAR — RESERVERAT / UTHYRT (Fas 6.9)
+// Lagerräknat material: flyttar antal tillgänglig → reserverad/uthyrd via
+// create_allocation-RPC och skapar en spårbar post (mål + datum).
+// ============================================================
+
+// Öppna dialog för att reservera ELLER hyra ut (kind styr texterna).
+function openAllocate(matId, kind) {
+  const m = materials.list.find(m => m.id === matId);
+  if (!m) return;
+  const avail = (materials.counts[m.id] || {}).tillgänglig || 0;
+  const isRent = kind === "uthyrd";
+  const title = isRent ? "📤 Hyr ut" : "📌 Reservera";
+  if (avail <= 0) { toast("Inget tillgängligt att " + (isRent ? "hyra ut" : "reservera"), 1); return; }
+  openModal(`
+    <div class="modal-title">${title} — ${esc(m.name)}</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
+      ${avail} ${esc(m.unit || "st")} tillgängligt.
+    </p>
+    <label class="field-label">ANTAL</label>
+    <input type="number" id="alloc-qty" min="1" max="${avail}" value="1">
+    <label class="field-label">${isRent ? "UTHYRT TILL" : "RESERVERAT TILL"}</label>
+    <input type="text" id="alloc-target" placeholder="T.ex. 'Tons of Rock 2026' eller kundnamn">
+    <label class="field-label">${isRent ? "VÄNTAS TILLBAKA (valfritt)" : "BEHÖVS SENAST (valfritt)"}</label>
+    <input type="date" id="alloc-return">
+    <label class="field-label">KOMMENTAR (valfritt)</label>
+    <input type="text" id="alloc-comment" placeholder="T.ex. 'Lastat på bil 2'">
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()" style="flex:1">Avbryt</button>
+      <button class="btn" onclick="doAllocate(${matId},'${kind}')" style="flex:1">${isRent ? "HYR UT" : "RESERVERA"}</button>
+    </div>
+  `);
+}
+
+async function doAllocate(matId, kind) {
+  const qty = parseInt(document.getElementById("alloc-qty")?.value) || 0;
+  const target_text = document.getElementById("alloc-target")?.value?.trim() || null;
+  const expected_return = document.getElementById("alloc-return")?.value || null;
+  const comment = document.getElementById("alloc-comment")?.value?.trim() || null;
+
+  if (qty <= 0) { toast("Ange ett antal större än 0", 1); return; }
+  const avail = (materials.counts[matId] || {}).tillgänglig || 0;
+  if (qty > avail) { toast(`Du kan max ${kind === "uthyrd" ? "hyra ut" : "reservera"} ${avail}`, 1); return; }
+  if (!target_text) { toast(kind === "uthyrd" ? "Ange vart det hyrs ut" : "Ange vad det reserveras till", 1); return; }
+
+  try {
+    await createAllocation({ material_id: matId, kind, qty, target_text, expected_return, comment });
+    await loadMats();
+    await loadMatHistory(matId);
+    closeModal();
+    toast(kind === "uthyrd" ? `✓ Hyrt ut ${qty} till ${target_text}` : `✓ Reserverat ${qty} till ${target_text}`);
+    render();
+  } catch (e) {
+    toast("Kunde inte spara: " + e.message, 1);
+  }
+}
+
+// "Skicka vidare till uthyrt" — flyttar en reservation till uthyrd.
+async function doPromoteAllocation(allocId, matId) {
+  const a = (materials.allocations[matId] || []).find(x => x.id === allocId);
+  if (!a) return;
+  openModal(`
+    <div class="modal-title">📤 Skicka vidare till uthyrt</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
+      Reservationen <b>${esc(a.target_text || "—")}</b> (${a.quantity} st) markeras som uthyrd och får dagens datum som skickat-datum.
+    </p>
+    <label class="field-label">KOMMENTAR (valfritt)</label>
+    <input type="text" id="promote-comment" placeholder="T.ex. 'Lastat och skickat'">
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()" style="flex:1">Avbryt</button>
+      <button class="btn" onclick="confirmPromoteAllocation(${allocId},${matId})" style="flex:1">SKICKA VIDARE</button>
+    </div>
+  `);
+}
+
+async function confirmPromoteAllocation(allocId, matId) {
+  const comment = document.getElementById("promote-comment")?.value?.trim() || null;
+  try {
+    await promoteAllocation(allocId, comment);
+    await loadMats();
+    await loadMatHistory(matId);
+    closeModal();
+    toast("✓ Skickat vidare till uthyrt");
+    render();
+  } catch (e) {
+    toast("Kunde inte skicka vidare: " + e.message, 1);
+  }
+}
+
+// Återlämna/avsluta en allokering — antalet går tillbaka till valt lagerstatus.
+function openCloseAllocation(allocId, matId) {
+  const a = (materials.allocations[matId] || []).find(x => x.id === allocId);
+  if (!a) return;
+  const isRent = a.kind === "uthyrd";
+  openModal(`
+    <div class="modal-title">${isRent ? "Återlämna uthyrt" : "Avsluta reservation"}</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
+      <b>${esc(a.target_text || "—")}</b> (${a.quantity} st) — vart ska antalet tillbaka?
+    </p>
+    <label class="field-label">TILLBAKA TILL</label>
+    <select id="close-to-status">
+      <option value="tillgänglig">✅ Tillgänglig</option>
+      <option value="tvätt">🧼 Tvätt behövs</option>
+      <option value="reparation">🔧 Reparation</option>
+      <option value="okänd">❓ Okänd</option>
+    </select>
+    <label class="field-label">KOMMENTAR (valfritt)</label>
+    <input type="text" id="close-comment" placeholder="T.ex. 'Tillbaka i lager, allt helt'">
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()" style="flex:1">Avbryt</button>
+      <button class="btn" onclick="doCloseAllocation(${allocId},${matId})" style="flex:1">${isRent ? "ÅTERLÄMNA" : "AVSLUTA"}</button>
+    </div>
+  `);
+}
+
+async function doCloseAllocation(allocId, matId) {
+  const to_status = document.getElementById("close-to-status")?.value || "tillgänglig";
+  const comment = document.getElementById("close-comment")?.value?.trim() || null;
+  try {
+    await closeAllocation(allocId, to_status, comment);
+    await loadMats();
+    await loadMatHistory(matId);
+    closeModal();
+    toast("✓ Återlämnat till " + (MAT_STATS[to_status]?.label || to_status));
+    render();
+  } catch (e) {
+    toast("Kunde inte återlämna: " + e.message, 1);
+  }
+}
+
 // ---- ARTIKLAR (artikelbaserat) ----
 function openAddItem(matId) {
   const m = materials.list.find(m => m.id === matId);

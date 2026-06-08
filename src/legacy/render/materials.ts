@@ -532,14 +532,21 @@ function rMatCountsView(m: Material): string {
   const borrowed = (materials.borrowed[m.id] || []).reduce((sum, b) => sum + (b.quantity || 0), 0);
   const own = m.total_count || 0;
   const total = own + borrowed;
+  const avail = counts.tillgänglig || 0;
 
   return `
 <div class="card">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-    <div>
-      <div class="lbl" style="margin-bottom:4px">TOTALT ANTAL</div>
-      <div style="font-family:var(--display);font-size:30px;font-weight:900">${total} ${esc(m.unit || "st")}</div>
-      ${borrowed > 0 ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${own} eget + <span style="color:var(--blue)">${borrowed} inhyrt</span></div>` : ""}
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:12px">
+    <div style="display:flex;gap:28px;flex-wrap:wrap">
+      <div>
+        <div class="lbl" style="margin-bottom:4px">TOTALT ANTAL</div>
+        <div style="font-family:var(--display);font-size:30px;font-weight:900">${total} ${esc(m.unit || "st")}</div>
+        ${borrowed > 0 ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${own} eget + <span style="color:var(--blue)">${borrowed} inhyrt</span></div>` : ""}
+      </div>
+      <div>
+        <div class="lbl" style="margin-bottom:4px">TILLGÄNGLIGT</div>
+        <div style="font-family:var(--display);font-size:30px;font-weight:900;color:#4CAF7D">${avail} ${esc(m.unit || "st")}</div>
+      </div>
     </div>
     ${auth.isAdmin ? `<button class="btn-ghost" onclick="openSetTotal(${m.id})">✎ Ändra total</button>` : ""}
   </div>
@@ -557,6 +564,55 @@ function rMatCountsView(m: Material): string {
     </div>`;
   }).join("")}
 
-  <button class="btn mt" style="width:100%" onclick="openMoveCount(${m.id})">⇄ FLYTTA ANTAL MELLAN STATUSAR</button>
+  <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+    <button class="btn" style="flex:1;min-width:140px" onclick="openAllocate(${m.id},'reserverad')">📌 Reservera</button>
+    <button class="btn" style="flex:1;min-width:140px" onclick="openAllocate(${m.id},'uthyrd')">📤 Hyr ut</button>
+  </div>
+  <button class="btn-ghost mt" style="width:100%" onclick="openMoveCount(${m.id})">⇄ Flytta antal mellan statusar</button>
+</div>
+${rMatAllocationLists(m)}`;
+}
+
+// ---- RESERVERAT- OCH UTHYRT-LISTOR (lagerräknat) ----
+// Två separata listor från material_allocations: vad som är reserverat (till
+// vad) och vad som är uthyrt (vart + när skickat). Reservationer kan skickas
+// vidare till uthyrt; båda kan återlämnas till lagret.
+function rMatAllocationLists(m: Material): string {
+  const allocs = materials.allocations[m.id] || [];
+  const reserved = allocs.filter(a => a.kind === "reserverad");
+  const rented = allocs.filter(a => a.kind === "uthyrd");
+
+  const row = (a: MaterialAllocation): string => {
+    const isRent = a.kind === "uthyrd";
+    const accent = isRent ? "#2E7DC4" : "#9B59B6";
+    const when = isRent && a.sent_at
+      ? `Skickat ${fmtDateOnly(a.sent_at)}`
+      : `Reserverat ${fmtDateOnly(a.reserved_at)}`;
+    const ret = a.expected_return
+      ? ` · ${isRent ? "åter" : "behövs"} ${fmtDateOnly(a.expected_return)}`
+      : "";
+    return `<div style="background:var(--bg);border:1px solid var(--border);border-left:3px solid ${accent};border-radius:8px;padding:10px;margin-bottom:6px">
+      <div style="font-family:var(--display);font-weight:700">${a.quantity} ${esc(m.unit || "st")} → ${esc(a.target_text || "—")}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px">${when}${ret} · ${esc(a.created_by)}</div>
+      ${a.comment ? `<div style="font-size:11px;margin-top:4px">${esc(a.comment)}</div>` : ""}
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+        ${!isRent ? `<button class="btn-ghost" style="font-size:11px" onclick="doPromoteAllocation(${a.id},${m.id})">📤 Skicka vidare till uthyrt →</button>` : ""}
+        <button class="btn-ghost" style="font-size:11px" onclick="openCloseAllocation(${a.id},${m.id})">${isRent ? "↩ Återlämna" : "✕ Avsluta"}</button>
+      </div>
+    </div>`;
+  };
+
+  return `
+<div class="card">
+  <div class="lbl">📌 RESERVERAT (${reserved.length})</div>
+  ${reserved.length === 0
+    ? `<div style="font-size:12px;color:var(--muted)">Inget reserverat just nu</div>`
+    : reserved.map(row).join("")}
+</div>
+<div class="card">
+  <div class="lbl">📤 UTHYRT (${rented.length})</div>
+  ${rented.length === 0
+    ? `<div style="font-size:12px;color:var(--muted)">Inget uthyrt just nu</div>`
+    : rented.map(row).join("")}
 </div>`;
 }
