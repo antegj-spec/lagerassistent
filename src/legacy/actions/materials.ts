@@ -364,38 +364,26 @@ async function saveTotal(matId) {
   const newTotal = parseInt(document.getElementById("set-total")?.value) || 0;
   if (newTotal < 0) { toast("Ange ett antal som inte är negativt", 1); return; }
 
-  // Allt utom "okänd" är öronmärkt och får inte överskridas av totalen.
+  // Klient-side förkoll för snabb feedback. Servern (set_total_count) gör samma
+  // koll auktoritativt — allt utom "okänd" är öronmärkt och får inte överskridas.
   const allocated = allocatedExclOkand(matId);
   if (newTotal < allocated) {
     toast(`Totalen kan inte vara mindre än ${allocated} (redan fördelat på Tillgänglig/Uthyrd m.fl.). Flytta tillbaka antal först.`, 1);
     return;
   }
 
-  // Invariant: okänd absorberar mellanskillnaden. Detta täcker både en ökning
-  // av totalen OCH avstämning av eventuellt befintligt glapp.
-  const prevOkand = (materials.counts[matId] || {})["okänd"] || 0;
-  const newOkand = newTotal - allocated;
-
   try {
-    await saveMat({ id: matId, total_count: newTotal });
-    if (newOkand !== prevOkand) {
-      await setMatCount(matId, "okänd", newOkand);
-      await logMatHistory({
-        material_id: matId,
-        old_status: null,
-        new_status: "okänd",
-        changed_by: auth.user,
-        count_change: newOkand - prevOkand,
-        comment: "Totalt antal ändrat — avstämt mot Okänd"
-      });
-    }
+    // Atomiskt: sätter total_count OCH stämmer av mellanskillnaden mot "okänd"
+    // i en enda transaktion (migration 029). Kan inte längre halv-spara om
+    // mobilen tappar anslutningen mitt i.
+    await setTotalCount(matId, newTotal);
     await loadMats();
     await loadMatHistory(matId);
     toast("✓ Totalt antal uppdaterat");
     closeModal();
     render();
   } catch (e) {
-    toast("Kunde inte spara", 1);
+    toast("Kunde inte spara: " + (e?.message || ""), 1);
   }
 }
 
@@ -696,6 +684,41 @@ async function saveServiceInterval(itemId, matId) {
     await loadMats();
     closeModal();
     toast(service_interval_days ? `✓ Service-intervall: ${service_interval_days}d` : "✓ Service-intervall borttaget");
+    render();
+  } catch (e) {
+    toast("Kunde inte spara", 1);
+  }
+}
+
+// Sätt/ändra artikelnummer på en befintlig artikel. Artikelnumret är fritext
+// och INTE samma som artikel-ID:t (namnet) — t.ex. ID "LD20-19", artikelnr
+// "1000247". Lämna tomt för att ta bort.
+function openItemArticleNumber(itemId, matId) {
+  const items = materials.items[matId] || [];
+  const it = items.find(i => i.id === itemId);
+  if (!it) return;
+  openModal(`
+    <div class="modal-title">Artikelnummer — ${esc(it.article_id)}</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">
+      Artikelnumret är fritext och behöver inte vara samma som artikel-ID:t.<br>
+      Lämna tomt för att ta bort numret.
+    </p>
+    <label class="field-label">ARTIKELNUMMER</label>
+    <input type="text" id="item-article-number-edit" placeholder="T.ex. 1000247" value="${escAttr(it.article_number || "")}">
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()" style="flex:1">Avbryt</button>
+      <button class="btn" onclick="saveItemArticleNumber(${itemId},${matId})" style="flex:1">SPARA</button>
+    </div>
+  `);
+}
+
+async function saveItemArticleNumber(itemId, matId) {
+  const article_number = document.getElementById("item-article-number-edit")?.value?.trim() || null;
+  try {
+    await saveMatItem({ id: itemId, article_number });
+    await loadMats();
+    closeModal();
+    toast(article_number ? `✓ Artikelnummer: ${article_number}` : "✓ Artikelnummer borttaget");
     render();
   } catch (e) {
     toast("Kunde inte spara", 1);

@@ -224,6 +224,20 @@ async function closeAllocation(
   } catch (e) { unwrapRpcError(e); }
 }
 
+// Atomiskt "Ändra total" (migration 029): sätter total_count OCH stämmer av
+// mellanskillnaden mot 'okänd' i en transaktion server-side. Ersätter det
+// tidigare saveMat()+setMatCount()-mönstret som kunde halv-spara om mobilen
+// tappade andra anropet mitt i.
+async function setTotalCount(material_id: number, new_total: number): Promise<void> {
+  try {
+    await sb("/rest/v1/rpc/set_total_count", {
+      method: "POST",
+      body: JSON.stringify({ p_material_id: material_id, p_new_total: new_total }),
+      prefer: "return=minimal"
+    });
+  } catch (e) { unwrapRpcError(e); }
+}
+
 async function loadMatHistory(material_id: number): Promise<void> {
   try {
     const data = await sb<MaterialHistory[]>("/rest/v1/material_history?material_id=eq." + material_id + "&order=created_at.desc&limit=50") || [];
