@@ -111,7 +111,10 @@ function rItemDetail(it: MaterialItem, m: Material): string {
     <div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${esc(m.emoji || "📦")} ${esc(m.name)}</div>
       <div style="font-family:var(--display);font-size:26px;font-weight:900">${esc(it.article_id)}</div>
-      ${it.article_number ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">Artikelnr: ${esc(it.article_number)}</div>` : ""}
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">
+        Artikelnr: ${it.article_number ? esc(it.article_number) : "ej satt"}
+        <button class="btn-ghost" onclick="openItemArticleNumber(${it.id},${m.id})" style="font-size:10px;padding:2px 8px;margin-left:6px">✎</button>
+      </div>
       ${it.last_washed ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">🧼 Senast tvättat: ${fmtDateOnly(it.last_washed)}${daysSinceWash != null ? ` (${daysSinceWash}d sedan)` : ""}</div>` : ""}
       ${it.status === "reserverad" && it.reserved_for ? `<div style="font-size:12px;color:#9B59B6;margin-top:6px;font-family:var(--display);font-weight:700">📌 Reserverad till: ${esc(it.reserved_for)}</div>` : ""}
       <div style="font-size:11px;color:${serviceOverdue ? "#E8521A" : "var(--muted)"};margin-top:6px">
@@ -509,6 +512,7 @@ function rMatItemsView(m: Material): string {
             <div>
               <div style="font-family:var(--display);font-weight:700;font-size:15px">${esc(it.article_id)}</div>
               <div style="display:flex;gap:10px;margin-top:3px;flex-wrap:wrap">
+                ${it.article_number ? `<span style="font-size:10px;color:var(--muted)">#${esc(it.article_number)}</span>` : ""}
                 ${it.last_washed ? `<span style="font-size:10px;color:var(--muted)">🧼 ${fmtDateOnly(it.last_washed)}</span>` : ""}
                 ${cmtCount ? `<span style="font-size:10px;color:var(--muted)">💬 ${cmtCount}</span>` : ""}
                 ${actionCount ? `<span style="font-size:10px;color:#E8521A;font-weight:700">⚠ ${actionCount} åtgärd${actionCount > 1 ? "er" : ""}</span>` : ""}
