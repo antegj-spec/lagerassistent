@@ -105,7 +105,7 @@ function rItemDetail(it: MaterialItem, m: Material): string {
     : null;
 
   return `
-<button class="btn-ghost mb" onclick="history.back()">← Tillbaka till ${esc(m.name)}</button>
+<button class="btn-ghost mb" onclick="closeItem()">← Tillbaka till ${esc(m.name)}</button>
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
     <div>
@@ -378,7 +378,7 @@ function rMatDetail(m: Material): string {
   let body = m.is_article_based ? rMatItemsView(m) : rMatCountsView(m);
 
   return `
-<button class="btn-ghost mb" onclick="history.back()">← Tillbaka till lista</button>
+<button class="btn-ghost mb" onclick="closeMat()">← Tillbaka till lista</button>
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
     <div>
