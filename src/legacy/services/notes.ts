@@ -77,9 +77,12 @@ async function delComment(id: number): Promise<void> {
 }
 
 async function editComment(id: number, text: string): Promise<void> {
+  // OBS: comments-tabellen saknar updated_at-kolumn (till skillnad från
+  // task_comments/material_comments). Skicka inte med den — PostgREST ger
+  // 400 Bad Request på okänd kolumn.
   await sb("/rest/v1/comments?id=eq." + id, {
     method: "PATCH",
-    body: JSON.stringify({ text, updated_at: new Date().toISOString() }),
+    body: JSON.stringify({ text }),
     prefer: "return=minimal"
   });
 }
