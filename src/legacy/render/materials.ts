@@ -550,6 +550,7 @@ function rMatCountsView(m: Material): string {
       <div>
         <div class="lbl" style="margin-bottom:4px">TILLGÄNGLIGT</div>
         <div style="font-family:var(--display);font-size:30px;font-weight:900;color:#4CAF7D">${avail} ${esc(m.unit || "st")}</div>
+        ${borrowed > 0 ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">inkl. inhyrt</div>` : ""}
       </div>
     </div>
     ${auth.isAdmin ? `<button class="btn-ghost" onclick="openSetTotal(${m.id})">✎ Ändra total</button>` : ""}

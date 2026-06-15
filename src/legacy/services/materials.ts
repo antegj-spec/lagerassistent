@@ -248,31 +248,43 @@ async function loadMatHistory(material_id: number): Promise<void> {
 }
 
 // ---- INHYRT MATERIAL ----
-async function saveBorrowed(b: Partial<BorrowedMaterial> & { id?: number; created_at?: string }): Promise<number | undefined> {
-  const { id, created_at, ...body } = b;
-  if (id) {
-    await sb("/rest/v1/borrowed_material?id=eq." + id, {
-      method: "PATCH",
-      body: JSON.stringify({ ...body, updated_at: new Date().toISOString() }),
+// Fas: inhyrt räknas som tillgängligt (migration 031). Skapande/borttag går via
+// SECURITY DEFINER-RPC som ATOMISKT håller material_counts.tillgänglig i synk —
+// speglar create_allocation/moveCount-mönstret inkl. error-unwrap.
+async function createBorrowed(args: {
+  material_id: number;
+  quantity: number;
+  supplier?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  reason?: string | null;
+  comment?: string | null;
+}): Promise<void> {
+  try {
+    await sb("/rest/v1/rpc/add_borrowed", {
+      method: "POST",
+      body: JSON.stringify({
+        p_material_id: args.material_id,
+        p_quantity: args.quantity,
+        p_supplier: args.supplier ?? null,
+        p_start_date: args.start_date ?? null,
+        p_end_date: args.end_date ?? null,
+        p_reason: args.reason ?? null,
+        p_comment: args.comment ?? null
+      }),
       prefer: "return=minimal"
     });
-    return id;
-  } else {
-    const r = await sb<{ id: number }[]>("/rest/v1/borrowed_material", {
-      method: "POST",
-      body: JSON.stringify(body),
-      headers: { "Prefer": "return=representation" }
-    });
-    return r?.[0]?.id;
-  }
+  } catch (e) { unwrapRpcError(e); }
 }
 
-async function delBorrowed(id: number): Promise<void> {
-  await sb("/rest/v1/borrowed_material?id=eq." + id, {
-    method: "PATCH",
-    body: JSON.stringify({ deleted_at: new Date().toISOString() }),
-    prefer: "return=minimal"
-  });
+async function removeBorrowed(borrow_id: number): Promise<void> {
+  try {
+    await sb("/rest/v1/rpc/remove_borrowed", {
+      method: "POST",
+      body: JSON.stringify({ p_borrow_id: borrow_id }),
+      prefer: "return=minimal"
+    });
+  } catch (e) { unwrapRpcError(e); }
 }
 
 // ---- KOMMENTARER PÅ MATERIAL/ARTIKLAR ----
