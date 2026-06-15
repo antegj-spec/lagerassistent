@@ -47,7 +47,7 @@ function rMatCommentCard(c: MaterialComment, matId: number): string {
         </div>` : ""}
       </div>
     </div>
-    ${c.image_url ? `<img class="info-cmt-img" src="${escAttr(c.image_url)}" loading="lazy" onclick="openLightbox('${escAttr(c.image_url)}')">` : ""}
+    ${c.image_url ? `<img class="info-cmt-img" src="${escAttr(c.image_url)}" loading="lazy" onclick="openLightbox('${escJs(c.image_url)}')">` : ""}
     <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}</div>
   </div>`;
 }
@@ -135,7 +135,7 @@ function rItemDetail(it: MaterialItem, m: Material): string {
   <div class="info-images">
     ${images.map(img =>
       `<div class="info-img-wrap">
-        <img src="${escAttr(img.image_url)}" loading="lazy" onclick="openLightbox('${escAttr(img.image_url)}')">
+        <img src="${escAttr(img.image_url)}" loading="lazy" onclick="openLightbox('${escJs(img.image_url)}')">
         ${auth.isAdmin ? `<button class="info-img-del" onclick="doDelItemImg(${img.id},${it.id})">×</button>` : ""}
       </div>`
     ).join("")}
@@ -268,7 +268,7 @@ function rMatStatus(): string {
   if (!searching && ui.matBasis === "count") {
     const uncat = countList.filter(m => !m.category).length;
     const chip = (id: string | null, label: string, count: number, emoji = "") =>
-      `<button class="filter-btn ${ui.matCatFilter === id ? "active" : ""}" onclick="setMatCatFilter(${id === null ? "null" : `'${escAttr(id)}'`})">${emoji ? emoji + " " : ""}${esc(label)} (${count})</button>`;
+      `<button class="filter-btn ${ui.matCatFilter === id ? "active" : ""}" onclick="setMatCatFilter(${id === null ? "null" : `'${escJs(id)}'`})">${emoji ? emoji + " " : ""}${esc(label)} (${count})</button>`;
     catChips = `
 <div class="filter-row">
   ${chip(null, "Alla", countList.length)}
@@ -355,7 +355,7 @@ function rMatLinkedInfo(m: Material): string {
   </div>
   ${pdfs.length ? `<div class="mat-linked-pdfs">
     ${pdfs.map(p =>
-      `<button class="btn-ghost" onclick="openPdfOverlay('${escAttr(p.pdf_url)}','${escAttr(p.pdf_name)}')">📄 ${esc(p.pdf_name)}</button>`
+      `<button class="btn-ghost" onclick="openPdfOverlay('${escJs(p.pdf_url)}','${escJs(p.pdf_name)}')">📄 ${esc(p.pdf_name)}</button>`
     ).join("")}
   </div>` : ""}
 </div>`;
@@ -403,7 +403,7 @@ ${body}
   <div class="info-images">
     ${matImages.map(img =>
       `<div class="info-img-wrap">
-        <img src="${escAttr(img.image_url)}" loading="lazy" onclick="openLightbox('${escAttr(img.image_url)}')">
+        <img src="${escAttr(img.image_url)}" loading="lazy" onclick="openLightbox('${escJs(img.image_url)}')">
         ${auth.isAdmin ? `<button class="info-img-del" onclick="doDelMatImg(${img.id},${m.id})">×</button>` : ""}
       </div>`
     ).join("")}

@@ -71,7 +71,7 @@ function rNoteFilterDropdown(key: "cat" | "stat" | "assigned"): string {
   <div class="filter-dropdown-menu">
     ${cfg.options.map(o => `
       <label class="filter-dropdown-opt">
-        <input type="checkbox" ${cfg.selected.includes(o.value) ? "checked" : ""} onchange="${cfg.setter}('${escAttr(o.value)}')">
+        <input type="checkbox" ${cfg.selected.includes(o.value) ? "checked" : ""} onchange="${cfg.setter}('${escJs(o.value)}')">
         <span>${esc(o.label)}</span>
       </label>`).join("")}
     <button class="filter-dropdown-clear" onclick="clearNoteFilter('${key}')">Rensa</button>
@@ -147,7 +147,7 @@ function rCard(n: Note, inTrash: boolean = false): string {
     ${n.image_url ? `<span style="font-size:9px;color:var(--muted)" title="Har bild">📷</span>` : ""}
   </div>
   <div class="note-text ${n.status === "klar" ? "done" : ""}">${esc(n.text)}</div>
-  ${open && n.image_url ? `<img class="note-img" src="${escAttr(n.image_url)}" loading="lazy" style="cursor:zoom-in" onclick="event.stopPropagation();openLightbox('${escAttr(n.image_url)}')">` : ""}
+  ${open && n.image_url ? `<img class="note-img" src="${escAttr(n.image_url)}" loading="lazy" style="cursor:zoom-in" onclick="event.stopPropagation();openLightbox('${escJs(n.image_url)}')">` : ""}
   <div class="note-meta">
     <span>${fmtD(n.created_at)}</span>
     <span>· ${esc(n.created_by || "")}</span>
@@ -169,7 +169,7 @@ function rCard(n: Note, inTrash: boolean = false): string {
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
           <div class="comment-text" style="flex:1">${esc(c.text)}</div>
           ${canMod ? `<div style="display:flex;gap:4px;flex-shrink:0">
-            <button class="cmt-act-btn" onclick="editNoteCommentAction(${n.id},${c.id},'${escAttr(c.text)}')">✎</button>
+            <button class="cmt-act-btn" onclick="editNoteCommentAction(${n.id},${c.id},'${escJs(c.text)}')">✎</button>
             <button class="cmt-act-btn cmt-act-del" onclick="delNoteCommentAction(${n.id},${c.id})">🗑</button>
           </div>` : ""}
         </div>

@@ -133,10 +133,10 @@ function rTaskInfoLinks(taskId: number): string {
     <div class="task-info-link-content">
       ${a.body ? `<div style="white-space:pre-wrap;margin-bottom:10px">${esc(a.body)}</div>` : ""}
       ${artImages.length > 0 ? `<div class="info-images" style="margin-bottom:10px">${artImages.map(img =>
-        `<div class="info-img-wrap"><img src="${escAttr(img.image_url)}" loading="lazy" onclick="openLightbox('${escAttr(img.image_url)}')"></div>`
+        `<div class="info-img-wrap"><img src="${escAttr(img.image_url)}" loading="lazy" onclick="openLightbox('${escJs(img.image_url)}')"></div>`
       ).join("")}</div>` : ""}
       ${artPdfs.map(p =>
-        `<button class="btn-ghost" style="margin:0 6px 6px 0" onclick="openPdfOverlay('${escAttr(p.pdf_url)}','${escAttr(p.pdf_name)}')">📄 ${esc(p.pdf_name)}</button>`
+        `<button class="btn-ghost" style="margin:0 6px 6px 0" onclick="openPdfOverlay('${escJs(p.pdf_url)}','${escJs(p.pdf_name)}')">📄 ${esc(p.pdf_name)}</button>`
       ).join("")}
       <button class="btn-ghost" style="margin-bottom:0" onclick="gotoInfo(${a.id})">📖 Öppna i Info →</button>
     </div>
@@ -246,7 +246,7 @@ ${rTaskInfoLinks(t.id)}
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
         <div class="comment-text" style="white-space:pre-wrap;flex:1">${esc(c.text)}</div>
         ${canMod ? `<div style="display:flex;gap:4px;flex-shrink:0">
-          <button class="cmt-act-btn" onclick="editTaskCommentAction(${t.id},${c.id},'${escAttr(c.text)}')">✎</button>
+          <button class="cmt-act-btn" onclick="editTaskCommentAction(${t.id},${c.id},'${escJs(c.text)}')">✎</button>
           <button class="cmt-act-btn cmt-act-del" onclick="delTaskCommentAction(${t.id},${c.id})">🗑</button>
         </div>` : ""}
       </div>

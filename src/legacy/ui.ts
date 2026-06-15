@@ -17,6 +17,23 @@ function esc(s: unknown): string {
 function escAttr(s: unknown): string {
   return esc(s).replace(/`/g, "&#96;");
 }
+// För värden som hamnar i en JS-strängliteral inuti en inline-handler, t.ex.
+// onclick="foo('${escJs(x)}')". escAttr RÄCKER INTE här: webbläsaren HTML-
+// avkodar attributet innan JS parsas, så ett escAttr-`&#39;` blir `'` igen och
+// bryter ut ur strängen (XSS / trasig knapp). Escapa därför för JS-strängen
+// FÖRST (\\ och \'), HTML-escapa sedan kvarvarande attribut-tecken.
+function escJs(s: unknown): string {
+  if (s == null) return "";
+  return String(s)
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, "\\r")
+    .replace(/\n/g, "\\n")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
 // ---- DATUM-FORMATERING ----
 function fmtD(iso: string): string {

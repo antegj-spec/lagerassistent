@@ -33,6 +33,6 @@ function rChat(): string {
     "Hur lagrar man golvplattor rätt?",
     "Ge mig en veckosammanfattning",
     "Hur rengör man kabelskydd effektivt?"
-  ].map(q => `<button class="quick-q" onclick="setQ('${escAttr(q)}')">${esc(q)}</button>`).join("")}
+  ].map(q => `<button class="quick-q" onclick="setQ('${escJs(q)}')">${esc(q)}</button>`).join("")}
 </div>`;
 }

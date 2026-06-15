@@ -90,8 +90,8 @@ function rEcoEntry(e: EconomyEntry): string {
   </div>
   <div class="eco-entry-price">${formatSek(e.price)}</div>
   <div class="eco-entry-actions">
-    <button class="cmt-act-btn" onclick="openEditEconomy('${escAttr(e.id)}')" title="Redigera">✎</button>
-    <button class="cmt-act-btn cmt-act-del" onclick="doDelEconomy('${escAttr(e.id)}')" title="Radera">🗑</button>
+    <button class="cmt-act-btn" onclick="openEditEconomy('${escJs(e.id)}')" title="Redigera">✎</button>
+    <button class="cmt-act-btn cmt-act-del" onclick="doDelEconomy('${escJs(e.id)}')" title="Radera">🗑</button>
   </div>
 </div>`;
 }
