@@ -335,21 +335,30 @@ function allocatedExclOkand(matId) {
     .reduce((sum, [, n]) => sum + (Number(n) || 0), 0);
 }
 
+// Summa aktivt inhyrt för ett material. Inhyrt ingår i material_counts sedan
+// migration 031, så den effektiva totalen är eget total_count + inhyrt.
+function borrowedSum(matId) {
+  return (materials.borrowed[matId] || []).reduce((sum, b) => sum + (Number(b.quantity) || 0), 0);
+}
+
 function openSetTotal(matId) {
   const m = materials.list.find(m => m.id === matId);
   if (!m) return;
   const unit = esc(m.unit || "st");
   const allocated = allocatedExclOkand(matId);
   const okand = (materials.counts[matId] || {})["okänd"] || 0;
-  const gap = (m.total_count || 0) - (allocated + okand);
+  const borrowed = borrowedSum(matId);
+  // Effektiv total = eget + inhyrt (speglar set_total_count server-side).
+  const effectiveTotal = (m.total_count || 0) + borrowed;
+  const gap = effectiveTotal - (allocated + okand);
   openModal(`
     <div class="modal-title">Ändra totalt antal</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
       Sätt det totala antalet ${unit} av ${esc(m.name)} (eget material, exklusive inhyrt).
-      Mellanskillnaden mot statusarna hamnar i <b>Okänd</b> ❓ som du sedan fördelar via "Flytta antal".
+      ${borrowed > 0 ? `Inhyrt (${borrowed} ${unit}) räknas redan in i Tillgänglig och påverkas inte. ` : ""}Mellanskillnaden mot statusarna hamnar i <b>Okänd</b> ❓ som du sedan fördelar via "Flytta antal".
     </p>
     ${gap !== 0 ? `<p style="font-size:12px;color:var(--red);background:var(--red-subtle);padding:8px 10px;border-radius:8px;margin-bottom:10px">
-      ⚠️ Just nu är ${allocated + okand} ${unit} fördelade på statusar men totalen är ${m.total_count || 0}. ${Math.abs(gap)} ${unit} ${gap > 0 ? "är oallokerat" : "är överallokerat"} — detta stäms av till Okänd när du sparar.
+      ⚠️ Just nu är ${allocated + okand} ${unit} fördelade på statusar men effektiva totalen är ${effectiveTotal} ${unit}${borrowed > 0 ? ` (${m.total_count || 0} eget + ${borrowed} inhyrt)` : ""}. ${Math.abs(gap)} ${unit} ${gap > 0 ? "är oallokerat" : "är överallokerat"} — detta stäms av till Okänd när du sparar.
     </p>` : ""}
     <label class="field-label">TOTALT ANTAL</label>
     <input type="number" id="set-total" min="0" value="${m.total_count || 0}">
@@ -366,9 +375,11 @@ async function saveTotal(matId) {
 
   // Klient-side förkoll för snabb feedback. Servern (set_total_count) gör samma
   // koll auktoritativt — allt utom "okänd" är öronmärkt och får inte överskridas.
+  // Inhyrt ingår i counts, så jämför mot den effektiva totalen (eget + inhyrt).
   const allocated = allocatedExclOkand(matId);
-  if (newTotal < allocated) {
-    toast(`Totalen kan inte vara mindre än ${allocated} (redan fördelat på Tillgänglig/Uthyrd m.fl.). Flytta tillbaka antal först.`, 1);
+  const borrowed = borrowedSum(matId);
+  if (newTotal + borrowed < allocated) {
+    toast(`Totalen kan inte vara mindre än ${allocated - borrowed} eget (redan fördelat på Tillgänglig/Uthyrd m.fl., inhyrt borträknat). Flytta tillbaka antal först.`, 1);
     return;
   }
 
@@ -822,10 +833,11 @@ async function addBorrowed(matId) {
   if (!start_date) { toast("Ange startdatum", 1); return; }
 
   try {
-    await saveBorrowed({
+    // Atomiskt: skapar inhyrt-posten OCH ökar tillgänglig (migration 031), så
+    // inhyrt går att reservera/hyra ut/flytta som eget material.
+    await createBorrowed({
       material_id: matId,
-      quantity, supplier, start_date, end_date, reason, comment,
-      created_by: auth.user
+      quantity, supplier, start_date, end_date, reason, comment
     });
     await loadMats();
     closeModal();
@@ -839,12 +851,14 @@ async function addBorrowed(matId) {
 async function doDelBorrowed(borrowId, matId) {
   if (!await confirmModal("Ta bort inhyrt material?", { confirmLabel: "Ta bort", danger: true })) return;
   try {
-    await delBorrowed(borrowId);
+    // Minskar tillgänglig atomiskt. Kastar om för lite ligger i Tillgänglig
+    // (inhyrt är ute på uthyrning/flyttat) — visa serverns meddelande.
+    await removeBorrowed(borrowId);
     await loadMats();
     toast("🗑 Borttaget");
     render();
   } catch (e) {
-    toast("Kunde inte ta bort", 1);
+    toast("Kunde inte ta bort: " + (e?.message || ""), 1);
   }
 }
 
