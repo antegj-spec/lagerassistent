@@ -118,7 +118,7 @@ function rOngoingBanner(t: CarTrip): string {
     <b>${esc(car ? carLabel(car) : "Bil")}</b> · ${esc(t.driver)}<br>
     Start ${t.odometer_start} km · ${esc(t.trip_date)}${t.from_loc ? " · från " + esc(t.from_loc) : ""}
   </div>
-  <button class="btn cj-ongoing-end-btn" onclick="endTrip('${escAttr(t.id)}')">AVSLUTA RESA</button>
+  <button class="btn cj-ongoing-end-btn" onclick="endTrip('${escJs(t.id)}')">AVSLUTA RESA</button>
 </div>`;
 }
 
@@ -139,7 +139,7 @@ function rTripCard(t: CarTrip): string {
     ${t.odometer_start} → ${t.odometer_end} km <b>(${distance} km)</b> — oförklarad körning
   </div>
   <div class="cj-trip-actions">
-    <button class="btn" onclick="fillGapPurpose('${escAttr(t.id)}')">+ Fyll i vad bilen användes till</button>
+    <button class="btn" onclick="fillGapPurpose('${escJs(t.id)}')">+ Fyll i vad bilen användes till</button>
   </div>
 </div>`;
   }
@@ -159,11 +159,11 @@ function rTripCard(t: CarTrip): string {
   <div class="cj-trip-row cj-trip-odo">
     ${t.odometer_start} → ${t.odometer_end} km <b>(${distance} km)</b>
   </div>
-  ${t.image_path ? `<img class="cj-trip-img" src="${escAttr(t.image_path)}" loading="lazy" onclick="openLightbox('${escAttr(t.image_path)}')">` : ""}
+  ${t.image_path ? `<img class="cj-trip-img" src="${escAttr(t.image_path)}" loading="lazy" onclick="openLightbox('${escJs(t.image_path)}')">` : ""}
   ${canEdit ? `
   <div class="cj-trip-actions">
-    <button class="btn-ghost" onclick="openEditTrip('${escAttr(t.id)}')">✎ Redigera</button>
-    <button class="btn-ghost" onclick="doDelTrip('${escAttr(t.id)}')" style="color:var(--accent)">🗑</button>
+    <button class="btn-ghost" onclick="openEditTrip('${escJs(t.id)}')">✎ Redigera</button>
+    <button class="btn-ghost" onclick="doDelTrip('${escJs(t.id)}')" style="color:var(--accent)">🗑</button>
   </div>` : ""}
 </div>`;
 }
@@ -178,8 +178,8 @@ function openCarRegistry(): void {
         ${!c.active ? ` <span class="cj-badge" style="background:var(--border)">Inaktiv</span>` : ""}
       </div>
       <div class="cj-car-actions">
-        <button class="btn-ghost" onclick="toggleCarActive('${escAttr(c.id)}', ${!c.active})">${c.active ? "Inaktivera" : "Aktivera"}</button>
-        <button class="btn-ghost" onclick="doDelCar('${escAttr(c.id)}')" style="color:var(--accent)">🗑</button>
+        <button class="btn-ghost" onclick="toggleCarActive('${escJs(c.id)}', ${!c.active})">${c.active ? "Inaktivera" : "Aktivera"}</button>
+        <button class="btn-ghost" onclick="doDelCar('${escJs(c.id)}')" style="color:var(--accent)">🗑</button>
       </div>
     </div>`).join("");
   openModal(`

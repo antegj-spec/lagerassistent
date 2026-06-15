@@ -98,7 +98,7 @@ function openEditEconomy(id: string): void {
     <textarea id="eco-comment" rows="2">${esc(e.comment || "")}</textarea>
     <div class="modal-actions">
       <button class="btn-ghost" onclick="closeModal()" style="flex:1">Avbryt</button>
-      <button class="btn" onclick="saveEditEconomy('${escAttr(id)}')" style="flex:1">SPARA</button>
+      <button class="btn" onclick="saveEditEconomy('${escJs(id)}')" style="flex:1">SPARA</button>
     </div>
   `);
 }

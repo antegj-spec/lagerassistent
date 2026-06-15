@@ -261,7 +261,7 @@ function openEditTrip(id: string): void {
     const actions = document.querySelector(".modal-actions");
     if (actions) {
       const saveBtn = actions.querySelectorAll("button")[1] as HTMLButtonElement | null;
-      if (saveBtn) saveBtn.setAttribute("onclick", `saveEditTrip('${escAttr(id)}')`);
+      if (saveBtn) saveBtn.setAttribute("onclick", `saveEditTrip('${escJs(id)}')`);
     }
     const titleEl = document.querySelector(".modal-title");
     if (titleEl) titleEl.textContent = "Redigera resa";
@@ -548,7 +548,7 @@ function endTrip(id?: string): void {
 
     <div class="modal-actions">
       <button class="btn-ghost" onclick="closeModal();ui.imgData=null;ui.imgFile=null" style="flex:1">Avbryt</button>
-      <button class="btn" onclick="submitEndTrip('${escAttr(t.id)}')" style="flex:1">AVSLUTA RESA</button>
+      <button class="btn" onclick="submitEndTrip('${escJs(t.id)}')" style="flex:1">AVSLUTA RESA</button>
     </div>
   `);
 }
@@ -621,7 +621,7 @@ function fillGapPurpose(id: string): void {
     </div>
     <div class="modal-actions">
       <button class="btn-ghost" onclick="closeModal()" style="flex:1">Avbryt</button>
-      <button class="btn" onclick="submitGapPurpose('${escAttr(t.id)}')" style="flex:1">SPARA</button>
+      <button class="btn" onclick="submitGapPurpose('${escJs(t.id)}')" style="flex:1">SPARA</button>
     </div>
   `);
 }

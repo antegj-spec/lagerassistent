@@ -102,7 +102,7 @@ ${a.body ? `<div class="info-art-body">${esc(a.body)}</div>` : ""}
 <div class="info-images">
   ${images.map(img =>
     `<div class="info-img-wrap">
-      <img src="${escAttr(img.image_url)}" loading="lazy" onclick="openLightbox('${escAttr(img.image_url)}')">
+      <img src="${escAttr(img.image_url)}" loading="lazy" onclick="openLightbox('${escJs(img.image_url)}')">
       ${auth.isAdmin ? `<button class="info-img-del" onclick="doDelInfoImage(${img.id})">×</button>` : ""}
     </div>`
   ).join("")}
@@ -118,7 +118,7 @@ ${`<div class="info-pdf-list">
       <span class="info-pdf-icon">📄</span>
       <span class="info-pdf-name">${esc(p.pdf_name)}</span>
       <div class="info-pdf-actions">
-        <button class="btn-ghost" onclick="openPdfOverlay('${escAttr(p.pdf_url)}','${escAttr(p.pdf_name)}')">Visa</button>
+        <button class="btn-ghost" onclick="openPdfOverlay('${escJs(p.pdf_url)}','${escJs(p.pdf_name)}')">Visa</button>
         ${auth.isAdmin ? `<button class="btn-ghost danger" onclick="doDelInfoPdf(${p.id})">🗑</button>` : ""}
       </div>
     </div>`
@@ -135,7 +135,7 @@ ${`<div class="info-pdf-list">
     `<div class="info-comment">
       <div class="comment-meta">${esc(c.created_by)} · ${fmtD(c.created_at)}${auth.isAdmin ? ` <button class="info-cmt-del" onclick="doDelInfoComment(${c.id})">×</button>` : ""}</div>
       ${c.body ? `<div class="comment-text" style="white-space:pre-wrap">${esc(c.body)}</div>` : ""}
-      ${c.image_url ? `<img class="info-cmt-img" src="${escAttr(c.image_url)}" loading="lazy" onclick="openLightbox('${escAttr(c.image_url)}')">` : ""}
+      ${c.image_url ? `<img class="info-cmt-img" src="${escAttr(c.image_url)}" loading="lazy" onclick="openLightbox('${escJs(c.image_url)}')">` : ""}
     </div>`
   ).join("")}
   <div class="info-comment-form">
