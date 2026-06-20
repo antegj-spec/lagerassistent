@@ -81,7 +81,16 @@ function rNoteFilterDropdown(key: "cat" | "stat" | "assigned"): string {
 
 function rNotes(): string {
   const filtered = getFilteredNotes();
+  // "Idag" visas överst — men bara i standardvyn (utan aktivt sök/filter), så
+  // den inte krockar med en filtrerad lista. Flyttad hit från Hem (Fas 9).
+  const isDefaultView = !ui.searchQuery && !ui.fCat.length && !ui.fStat.length && !ui.fAssigned.length;
+  const today = notes.list.filter(n =>
+    new Date(n.created_at).toDateString() === new Date().toDateString()
+  );
   return `
+${isDefaultView && today.length ? `<div class="lbl">IDAG (${today.length})</div>
+<div class="note-list">${today.slice(0, 8).map(n => rCard(n)).join("")}</div>
+<div class="section-gap"></div>` : ""}
 <div class="search-box">
   <input type="text" id="search-input" placeholder="Sök bland anteckningar..." value="${escAttr(ui.searchQuery)}" oninput="setSearch(this.value)">
   ${ui.searchQuery ? `<button class="search-clear" onclick="clearSearch()">×</button>` : ""}
@@ -132,23 +141,28 @@ function rCard(n: Note, inTrash: boolean = false): string {
   const noteComments = notes.comments[n.id] || [];
   const commentCount = noteComments.length;
 
-  return `<div class="note-card" data-note-id="${n.id}" onclick="toggleNote(${n.id})" style="border-left:3px solid ${cat?.color}${
-    dlStatus === "overdue" ? ";border-top:2px solid #ff6b6b" :
-    dlStatus === "urgent"  ? ";border-top:2px solid var(--accent)" : ""
-  }">
+  // Alt A (Fas 9): prioritet bär färgen via kortets vänsterkant. Bara "hög"
+  // får kant — medel/låg = lugnt läge utan kant, så akuta kort sticker ut.
+  const prioBorder = n.priority === "hög" ? (prio?.color || "transparent") : "transparent";
+  // Deadline visas som färgad text i meta-raden (inte längre en egen bricka).
+  const dlColor =
+    dlStatus === "overdue" ? "var(--red)" :
+    dlStatus === "urgent"  ? "var(--accent)" :
+    dlStatus === "soon"    ? "var(--yellow)" : "var(--muted)";
+
+  return `<div class="note-card" data-note-id="${n.id}" onclick="toggleNote(${n.id})" style="border-left:3px solid ${prioBorder}">
   <div class="note-tags">
-    <span class="tag" style="background:${cat?.color}22;color:${cat?.color}">${cat?.emoji} ${cat?.label?.toUpperCase()}</span>
-    <span style="font-size:9px;color:${prio?.color};font-family:var(--display);font-weight:700">● ${prio?.label}</span>
+    <span class="note-cat" style="color:${cat?.color}">${cat?.emoji} ${cat?.label?.toUpperCase()}</span>
     <button onclick="event.stopPropagation();cycleNoteStatus(${n.id})" title="Tryck för att cykla status" style="font-size:9px;color:${n.status === "klar" ? "#4CAF7D" : "var(--muted)"};font-family:var(--display);font-weight:700;background:transparent;border:1px solid currentColor;border-radius:10px;padding:1px 8px;cursor:pointer">${(STATS[n.status] || esc(n.status)).toUpperCase()}</button>
     ${n.assigned_to ? `<span class="note-assign">@${esc(n.assigned_to)}</span>` : ""}
     ${linkedMat ? `<span class="note-link">📦 ${esc(linkedMat.name)}</span>` : ""}
-    ${dlStatus ? `<span class="${deadlineBadgeClass(dlStatus)}">${esc(dlLabel)}</span>` : ""}
     ${commentCount > 0 ? `<span style="font-size:9px;color:var(--muted)">💬 ${commentCount}</span>` : ""}
     ${n.image_url ? `<span style="font-size:9px;color:var(--muted)" title="Har bild">📷</span>` : ""}
   </div>
   <div class="note-text ${n.status === "klar" ? "done" : ""}">${esc(n.text)}</div>
   ${open && n.image_url ? `<img class="note-img" src="${escAttr(n.image_url)}" loading="lazy" style="cursor:zoom-in" onclick="event.stopPropagation();openLightbox('${escJs(n.image_url)}')">` : ""}
   <div class="note-meta">
+    ${dlStatus ? `<span class="note-deadline" style="color:${dlColor}">${esc(dlLabel)}</span>` : ""}
     <span>${fmtD(n.created_at)}</span>
     <span>· ${esc(n.created_by || "")}</span>
     ${inTrash ? `<span style="color:var(--accent)">· raderad ${fmtDateOnly(n.deleted_at || "")}</span>` : ""}

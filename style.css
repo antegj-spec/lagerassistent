@@ -370,6 +370,22 @@ main { flex: 1; padding: var(--sp-lg) var(--sp-md) 100px; overflow-y: auto; }
 }
 .cj-car-actions { display: flex; gap: 4px; }
 
+/* Utfällbar "visa mer"-knapp (körjournal: tidigare resor, material: historik) */
+.cj-past, .mat-history { margin-top: 16px; }
+.cj-past { border-top: 1px solid var(--border); padding-top: 14px; }
+.cj-past-summary, .mat-history-summary {
+  list-style: none; cursor: pointer; user-select: none;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 0 16px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--muted);
+  font-family: var(--mono); font-size: 13px;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.cj-past-summary::-webkit-details-marker, .mat-history-summary::-webkit-details-marker { display: none; }
+.cj-past-summary:hover, .mat-history-summary:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.cj-past[open] > .cj-past-summary, .mat-history[open] > .mat-history-summary { border-color: var(--accent); color: var(--accent); margin-bottom: 14px; }
+
 /* OCR/Geo-knapp intill input-fält */
 .trip-input-with-btn { display: flex; gap: 6px; align-items: stretch; }
 .trip-input-with-btn input { flex: 1; }
@@ -627,6 +643,16 @@ label.field-label { font-size: var(--fs-xs); letter-spacing: 1.5px; color: var(-
 .note-card:active { transform: scale(.99); }
 .note-tags { display: flex; gap: var(--sp-xs); flex-wrap: wrap; margin-bottom: var(--sp-sm); align-items: center; }
 .tag { font-size: var(--fs-xs); padding: 3px 9px; border-radius: 20px; letter-spacing: .5px; font-family: var(--display); font-weight: 700; line-height: var(--lh-snug); }
+/* Fas 9 (Alt A): kategori som lugn färgad text istället för fylld pill — prioritet bär färgen via kortets vänsterkant. */
+.note-cat { font-family: var(--display); font-weight: 700; font-size: var(--fs-xs); letter-spacing: .5px; line-height: var(--lh-snug); }
+.note-deadline { font-weight: 500; }
+
+/* Fas 9: progressiv anteckningsform på Hem — resten av formuläret fälls ut
+   när man klickar/fokuserar någonstans i kortet. Ren CSS, ingen state.
+   (En full render() nollställer ändå formuläret, så vi behöver ingen
+   persistens utöver fokus.) */
+.note-extra { display: none; }
+.note-compose:focus-within .note-extra { display: block; }
 .note-text { font-size: var(--fs-base); line-height: var(--lh-base); word-wrap: break-word; overflow-wrap: break-word; color: var(--text-sec); }
 .note-text.done { text-decoration: line-through; color: var(--muted); }
 .note-img { width: 100%; max-height: 180px; object-fit: cover; border-radius: var(--r-sm); margin-top: var(--sp-sm); border: 1px solid var(--border); }
@@ -810,6 +836,31 @@ label.field-label { font-size: var(--fs-xs); letter-spacing: 1.5px; color: var(-
 .mat-linked-pdfs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 
 /* ============================================================
+   RETURER — rad per material
+   ============================================================ */
+/* Formulär: en rad = material + antal + kommentar (allt fri text) */
+.ret-item-row { position: relative; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px; margin-bottom: 8px; }
+.ret-item-line { display: flex; gap: 7px; }
+.ret-item-row .ret-mat { flex: 1; }
+.ret-item-row .ret-qty { width: 80px; flex-shrink: 0; text-align: center; }
+.ret-item-row .ret-cmt { margin-top: 7px; }
+.ret-item-row input { font-size: var(--fs-sm); padding: 9px; }
+.ret-item-del { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); }
+.ret-item-del:hover { border-color: var(--red); color: var(--red); }
+.ret-add-row { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 11px; border: 1px dashed var(--border); border-radius: var(--r-sm); background: transparent; color: var(--muted); font-family: var(--mono); font-size: 12px; cursor: pointer; transition: border-color .15s, color .15s; }
+.ret-add-row:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Kort: sparade rader */
+.ret-card-items { margin-top: 8px; }
+.ret-card-item { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+.ret-card-item:first-child { border-top: none; }
+.ret-card-qty { font-family: var(--display); font-weight: 700; font-size: var(--fs-md); color: var(--accent); min-width: 48px; }
+.ret-card-qty--empty { color: var(--dim); }
+.ret-card-main { min-width: 0; flex: 1; }
+.ret-card-mat { font-size: var(--fs-base); line-height: 1.35; }
+.ret-card-cmt { font-size: var(--fs-xs); color: var(--muted); font-style: italic; margin-top: 2px; }
+
+/* ============================================================
    AI-CHATT
    ============================================================ */
 .chat-box { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); height: 360px; overflow-y: auto; padding: var(--sp-md); margin-bottom: var(--sp-sm); }
@@ -898,8 +949,13 @@ details[open] > .info-cat-header .info-cat-caret { transform: rotate(90deg); }
 .info-list-item.active { background: var(--blue-subtle); border-color: var(--blue); }
 .info-list-title { font-size: var(--fs-sm); font-weight: 600; line-height: var(--lh-snug); }
 .info-list-meta { font-size: var(--fs-xs); color: var(--muted); margin-top: 3px; line-height: var(--lh-snug); }
-.info-pin { color: var(--accent); margin-right: 3px; }
-.info-suggest { font-size: 9px; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; margin-right: 4px; font-family: var(--display); font-weight: 700; }
+/* FÖRSLAG-SEKTION (separat från huvuddelens kategorier) */
+.info-suggest-section { margin-top: var(--sp-md); border: 1px dashed var(--yellow); border-radius: var(--r-sm); background: var(--yellow-subtle); padding: 4px var(--sp-sm) var(--sp-xs); }
+.info-suggest-header { display: flex; align-items: center; gap: var(--sp-xs); font-family: var(--display); font-size: var(--fs-xs); font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--yellow); padding: var(--sp-sm) 0; cursor: pointer; list-style: none; user-select: none; }
+.info-suggest-header::-webkit-details-marker { display: none; }
+details[open] > .info-suggest-header .info-cat-caret { transform: rotate(90deg); }
+.info-promote-btn { display: block; width: 100%; margin-top: var(--sp-xs); padding: 6px 8px; font-family: var(--display); font-weight: 700; font-size: 10px; letter-spacing: .5px; border-radius: var(--r-sm); border: 1px solid var(--green); background: var(--green-subtle); color: var(--green); cursor: pointer; transition: background .15s, color .15s; }
+.info-promote-btn:hover { background: var(--green); color: #fff; }
 
 .info-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; color: var(--muted); }
 

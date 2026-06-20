@@ -13,7 +13,9 @@ import '../style.css';
 
 // Fas 6.16: registrera Service Worker för offline-stöd + push.
 // Tysta fel — appen funkar utan SW, bara utan push/offline.
-if ('serviceWorker' in navigator) {
+// Hoppa över i demo-läge (?demo) så SW-cachen inte serverar gamla assets
+// under utveckling/granskning.
+if ('serviceWorker' in navigator && !location.search.includes('demo')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(err => {
       console.warn('SW register failed:', err);

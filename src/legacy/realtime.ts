@@ -34,6 +34,7 @@ const RT_TABLE_RELOADERS: Record<string, RtTableEntry> = {
   material_allocations: { reload: async () => { await loadMats(); }, storeKey: "materials" },
   tasks:             { reload: async () => { await loadTasks(); },   storeKey: "tasks" },
   returns:           { reload: async () => { await loadReturns(); }, storeKey: "returns" },
+  return_items:      { reload: async () => { await loadReturns(); }, storeKey: "returns" },
   cars:              { reload: async () => { await loadCars(); },    storeKey: "cars" },
   car_trips:         { reload: async () => { await loadCarTrips(); },storeKey: "cars" },
   // Ekonomi: laddas bara om admin är inloggad. RLS blockerar non-admin

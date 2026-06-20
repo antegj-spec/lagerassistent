@@ -250,9 +250,24 @@ export interface Return extends BaseRow, SoftDeletable {
   archived: boolean;
   name?: string | null;
   received_by?: UserName | string | null;
+  // Legacy fritext-fält. Behålls för bakåtkompatibel visning av gamla returer.
+  // Nya returer använder return_items (en rad per material) istället.
   content?: string | null;
   comment?: string | null;
   created_by?: UserName | string | null;
+}
+
+// En returnerad materialrad (migration 030). Allt fri text — ingen koppling
+// till materials_v2. quantity är text ("40 m", "ca 20"), inte numerisk.
+export interface ReturnItem {
+  id: number;
+  return_id: number;
+  material: string;
+  quantity?: string | null;
+  comment?: string | null;
+  sort_order?: number | null;
+  created_by?: UserName | string;
+  created_at: Timestamp;
 }
 
 // ---------- Tasks ----------

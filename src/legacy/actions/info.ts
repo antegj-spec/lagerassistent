@@ -121,27 +121,32 @@ async function saveInfoArticleForm(): Promise<void> {
   }
 }
 
-async function pinInfoArticle(id: number): Promise<void> {
+// Publicera ett förslag → flyttar in det i huvuddelen (admin).
+// OBS: lagras fortfarande i kolumnen is_pinned (true = i huvuddelen). Den
+// gamla "pinnad"-statusen är borttagen ur UX:en — konceptet heter nu
+// "publicerad / förslag".
+async function publishInfoArticle(id: number): Promise<void> {
   if (!auth.isAdmin) return;
   try {
     await saveInfoArticle({ id, is_pinned: true });
     await loadInfoArticles();
-    toast("📌 Artikeln är nu fäst");
+    toast("✓ Flyttad till huvuddelen");
     render();
   } catch (e) {
-    toast("Kunde inte fästa", 1);
+    toast("Kunde inte flytta", 1);
   }
 }
 
-async function unpinInfoArticle(id: number): Promise<void> {
+// Gör en publicerad artikel till förslag igen (admin).
+async function unpublishInfoArticle(id: number): Promise<void> {
   if (!auth.isAdmin) return;
   try {
     await saveInfoArticle({ id, is_pinned: false });
     await loadInfoArticles();
-    toast("Avfäst — tillbaka som förslag");
+    toast("Flyttad tillbaka till förslag");
     render();
   } catch (e) {
-    toast("Kunde inte avfästa", 1);
+    toast("Kunde inte flytta", 1);
   }
 }
 

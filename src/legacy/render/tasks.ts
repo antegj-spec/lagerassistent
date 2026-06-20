@@ -74,19 +74,22 @@ function rTaskListRow(t: Task, isArchived: boolean = false): string {
     ? fmtD((tasks.comments[t.id] || []).at(-1)?.created_at || "")
     : fmtD(t.updated_at || t.created_at);
 
-  return `<div class="task-row" data-task-id="${t.id}" onclick="openTaskDetail(${t.id})" style="border-left:3px solid ${prio.color};${isDone ? "opacity:.55;" : ""}${
-    dlStatus === "overdue" ? "border-top:2px solid #ff6b6b;" :
-    dlStatus === "urgent"  ? "border-top:2px solid var(--accent);" : ""
-  }">
+  // Alt A (Fas 9): prioritet bär färgen via vänsterkanten — bara "hög" får kant,
+  // medel/låg = lugnt. Deadline flyttar till meta-raden som färgad text.
+  const prioBorder = t.priority === "hög" ? prio.color : "transparent";
+  const dlColor =
+    dlStatus === "overdue" ? "var(--red)" :
+    dlStatus === "urgent"  ? "var(--accent)" :
+    dlStatus === "soon"    ? "var(--yellow)" : "var(--muted)";
+
+  return `<div class="task-row" data-task-id="${t.id}" onclick="openTaskDetail(${t.id})" style="border-left:3px solid ${prioBorder};${isDone ? "opacity:.55;" : ""}">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
     <div style="flex:1;min-width:0">
       <div style="font-family:var(--display);font-weight:700;font-size:15px;${isDone ? "text-decoration:line-through;color:var(--muted);" : ""}">${esc(t.title)}</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;align-items:center">
-        <span style="font-size:9px;color:${prio.color};font-family:var(--display);font-weight:700">● ${prio.label}</span>
         <button onclick="event.stopPropagation();cycleTaskStatus(${t.id})" title="Tryck för att cykla status" style="font-size:9px;color:${stat.color};font-family:var(--display);font-weight:700;background:transparent;border:1px solid currentColor;border-radius:10px;padding:1px 8px;cursor:pointer">${stat.label.toUpperCase()}</button>
         ${t.responsible ? `<span class="note-assign">⭐ ${esc(t.responsible)}</span>` : ""}
         ${(t.assigned_to || []).filter(u => u !== t.responsible).map(u => `<span class="note-assign">@${esc(u)}</span>`).join("")}
-        ${dlStatus ? `<span class="${deadlineBadgeClass(dlStatus)}">${esc(dlLabel)}</span>` : ""}
         ${checkItems.length ? `<span style="font-size:9px;color:var(--muted)">✓ ${doneItems}/${checkItems.length}</span>` : ""}
         ${cmtCount ? `<span style="font-size:9px;color:var(--muted)">💬 ${cmtCount}</span>` : ""}
       </div>
@@ -97,6 +100,7 @@ function rTaskListRow(t: Task, isArchived: boolean = false): string {
     </div>
   </div>
   <div class="note-meta" style="margin-top:4px">
+    ${dlStatus ? `<span class="note-deadline" style="color:${dlColor}">${esc(dlLabel)}</span>` : ""}
     <span>Skapad ${fmtD(t.created_at)} av ${esc(t.created_by || "")}</span>
     ${t.start_date ? `<span>· start ${fmtDateOnly(t.start_date)}</span>` : ""}
   </div>
