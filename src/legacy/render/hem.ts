@@ -9,9 +9,6 @@
 // ============================================================
 function rHem(): string {
   const hp = notes.list.filter(n => n.priority === "hög" && n.status !== "klar");
-  const today = notes.list.filter(n =>
-    new Date(n.created_at).toDateString() === new Date().toDateString()
-  );
   const deadlineUrgent = notes.list.filter(n =>
     n.status !== "klar" && n.deadline &&
     (deadlineStatus(n.deadline) === "urgent" ||
@@ -42,9 +39,10 @@ function rHem(): string {
 <input type="file" id="quick-photo-file" accept="image/*" capture="environment" style="display:none" onchange="quickPhotoNote(this)">
 
 <div class="desktop-grid">
-  <div class="card">
+  <div class="card note-compose">
     <div class="lbl">NY ANTECKNING</div>
     <textarea id="note-input" rows="3" placeholder="Beskriv vad du observerat... (t.ex. 'Kravallstaket rad 3 trasig fot, brådskande')"></textarea>
+    <div class="note-extra">
     <label class="field-label">KATEGORI (auto)</label>
     <select id="note-cat">${Object.entries(CATS).filter(([k]) => k !== "intern" || INTERN_USERS.includes(auth.user || "")).map(([k, v]) => `<option value="${k}">${v.emoji} ${v.label}</option>`).join("")}</select>
     <label class="field-label">PRIORITET (auto)</label>
@@ -63,6 +61,7 @@ function rHem(): string {
     </div>
     <input type="file" id="img-file" accept="image/*" capture="environment" style="display:none" onchange="handleImg(this)">
     <button class="btn mt" style="width:100%" onclick="addNote()" id="add-btn">LÄGG TILL →</button>
+    </div>
   </div>
   <div>
     ${hp.length ? `<div class="alert"><div class="alert-title">🔴 HÖG PRIORITET (${hp.length})</div>${
@@ -89,12 +88,5 @@ function rHem(): string {
       </div>`).join("")
     }</div>
   </div>
-</div>
-<div class="lbl mt">IDAG (${today.length})</div>
-<div class="note-list">
-  ${today.length === 0
-    ? `<div class="empty">Inga anteckningar idag</div>`
-    : today.slice(0, 8).map(n => rCard(n)).join("")
-  }
 </div>`;
 }

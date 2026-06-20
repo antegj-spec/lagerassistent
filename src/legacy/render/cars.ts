@@ -10,45 +10,49 @@
 
 function rCarJournal(): string {
   const activeCars = cars.list.filter(c => c.active);
-  // Öppna (pågående) resor visas som banner högst upp, inte i listan.
-  const allTrips = cars.trips.filter(t => t.status !== "open");
+  // Öppna (pågående) resor visas som banner högst upp.
   const ongoing = cars.trips.filter(t => t.status === "open");
+  // Avslutade resor delas i "att fylla i" (oförklarade luckor) och vanliga
+  // tidigare resor. Bara pågående + luckor visas som standard; resten ligger
+  // bakom en utfällbar "Visa tidigare resor"-knapp.
+  const closed = cars.trips.filter(t => t.status !== "open");
+  const needsFill = closed.filter(t => t.needs_purpose);
+  const pastTrips = closed.filter(t => !t.needs_purpose);
 
-  // Filter-state (lightweight, in-memory — inte i ui-store):
-  // hanteras via DOM-läsning inom render-cycle.
+  // Gap-detektion per bil på ALLA avslutade resor — luckor ska alltid synas,
+  // oavsett om "tidigare resor" är utfällt eller filtrerat.
+  const gapsByCar: Record<string, ReturnType<typeof detectTripGaps>> = {};
+  for (const cid of Array.from(new Set(closed.map(t => t.car_id)))) {
+    gapsByCar[cid] = detectTripGaps(closed.filter(t => t.car_id === cid));
+  }
+  const gaps = Object.values(gapsByCar).flat();
+  const fillCount = gaps.length + needsFill.length;
+
+  // Filter gäller bara "tidigare resor"-listan. Läses från DOM inom render-
+  // cykeln (samma mönster som tidigare). Utfällt-läget läses också från DOM så
+  // sektionen stannar öppen när man byter filter.
+  const showPast     = (document.getElementById("cj-past-toggle")  as HTMLDetailsElement | null)?.open || false;
   const filterCar    = (document.getElementById("cj-filter-car")    as HTMLSelectElement | null)?.value || "";
   const filterDriver = (document.getElementById("cj-filter-driver") as HTMLSelectElement | null)?.value || "";
   const filterPriv   = (document.getElementById("cj-filter-priv")   as HTMLSelectElement | null)?.value || "alla";
   const filterFuel   = (document.getElementById("cj-filter-fuel")   as HTMLInputElement | null)?.checked || false;
   const filterMonth  = (document.getElementById("cj-filter-month")  as HTMLInputElement | null)?.value || "";
 
-  let visible = allTrips;
-  if (filterCar)    visible = visible.filter(t => t.car_id === filterCar);
-  if (filterDriver) visible = visible.filter(t => t.driver === filterDriver);
-  if (filterPriv === "privat") visible = visible.filter(t => t.is_private);
-  if (filterPriv === "tjänst") visible = visible.filter(t => !t.is_private);
-  if (filterFuel)   visible = visible.filter(t => t.is_fueling);
-  if (filterMonth)  visible = visible.filter(t => t.trip_date.startsWith(filterMonth));
-
-  // Gap-detektion per bil (på FILTERED tripset så vi inte visar luckor
-  // användaren inte ser).
-  const gapsByCar: Record<string, ReturnType<typeof detectTripGaps>> = {};
-  const carsInView = Array.from(new Set(visible.map(t => t.car_id)));
-  for (const cid of carsInView) {
-    const tripsForCar = allTrips.filter(t => t.car_id === cid);
-    gapsByCar[cid] = detectTripGaps(tripsForCar);
-  }
-  // Flata gap-listan + filtrera så de bara visas om båda resor är synliga.
-  const visibleSet = new Set(visible.map(t => t.id));
-  const visibleGaps = Object.values(gapsByCar).flat().filter(
-    g => visibleSet.has(g.prev.id) && visibleSet.has(g.next.id)
-  );
+  let visiblePast = pastTrips;
+  if (filterCar)    visiblePast = visiblePast.filter(t => t.car_id === filterCar);
+  if (filterDriver) visiblePast = visiblePast.filter(t => t.driver === filterDriver);
+  if (filterPriv === "privat") visiblePast = visiblePast.filter(t => t.is_private);
+  if (filterPriv === "tjänst") visiblePast = visiblePast.filter(t => !t.is_private);
+  if (filterFuel)   visiblePast = visiblePast.filter(t => t.is_fueling);
+  if (filterMonth)  visiblePast = visiblePast.filter(t => t.trip_date.startsWith(filterMonth));
 
   const userOpts = ["", ...USERS.filter(u => u !== "Admin")].map(u =>
     `<option value="${esc(u)}" ${u === filterDriver ? "selected" : ""}>${u || "Alla förare"}</option>`
   ).join("");
   const carFilterOpts = `<option value="">Alla bilar</option>` +
     cars.list.map(c => `<option value="${esc(c.id)}" ${c.id === filterCar ? "selected" : ""}>${esc(carLabel(c))}</option>`).join("");
+
+  const nothingAtAll = !ongoing.length && !fillCount && !pastTrips.length;
 
   return `
 <div class="cj-toolbar">
@@ -62,30 +66,36 @@ ${ongoing.length ? `
   ${ongoing.map(rOngoingBanner).join("")}
 </div>` : ""}
 
-<div class="cj-filters">
-  <select id="cj-filter-car" onchange="render()">${carFilterOpts}</select>
-  <select id="cj-filter-driver" onchange="render()">${userOpts}</select>
-  <select id="cj-filter-priv" onchange="render()">
-    <option value="alla" ${filterPriv === "alla" ? "selected" : ""}>Privat + Tjänst</option>
-    <option value="tjänst" ${filterPriv === "tjänst" ? "selected" : ""}>Endast tjänst</option>
-    <option value="privat" ${filterPriv === "privat" ? "selected" : ""}>Endast privat</option>
-  </select>
-  <input type="month" id="cj-filter-month" value="${escAttr(filterMonth)}" onchange="render()">
-  <label class="cj-filter-checkbox">
-    <input type="checkbox" id="cj-filter-fuel" ${filterFuel ? "checked" : ""} onchange="render()"> Bara tankningar
-  </label>
-</div>
+${fillCount ? `
+<div class="lbl">⚠ ATT FYLLA I (${fillCount})</div>
+${gaps.length ? `<div class="cj-gap-list">${gaps.map(g => rGapCard(g)).join("")}</div>` : ""}
+${needsFill.map(rTripCard).join("")}` : ""}
 
-${visibleGaps.length ? `
-<div class="cj-gap-list">
-  ${visibleGaps.map(g => rGapCard(g)).join("")}
-</div>` : ""}
-
-<div class="lbl">${visible.length} ${visible.length === 1 ? "RESA" : "RESOR"}</div>
-
-${visible.length === 0
-  ? `<div class="empty">Inga resor matchar filtret.${!allTrips.length && activeCars.length ? "<br><br>Klicka <b>+ NY RESA</b> för att börja." : ""}${!activeCars.length ? "<br><br>Inga bilar i registret än." + (auth.isAdmin ? " Klicka <b>⚙ Bilar</b>." : " Be admin lägga till en.") : ""}</div>`
-  : visible.map(rTripCard).join("")}
+${nothingAtAll
+  ? `<div class="empty">${activeCars.length
+      ? "Inga resor än.<br><br>Klicka <b>+ INLED RESA</b> för att börja."
+      : "Inga bilar i registret än." + (auth.isAdmin ? " Klicka <b>⚙ Bilar</b>." : " Be admin lägga till en.")}</div>`
+  : pastTrips.length ? `
+<details class="cj-past" id="cj-past-toggle"${showPast ? " open" : ""}>
+  <summary class="cj-past-summary">🕓 Visa tidigare resor (${pastTrips.length})</summary>
+  <div class="cj-filters">
+    <select id="cj-filter-car" onchange="render()">${carFilterOpts}</select>
+    <select id="cj-filter-driver" onchange="render()">${userOpts}</select>
+    <select id="cj-filter-priv" onchange="render()">
+      <option value="alla" ${filterPriv === "alla" ? "selected" : ""}>Privat + Tjänst</option>
+      <option value="tjänst" ${filterPriv === "tjänst" ? "selected" : ""}>Endast tjänst</option>
+      <option value="privat" ${filterPriv === "privat" ? "selected" : ""}>Endast privat</option>
+    </select>
+    <input type="month" id="cj-filter-month" value="${escAttr(filterMonth)}" onchange="render()">
+    <label class="cj-filter-checkbox">
+      <input type="checkbox" id="cj-filter-fuel" ${filterFuel ? "checked" : ""} onchange="render()"> Bara tankningar
+    </label>
+  </div>
+  <div class="lbl">${visiblePast.length} ${visiblePast.length === 1 ? "RESA" : "RESOR"}</div>
+  ${visiblePast.length === 0
+    ? `<div class="empty">Inga resor matchar filtret.</div>`
+    : visiblePast.map(rTripCard).join("")}
+</details>` : ""}
 `;
 }
 

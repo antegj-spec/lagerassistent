@@ -18,9 +18,11 @@ function rInfo(): string {
 function rInfoList(): string {
   const openArticle = info.openId != null ? info.articles.find(a => a.id === info.openId) : null;
   let html = `<button class="btn mb" onclick="startNewInfo()" style="width:100%">+ NYTT FÖRSLAG</button>`;
+
+  // HUVUDDELEN: bara publicerade artiklar (is_pinned === true), per kategori.
   Object.entries(INFO_CATS).forEach(([catName, catCfg]) => {
-    const articles = info.articles.filter(a => a.category === catName);
-    const isOpen = openArticle?.category === catName;
+    const articles = info.articles.filter(a => a.category === catName && a.is_pinned);
+    const isOpen = openArticle?.category === catName && !!openArticle?.is_pinned;
     const header = `<summary class="info-cat-header" style="color:${catCfg.color}">
         <span class="info-cat-caret">▸</span>
         <span class="info-cat-label">${catCfg.emoji} ${esc(catName.toUpperCase())}</span>
@@ -33,14 +35,27 @@ function rInfoList(): string {
       </details>`;
       return;
     }
-    const pinned = articles.filter(a => a.is_pinned);
-    const suggestions = articles.filter(a => !a.is_pinned);
     html += `<details class="info-cat-section"${isOpen ? " open" : ""}>
       ${header}
-      ${pinned.map(a => rInfoListItem(a, catCfg)).join("")}
-      ${suggestions.map(a => rInfoListItem(a, catCfg)).join("")}
+      ${articles.map(a => rInfoListItem(a, catCfg)).join("")}
     </details>`;
   });
+
+  // FÖRSLAG: alla ej-publicerade artiklar, i en egen sektion separat från
+  // huvuddelen. Admin kan flytta in dem i huvuddelen (publishInfoArticle).
+  const suggestions = info.articles.filter(a => !a.is_pinned);
+  const suggOpen = !!(openArticle && !openArticle.is_pinned);
+  html += `<details class="info-suggest-section"${suggOpen ? " open" : ""}>
+    <summary class="info-suggest-header">
+      <span class="info-cat-caret">▸</span>
+      <span class="info-cat-label">💡 Förslag att granska</span>
+      <span class="info-cat-count">${suggestions.length}</span>
+    </summary>
+    ${suggestions.length === 0
+      ? `<div class="info-empty">Inga förslag just nu</div>`
+      : suggestions.map(a => rInfoSuggestItem(a)).join("")}
+  </details>`;
+
   return html;
 }
 
@@ -49,13 +64,26 @@ function rInfoListItem(a: InfoArticle, catCfg: { emoji: string; color: string })
   const imgCount = (info.images[a.id] || []).length;
   const cmtCount = (info.comments[a.id] || []).length;
   return `<div class="info-list-item${active}" onclick="openInfo(${a.id})" style="border-left-color:${catCfg.color}">
-    <div class="info-list-title">
-      ${a.is_pinned ? `<span class="info-pin">📌</span>` : `<span class="info-suggest">💡 Förslag</span>`}
-      ${esc(a.title)}
-    </div>
+    <div class="info-list-title">${esc(a.title)}</div>
     <div class="info-list-meta">
       ${esc(a.created_by || "")}${imgCount ? ` · 📷 ${imgCount}` : ""}${cmtCount ? ` · 💬 ${cmtCount}` : ""}
     </div>
+  </div>`;
+}
+
+// Förslags-rad: visar målkategori som ledtråd + admin-knapp för att flytta in
+// förslaget i huvuddelen.
+function rInfoSuggestItem(a: InfoArticle): string {
+  const active = info.openId === a.id ? " active" : "";
+  const catCfg = INFO_CATS[a.category] || INFO_CATS.Utrustning;
+  const imgCount = (info.images[a.id] || []).length;
+  const cmtCount = (info.comments[a.id] || []).length;
+  return `<div class="info-list-item${active}" onclick="openInfo(${a.id})" style="border-left-color:${catCfg.color}">
+    <div class="info-list-title">${esc(a.title)}</div>
+    <div class="info-list-meta">
+      ${catCfg.emoji} ${esc(a.category)} · ${esc(a.created_by || "")}${imgCount ? ` · 📷 ${imgCount}` : ""}${cmtCount ? ` · 💬 ${cmtCount}` : ""}
+    </div>
+    ${auth.isAdmin ? `<button class="info-promote-btn" onclick="event.stopPropagation();publishInfoArticle(${a.id})">⬆ Flytta till huvuddelen</button>` : ""}
   </div>`;
 }
 
@@ -66,7 +94,7 @@ function rInfoContent(): string {
       <div style="font-size:48px;margin-bottom:10px">📖</div>
       <div style="font-family:var(--display);font-size:18px;margin-bottom:6px">VÄLJ EN ARTIKEL</div>
       <div style="font-size:12px;color:var(--muted);max-width:300px;text-align:center;line-height:1.6">
-        Klicka på en artikel i listan, eller lägg till ett nytt förslag. Alla kan föreslå artiklar och bilder — Admin fäster det som ska bli officiellt.
+        Klicka på en artikel i listan, eller lägg till ett nytt förslag. Alla kan föreslå artiklar och bilder — Admin flyttar det som ska bli officiellt till huvuddelen.
       </div>
     </div>`;
   }
@@ -85,13 +113,13 @@ function rInfoArticle(a: InfoArticle): string {
   return `
 <div class="info-article-head">
   <div style="flex:1">
-    <div class="info-art-cat" style="color:${catCfg.color}">${catCfg.emoji} ${esc(a.category.toUpperCase())} ${a.is_pinned ? `· 📌 FÄST` : `· 💡 FÖRSLAG`}</div>
+    <div class="info-art-cat" style="color:${catCfg.color}">${catCfg.emoji} ${esc(a.category.toUpperCase())}${a.is_pinned ? "" : ` · 💡 FÖRSLAG`}</div>
     <div class="info-art-title">${esc(a.title)}</div>
     <div class="info-art-meta">av ${esc(a.created_by || "okänd")} · ${fmtD(a.created_at)}${a.updated_at && a.updated_at !== a.created_at ? ` · uppdaterad ${fmtD(a.updated_at)}` : ""}</div>
   </div>
   <div class="info-art-actions">
-    ${auth.isAdmin && !a.is_pinned ? `<button class="btn" onclick="pinInfoArticle(${a.id})">📌 FÄST</button>` : ""}
-    ${auth.isAdmin && a.is_pinned ? `<button class="btn-ghost" onclick="unpinInfoArticle(${a.id})">Avfäst</button>` : ""}
+    ${auth.isAdmin && !a.is_pinned ? `<button class="btn" onclick="publishInfoArticle(${a.id})">⬆ Flytta till huvuddelen</button>` : ""}
+    ${auth.isAdmin && a.is_pinned ? `<button class="btn-ghost" onclick="unpublishInfoArticle(${a.id})">↩ Gör till förslag</button>` : ""}
     ${canEdit ? `<button class="btn-ghost" onclick="startEditInfo(${a.id})">✎ Redigera</button>` : ""}
     ${auth.isAdmin ? `<button class="btn-ghost danger" onclick="doDelInfoArticle(${a.id})">🗑</button>` : ""}
   </div>

@@ -41,6 +41,7 @@ declare global {
   type AllocationKind = D.AllocationKind;
   type AllocationStatus = D.AllocationStatus;
   type Return = D.Return;
+  type ReturnItem = D.ReturnItem;
   type Task = D.Task;
   type TaskStatusLog = D.TaskStatusLog;
   type TaskComment = D.TaskComment;

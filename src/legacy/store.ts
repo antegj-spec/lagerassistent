@@ -78,6 +78,7 @@ interface MaterialsState {
 interface ReturnsState {
   list: Return[];                                         // Aktiva returer (ej arkiverade)
   archived: Return[];                                     // Arkiverade returer (admin)
+  items: Record<number, ReturnItem[]>;                   // { returnId: [materialrader] }
 }
 
 interface TasksState {
@@ -187,6 +188,7 @@ const appState: AppState = {
   returns: {
     list: [],
     archived: [],
+    items: {},
   },
   tasks: {
     list: [],
@@ -264,6 +266,7 @@ function resetAppState(): void {
   // Returns
   returns.list = [];
   returns.archived = [];
+  returns.items = {};
   // Tasks
   tasks.list = [];
   tasks.archived = [];

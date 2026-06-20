@@ -374,6 +374,9 @@ function rMatDetail(m: Material): string {
   const borrowed = materials.borrowed[m.id] || [];
   const matImages = materials.images[m.id] || [];
   const matLevelComments = (materials.comments[m.id] || []).filter(c => !c.item_id);
+  // Historiken ligger bakom en utfällbar knapp (default kollapsad). Öppet-läget
+  // läses från DOM så det överlever en re-render (samma mönster som cj-past).
+  const histOpen = (document.getElementById("mat-history-toggle") as HTMLDetailsElement | null)?.open || false;
 
   let body = m.is_article_based ? rMatItemsView(m) : rMatCountsView(m);
 
@@ -466,25 +469,28 @@ ${m.info_text ? `<div class="card">
   </div>
 </div>
 
-<!-- HISTORIK -->
-<div class="card">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <div class="lbl" style="margin:0">SENASTE UPPDATERINGAR</div>
-    <button class="btn-ghost" onclick="reloadMatHistory(${m.id})">↻ Uppdatera</button>
+<!-- HISTORIK (bakom utfällbar knapp, default kollapsad) -->
+<details class="mat-history" id="mat-history-toggle"${histOpen ? " open" : ""}>
+  <summary class="mat-history-summary">🕓 Visa historik${history.length ? ` (${history.length})` : ""}</summary>
+  <div class="card" style="margin-top:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div class="lbl" style="margin:0">SENASTE UPPDATERINGAR</div>
+      <button class="btn-ghost" onclick="reloadMatHistory(${m.id})">↻ Uppdatera</button>
+    </div>
+    ${history.length === 0
+      ? `<div style="font-size:12px;color:var(--muted)">Ingen historik än</div>`
+      : history.slice(0, 15).map(h => {
+          const oldS = h.old_status ? MAT_STATS[h.old_status]?.label || h.old_status : "";
+          const newS = h.new_status ? MAT_STATS[h.new_status]?.label || h.new_status : "";
+          return `<div style="background:var(--bg);border-left:2px solid var(--border);padding:8px 10px;margin-bottom:4px;border-radius:0 6px 6px 0">
+            <div style="font-size:12px">${h.article_id ? `<b>${esc(h.article_id)}</b>: ` : ""}${oldS ? esc(oldS) + " → " : ""}<b>${esc(newS)}</b>${h.count_change ? ` (${h.count_change > 0 ? "+" : ""}${h.count_change})` : ""}</div>
+            ${h.comment ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(h.comment)}</div>` : ""}
+            <div style="font-size:10px;color:var(--dim);margin-top:3px">${esc(h.changed_by)} · ${fmtD(h.created_at)}</div>
+          </div>`;
+        }).join("")
+    }
   </div>
-  ${history.length === 0
-    ? `<div style="font-size:12px;color:var(--muted)">Ingen historik än</div>`
-    : history.slice(0, 15).map(h => {
-        const oldS = h.old_status ? MAT_STATS[h.old_status]?.label || h.old_status : "";
-        const newS = h.new_status ? MAT_STATS[h.new_status]?.label || h.new_status : "";
-        return `<div style="background:var(--bg);border-left:2px solid var(--border);padding:8px 10px;margin-bottom:4px;border-radius:0 6px 6px 0">
-          <div style="font-size:12px">${h.article_id ? `<b>${esc(h.article_id)}</b>: ` : ""}${oldS ? esc(oldS) + " → " : ""}<b>${esc(newS)}</b>${h.count_change ? ` (${h.count_change > 0 ? "+" : ""}${h.count_change})` : ""}</div>
-          ${h.comment ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(h.comment)}</div>` : ""}
-          <div style="font-size:10px;color:var(--dim);margin-top:3px">${esc(h.changed_by)} · ${fmtD(h.created_at)}</div>
-        </div>`;
-      }).join("")
-  }
-</div>`;
+</details>`;
 }
 
 // ---- ARTIKELBASERAD VY (lista över artiklar) ----

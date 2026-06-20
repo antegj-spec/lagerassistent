@@ -16,6 +16,9 @@ public/js/
 # Supabase CLI lokal state (per-maskin) — Fas 6 M4 cleanup glömdes
 supabase/.temp/
 
+# Dev-server-logg (lokal)
+dev-server.log
+
 # OS
 .DS_Store
 Thumbs.db
