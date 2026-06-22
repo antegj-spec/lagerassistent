@@ -74,7 +74,10 @@ Deno.serve(async (req) => {
     return json(401, { error: "Unauthorized" }, origin);
   }
 
-  const userName = (user.user_metadata?.user_name as string | undefined)?.trim();
+  // Läs identiteten ur app_metadata (service-role-only) — INTE user_metadata,
+  // som är användarskrivbar. Annars kunde en användare sätta sitt eget
+  // user_metadata.user_name = "Admin" och byta admins PIN. (Säkerhetshärdning K1.)
+  const userName = (user.app_metadata?.user_name as string | undefined)?.trim();
   if (!userName) {
     return json(401, { error: "Unauthorized — no user_name claim" }, origin);
   }

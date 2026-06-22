@@ -53,7 +53,8 @@ async function getUserNameFromJwt(authHeader: string): Promise<string | null> {
     });
     if (!r.ok) return null;
     const u = await r.json();
-    return u?.user_metadata?.user_name || null;
+    // app_metadata (service-role-only), inte user_metadata (användarskrivbar). K1.
+    return u?.app_metadata?.user_name || null;
   } catch (e) {
     return null;
   }
