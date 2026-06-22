@@ -104,9 +104,22 @@ Detta funkar eftersom `tsconfig.legacy.json` har `module: "none"` — alla filer
 
 All Supabase calls go through the `sb<T>(path, opts)` wrapper in `supabase.ts`, which adds auth headers using the JWT from sessionStorage (anon key as fallback pre-login).
 
+## Database migrations
+
+Two eras:
+- **`migrations/001–032`** — pre-CLI archive. Applied manually in the Supabase SQL Editor; kept for history + rollback notes. Not tracked by the CLI.
+- **`supabase/migrations/<timestamp>_name.sql`** — current. Applied with the Supabase CLI (`supabase db push`) and tracked in the remote `schema_migrations` table.
+
+Workflow for a new migration:
+1. `supabase migration new <name>` (or create `supabase/migrations/<timestamp>_<name>.sql`)
+2. `supabase db push --linked --dry-run` to preview, then without `--dry-run` to apply
+3. `supabase migration list` to confirm Local = Remote
+
+Credentials live in gitignored **`.env.local`**: `SUPABASE_ACCESS_TOKEN` (API ops + function deploys) and `SUPABASE_DB_PASSWORD` (raw, single-quoted — for `db push`). The CLI reads both from env. Keep migrations **idempotent** (`create ... if not exists`, `create or replace`, `drop ... if exists`). Edge Functions deploy separately (not via git/Netlify): `supabase functions deploy <name> --project-ref tzidalknfoumoknhsetx`.
+
 ## Users and roles
 
-Users are hardcoded in `config.ts` (`USERS` array). Role distinction comes from JWT `user_metadata.role` (set by `verify-pin` Edge Function during login). Admin-only features: Export tab, Trash tab, AI chat tab, archived tasks/returns, and setting item status to "tillgänglig".
+Users are hardcoded in `config.ts` (`USERS` array). **Role and identity come from the JWT `app_metadata`** (`app_metadata.user_name` / `app_metadata.role`), set by the `verify-pin` Edge Function with the service-role key. **Never trust `user_metadata`** — it is user-writable, and reading identity from it was a critical auth-bypass (fixed in migration 032; RLS helper `current_user_name()` now reads `app_metadata`; see `docs/SECURITY_HARDENING.md`). Admin-only features: Export tab, Trash tab, AI chat tab, archived tasks/returns, and setting item status to "tillgänglig".
 
 ## XSS safety
 
