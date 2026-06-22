@@ -3,11 +3,10 @@
 // Fas 1, steg 1.4 — säker PIN-verifiering med bcrypt + lockout
 //
 // Säkerhetshärdning (K1 + H3):
-//  K1) Identiteten skrivs till APP_METADATA (service-role-only), inte bara
-//      user_metadata. RLS-helpern current_user_name() läser app_metadata
-//      (migration 032), vilket gör identiteten omöjlig att förfalska från
-//      klienten. user_metadata sätts fortfarande parallellt under övergången
-//      (bakåtkompatibilitet tills helpern flippats + alla loggat om).
+//  K1) Identiteten skrivs ENBART till APP_METADATA (service-role-only).
+//      RLS-helpern current_user_name() läser app_metadata (migration 032),
+//      vilket gör identiteten omöjlig att förfalska från klienten. Vi sätter
+//      INTE user_metadata (det är användarskrivbart och var det kritiska hålet).
 //  H3) Per-IP rate limiting via login_attempts-tabellen (migration 033) —
 //      stoppar brute-force som sprids över flera konton från samma IP.
 //
@@ -207,11 +206,9 @@ Deno.serve(async (req) => {
       .update({ failed_attempts: 0, locked_until: null })
       .eq("user_name", userName);
 
-    // 7. Skapa anonym session. user_metadata sätts för bakåtkompatibilitet
-    //    under övergången; den AUKTORITATIVA identiteten skrivs i steg 8.
-    const { data: signInData, error: signInErr } = await supabaseAdmin.auth.signInAnonymously({
-      options: { data: { user_name: userName, role } },
-    });
+    // 7. Skapa anonym session. Identiteten skrivs ENBART till app_metadata i
+    //    steg 8 (service-role-only, ej användarskrivbar). Inget user_metadata.
+    const { data: signInData, error: signInErr } = await supabaseAdmin.auth.signInAnonymously();
 
     if (signInErr || !signInData?.session?.user) {
       console.error("Anonymous signin failed:", signInErr);

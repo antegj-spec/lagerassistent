@@ -9,10 +9,11 @@ ut alla användare tillfälligt.
 - ✅ Migration **032** (app_metadata-helper + user_pins-lockdown) applicerad.
 - ✅ Migration **033** (login_throttle) applicerad — nu CLI-spårad i `supabase/migrations/`.
 - ✅ Edge Functions deployade: **verify-pin v7**, **change-pin v6**, **save-push-subscription v3**.
-- ⏳ **Återstår:** merga PR #42 → Netlify deployar frontend (`auth.ts`) + netlify-funktioner
-  (`claude.js`, `send-weekly.js`) + `netlify.toml`-headers. Därefter **omlogin för alla 5**.
-- ⏳ **Senare cleanup:** ta bort `user_metadata`-dubbelskrivningen i verify-pin när alla
-  bär app_metadata (då är identiteten app_metadata-ONLY).
+- ✅ PR #42 + #43 mergade → Netlify deployade frontend (`auth.ts`) + netlify-funktioner
+  (`claude.js`, `send-weekly.js`) + `netlify.toml`-headers.
+- ✅ Cleanup klar: `user_metadata`-dubbelskrivningen borttagen → identitet **app_metadata-ONLY**
+  (verify-pin sätter inget user_metadata; `auth.ts` läser bara app_metadata).
+- ⏳ **Återstår (operativt):** omlogin för alla 5; CSP Report-Only → enforcing efter prod-konsolkoll.
 
 ## TL;DR
 
@@ -49,7 +50,7 @@ blir ofarlig).
 - `supabase/functions/verify-pin/index.ts` — `admin.updateUserById(app_metadata)` + token-refresh
 - `supabase/functions/change-pin/index.ts`, `save-push-subscription/index.ts` — läs app_metadata
 - `netlify/functions/claude.js`, `send-weekly.js` — läs app_metadata
-- `src/legacy/auth.ts` — `restoreSession` läser app_metadata (fallback user_metadata)
+- `src/legacy/auth.ts` — `restoreSession` läser app_metadata (ENBART, efter cleanup)
 
 ### ⚠️ Deploy-ordning (måste följas)
 

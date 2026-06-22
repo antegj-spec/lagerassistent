@@ -132,7 +132,7 @@ NPM-scripts kallar `node node_modules/<bin>/...` direkt — bypassar npm cmd-shi
 1. User skriver PIN på PIN-skärm
 2. `auth.ts:checkPin` POSTar till `https://tzidalknfoumoknhsetx.supabase.co/functions/v1/verify-pin`
 3. Edge Function bcrypt-jämför mot `user_pins.pin_hash`
-4. Vid OK: `signInAnonymously` med `user_name` + `role` i `user_metadata`
+4. Vid OK: `signInAnonymously` + identiteten skrivs till `app_metadata` (service-role, ej användarskrivbar — Säkerhetshärdning K1; tidigare `user_metadata` var en auth-bypass)
 5. Returnerar JWT, sparas i `sessionStorage`
 6. `sb()` skickar JWT istället för anon-key
 7. RLS-policies på alla tabeller binder operations till `current_user_name()` / `is_admin()`
@@ -202,7 +202,7 @@ Edge Functions accepterar:
 ### Helper-funktioner
 
 ```sql
-current_user_name() → text       -- läser JWT user_metadata.user_name
+current_user_name() → text       -- läser JWT app_metadata.user_name (ej user_metadata — K1)
 current_user_role() → text       -- läser från user_roles-tabell
 is_admin() → boolean
 is_intern_or_admin() → boolean
