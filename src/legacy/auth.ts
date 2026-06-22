@@ -379,6 +379,13 @@ async function doChangePin(): Promise<void> {
 // definierad → F5 hamnade alltid på PIN-skärmen.
 
 interface JwtUserResponse {
+  // app_metadata är den auktoritativa källan (sätts av verify-pin med service-
+  // role, kan inte ändras av användaren). user_metadata behålls som fallback
+  // under övergången (Säkerhetshärdning K1).
+  app_metadata?: {
+    user_name?: string;
+    role?: Role;
+  };
   user_metadata?: {
     user_name?: string;
     role?: Role;
@@ -407,8 +414,10 @@ async function restoreSession(): Promise<void> {
     // Token är giltig — läs identity från svaret (källan till sanning),
     // INTE från sessionStorage (kan ha trasslats).
     const u: JwtUserResponse = await r.json();
-    const claimUser = u?.user_metadata?.user_name;
-    const claimRole = u?.user_metadata?.role;
+    // Föredra app_metadata (auktoritativ); fall tillbaka på user_metadata
+    // under övergången tills alla sessioner bär app_metadata.
+    const claimUser = u?.app_metadata?.user_name ?? u?.user_metadata?.user_name;
+    const claimRole = u?.app_metadata?.role ?? u?.user_metadata?.role;
 
     if (!claimUser) {
       // Token utan claims → korrupt session, rensa

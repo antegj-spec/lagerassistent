@@ -70,7 +70,8 @@ async function verifyAdminToken(token) {
     });
     if (!r.ok) return false;
     const u = await r.json();
-    return u?.user_metadata?.role === "admin";
+    // app_metadata (service-role-only), inte user_metadata (användarskrivbar). K1.
+    return u?.app_metadata?.role === "admin";
   } catch (e) {
     return false;
   }
@@ -171,11 +172,17 @@ h1{color:#E8521A;font-size:28px;margin-bottom:4px}
 </body>
 </html>`;
 
-    // Mottagare: 1) explicit i body (UI-input), 2) env WEEKLY_MAIL, 3) fallback
-    let toAddress = process.env.WEEKLY_MAIL || "andreas.glad@eps.net";
+    // Mottagare: default = env WEEKLY_MAIL. En klient-angiven `to` hedras BARA
+    // om den finns i WEEKLY_MAIL_ALLOWLIST (komma-separerad env). Annars kunde
+    // en admin maila sammanfattningen till godtycklig adress (exfiltrering). M3.
+    const defaultTo = process.env.WEEKLY_MAIL || "andreas.glad@eps.net";
+    let toAddress = defaultTo;
+    const allowlist = (process.env.WEEKLY_MAIL_ALLOWLIST || defaultTo)
+      .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
     try {
       const reqBody = event.body ? JSON.parse(event.body) : {};
-      if (reqBody?.to && typeof reqBody.to === "string") toAddress = reqBody.to.trim();
+      const requested = reqBody?.to && typeof reqBody.to === "string" ? reqBody.to.trim() : "";
+      if (requested && allowlist.includes(requested.toLowerCase())) toAddress = requested;
     } catch (_) { /* ignore — använd default */ }
 
     // Avsändare: använd verifierad egen domän om FROM_EMAIL är satt i env,

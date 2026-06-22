@@ -24,3 +24,23 @@
 # [[scheduled-functions]]
 #   name = "send-weekly"
 #   cron = "0 7 * * 1"
+
+
+# ============================================================
+# Säkerhetsheaders (M2). Gäller alla svar.
+#
+# CSP skickas som Report-Only först — appen är full av inline onclick/style +
+# en inline <script> (tema) + Google Fonts, så en enforced CSP kräver
+# 'unsafe-inline'. Report-Only bryter INGET men loggar violations i
+# webbläsarkonsolen. Validera på en deploy-preview, byt sedan nyckeln
+# "Content-Security-Policy-Report-Only" → "Content-Security-Policy" för att
+# tvinga den. X-Frame-Options ger clickjacking-skydd direkt oavsett.
+# ============================================================
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(self), camera=(self), microphone=(), payment=(), usb=(), interest-cohort=()"
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://tzidalknfoumoknhsetx.supabase.co; connect-src 'self' https://tzidalknfoumoknhsetx.supabase.co wss://tzidalknfoumoknhsetx.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"

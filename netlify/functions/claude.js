@@ -75,8 +75,10 @@ exports.handler = async function (event) {
     };
   }
 
-  // Bara admin får använda AI (för kostnad-kontroll)
-  const role = userObj?.user_metadata?.role;
+  // Bara admin får använda AI (för kostnad-kontroll).
+  // Läs roll ur app_metadata (service-role-only), inte user_metadata
+  // (användarskrivbar → annars trivial admin-eskalering). Säkerhetshärdning K1.
+  const role = userObj?.app_metadata?.role;
   if (role !== "admin") {
     return {
       statusCode: 403,
@@ -95,7 +97,32 @@ exports.handler = async function (event) {
   }
 
   try {
-    const body = JSON.parse(event.body);
+    // H2-härdning: vidarebefordra INTE klientens body rakt av (det vore en
+    // oavkortad proxy till Anthropic — obegränsad modell/kostnad om en
+    // admin-JWT läcker). Bygg en saniterad förfrågan: tillåten modell-allowlist,
+    // tak på max_tokens, och bara kända fält skickas vidare.
+    const raw = JSON.parse(event.body) || {};
+
+    const MODEL_ALLOWLIST = ["claude-sonnet-4-5"]; // lägg till nytt id vid modellbyte
+    const MAX_TOKENS_CAP = 2000;
+
+    const model = MODEL_ALLOWLIST.includes(raw.model) ? raw.model : MODEL_ALLOWLIST[0];
+    const max_tokens = Math.min(
+      Number.isFinite(raw.max_tokens) ? raw.max_tokens : MAX_TOKENS_CAP,
+      MAX_TOKENS_CAP,
+    );
+
+    if (!Array.isArray(raw.messages) || raw.messages.length === 0) {
+      return {
+        statusCode: 400,
+        headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+        body: JSON.stringify({ error: "messages krävs" }),
+      };
+    }
+
+    const payload = { model, max_tokens, messages: raw.messages };
+    if (typeof raw.system === "string") payload.system = raw.system;
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -103,7 +130,7 @@ exports.handler = async function (event) {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     });
 
     const data = await response.json();

@@ -13,13 +13,8 @@ const SB_KEY: string = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmF
 
 // ANVÄNDARE
 const USERS: readonly string[] = ["Admin", "Andreas", "Nicklas", "Per", "Johannes"];
-const DEFAULT_PINS: Record<string, string> = {
-  "Admin":    "0987",
-  "Andreas":  "0000",
-  "Nicklas":  "0000",
-  "Per":      "0000",
-  "Johannes": "0000"
-};
+// (DEFAULT_PINS borttagen — oanvänd, och default-PIN:ar hör inte hemma i källkod.
+//  Faktiska PIN:ar ligger bcrypt-hashade i user_pins-tabellen.)
 
 // INSTÄLLNINGAR
 const TRASH_DAYS: number = 30;
