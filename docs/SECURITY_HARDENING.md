@@ -4,6 +4,16 @@ Resultat av en read-only säkerhetsgranskning + åtgärder. Det här dokumentet 
 **runbook + beslutslogg**. Läs deploy-ordningen för K1 noga — fel ordning låser
 ut alla användare tillfälligt.
 
+## Deploy-status (per 2026-06-22)
+
+- ✅ Migration **032** (app_metadata-helper + user_pins-lockdown) applicerad.
+- ✅ Migration **033** (login_throttle) applicerad — nu CLI-spårad i `supabase/migrations/`.
+- ✅ Edge Functions deployade: **verify-pin v7**, **change-pin v6**, **save-push-subscription v3**.
+- ⏳ **Återstår:** merga PR #42 → Netlify deployar frontend (`auth.ts`) + netlify-funktioner
+  (`claude.js`, `send-weekly.js`) + `netlify.toml`-headers. Därefter **omlogin för alla 5**.
+- ⏳ **Senare cleanup:** ta bort `user_metadata`-dubbelskrivningen i verify-pin när alla
+  bär app_metadata (då är identiteten app_metadata-ONLY).
+
 ## TL;DR
 
 | ID | Allvar | Problem | Status |
@@ -69,8 +79,9 @@ Vidarebefordrar inte längre klientens body rakt av. Modell-allowlist
 bara `{model, max_tokens, system, messages}` skickas vidare. Fortsatt admin-gated.
 
 ## H3 — brute-force
-- **Klart:** per-IP-throttling (`migrations/033_login_throttle.sql` + `verify-pin`),
+- **Klart:** per-IP-throttling (`supabase/migrations/…_login_throttle.sql` + `verify-pin`),
   30 försök / 15 min / IP. OBS: delar kontorets-IP flera användare → höj `IP_THRESHOLD` vid behov.
+  (Detta var den första CLI-körda migrationen — `migrations/033` är borttagen, ersatt av CLI-kopian.)
 - **Uppskjutet (rör PIN — medvetet ej gjort nu):**
   - Rotera de 5 PIN-koderna bort från default (`0000`/`0987`).
   - Tvinga PIN-byte för den som har default. First-PIN-skärmen i `index.html` är

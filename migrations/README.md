@@ -21,3 +21,14 @@ SQL-filer som körs manuellt i Supabase SQL Editor i numerisk ordning.
 ## Rollback per migration
 
 Varje fil har en `-- ROLLBACK:` kommentar längst ner med SQL som upphäver ändringen.
+
+## Era-split (CLI sedan 2026-06)
+
+Den här mappen (`migrations/001–032`) är ett **historiskt arkiv** av migrationer som
+kördes **manuellt** i SQL Editor. De är redan applicerade i prod och spåras INTE av
+Supabase-CLI:n.
+
+**Nya migrationer skrivs i `supabase/migrations/`** och körs med `supabase db push`
+(se "Database migrations" i `CLAUDE.md`). CLI:ns historik börjar med
+`login_throttle` (f.d. 033). Om hela schemat någon gång ska kunna återskapas från
+noll: kör `supabase db pull` för att baseline:a nuvarande remote-schema.
