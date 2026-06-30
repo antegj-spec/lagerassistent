@@ -30,6 +30,27 @@ function setEconomyCategoryFilter(cat: string): void {
   render();
 }
 
+// Sök: re-rendera ekonomivyn in i #main och behåll fokus/caret i sökrutan
+// (mönster från setMatSearch() i actions/materials.ts).
+function setEconomySearch(v: string): void {
+  economy.searchQuery = v;
+  const m = document.getElementById("main");
+  if (!m) return;
+  const inp = document.getElementById("eco-search-input") as HTMLInputElement | null;
+  const pos = document.activeElement === inp && inp ? inp.selectionStart : null;
+  m.innerHTML = rEkonomi();
+  if (pos !== null) {
+    const ni = document.getElementById("eco-search-input") as HTMLInputElement | null;
+    if (ni) { ni.focus(); ni.setSelectionRange(pos, pos); }
+  }
+  bindEvents();
+}
+
+function clearEconomySearch(): void {
+  economy.searchQuery = "";
+  render();
+}
+
 // ---- LÄGG TILL / REDIGERA ----
 
 function openAddEconomy(prefill?: { category?: string }): void {
