@@ -118,6 +118,7 @@ interface EconomyState {
   entries: EconomyEntry[];
   year: number;
   categoryFilter: string;     // "alla" eller en kategori-id
+  searchQuery: string;        // fritext-sök på titel + kommentar
 }
 
 interface AppState {
@@ -221,6 +222,7 @@ const appState: AppState = {
     entries: [],
     year: new Date().getFullYear(),
     categoryFilter: "alla",
+    searchQuery: "",
   },
 };
 
@@ -294,6 +296,7 @@ function resetAppState(): void {
   economy.entries = [];
   economy.year = new Date().getFullYear();
   economy.categoryFilter = "alla";
+  economy.searchQuery = "";
 }
 
 function resetUiState(): void {

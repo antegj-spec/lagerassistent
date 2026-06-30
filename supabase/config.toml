@@ -380,6 +380,15 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# verify-pin är LOGIN-endpointen — den anropas innan användaren har någon JWT
+# (frontend skickar bara `apikey`, ingen Authorization-header, se auth.ts). Den
+# MÅSTE därför ha verify_jwt = false, annars stoppar gatewayen varje login med
+# UNAUTHORIZED_NO_AUTH_HEADER innan funktionskoden ens kör. Default (true) kom in
+# vid en CLI-redeploy och slog ut all inloggning.
+# Övriga functions (change-pin, push m.fl.) anropas inloggade → får ha JWT på.
+[functions.verify-pin]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

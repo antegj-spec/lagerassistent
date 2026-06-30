@@ -14,8 +14,15 @@ function rEkonomi(): string {
   const years = getEconomyYears();
   const yearOpts = years.map(y => `<option value="${y}" ${y === economy.year ? "selected" : ""}>${y}</option>`).join("");
   const cf = economy.categoryFilter;
+  const q = economy.searchQuery.trim().toLowerCase();
   const allEntries = economy.entries;
-  const visible = cf === "alla" ? allEntries : allEntries.filter(e => e.category === cf);
+  let visible = cf === "alla" ? allEntries : allEntries.filter(e => e.category === cf);
+  if (q) {
+    visible = visible.filter(e =>
+      e.title.toLowerCase().includes(q) ||
+      (e.comment ? e.comment.toLowerCase().includes(q) : false)
+    );
+  }
 
   // Summor per kategori (på hela året, inte filtered — chips visar totals).
   const sumByCat = ecoSumByCategory(allEntries);
@@ -51,10 +58,17 @@ function rEkonomi(): string {
   <button class="btn" onclick="openAddEconomy()">+ NY UTGIFT</button>
 </div>
 
+<div class="search-box">
+  <input type="text" id="eco-search-input" placeholder="Sök utgift (titel, kommentar)..." value="${escAttr(economy.searchQuery)}" oninput="setEconomySearch(this.value)">
+  ${economy.searchQuery ? `<button class="search-clear" onclick="clearEconomySearch()">×</button>` : ""}
+</div>
+
 ${chips}
 
 ${orderedCats.length === 0
-  ? `<div class="empty">Inga utgifter ${economy.year}${cf !== "alla" ? " i den här kategorin" : ""}.<br><br>Klicka <b>+ NY UTGIFT</b> för att börja.</div>`
+  ? (q
+      ? `<div class="empty">Inga utgifter matchar "${esc(economy.searchQuery)}"${cf !== "alla" ? " i den här kategorin" : ""}.</div>`
+      : `<div class="empty">Inga utgifter ${economy.year}${cf !== "alla" ? " i den här kategorin" : ""}.<br><br>Klicka <b>+ NY UTGIFT</b> för att börja.</div>`)
   : orderedCats.map(cid => rEcoCategorySection(cid, grouped[cid] || [])).join("")}
 
 <div class="eco-totals-footer">
